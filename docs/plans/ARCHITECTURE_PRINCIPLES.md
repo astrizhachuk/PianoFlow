@@ -563,16 +563,352 @@ class MidiRepositoryImpl @Inject constructor(
 }
 ```
 
-## 9. Заключение
+## 9. Вынесение ядра как отдельной библиотеки
+
+### 9.1. Анализ возможности
+
+
+
+Архитектура спроектирована с учетом принципа **независимости ядра от клиента** (см. раздел 2.2), что делает возможным использование Domain-слоя в различных контекстах:
+
+#### Преимущества текущей архитектуры:
+
+1. **Domain-слой независим от платформы**
+   - Не содержит Android-специфичных классов
+   - Использует только чистый Kotlin и стандартные библиотеки
+   - Может быть скомпилирован как Kotlin Multiplatform библиотека
+
+2. **Четкое разделение через интерфейсы**
+   - Repository-интерфейсы определены в Domain-слое
+   - Каждая платформа реализует свои адаптеры для Data-слоя
+   - Use Cases работают только с абстракциями
+
+3. **Возможность переиспользования**
+   - Ядро может быть использовано в Android-приложении
+   - Ядро может быть использовано в Windows-приложении (Kotlin/Native или Kotlin/JVM)
+   - Ядро может быть использовано в веб-приложении (Kotlin/JS или через WebAssembly)
+
+#### Варианты реализации:
+
+**Вариант 1: Kotlin Multiplatform Library**
+- Domain-слой компилируется как KMP-модуль
+- Поддерживает Android, JVM (Windows), JS (Web)
+- Единый код для всех платформ
+
+**Вариант 2: Отдельный Gradle-модуль**
+- Domain-слой выносится в отдельный модуль `:core` или `:domain`
+- Может быть опубликован как библиотека (Maven/Gradle)
+- Каждая платформа подключает библиотеку и реализует свои адаптеры
+
+**Вариант 3: REST API сервис**
+- Ядро работает как backend-сервис
+- Клиенты (Android, Windows, Web) взаимодействуют через REST API
+- Подходит для централизованной обработки и синхронизации данных
+
+### 9.2. Структура для мультиплатформенного использования
+
+При вынесении ядра как библиотеки, структура проекта может выглядеть следующим образом:
+
+```
+pianoflow-core/              # Отдельная библиотека (ядро)
+├── domain/                  # Domain-слой (чистый Kotlin)
+│   ├── model/
+│   ├── usecase/
+│   └── repository/          # Интерфейсы
+└── build.gradle.kts
+
+pianoflow-android/           # Android-приложение
+├── app/
+│   ├── presentation/        # Android UI
+│   └── data/                # Android-адаптеры (Android MIDI API)
+└── build.gradle.kts
+    dependencies {
+        implementation(project(":pianoflow-core"))
+    }
+
+pianoflow-windows/           # Windows-приложение
+├── app/
+│   ├── presentation/         # Desktop UI (Compose Multiplatform)
+│   └── data/                # Windows-адаптеры (Windows MIDI API)
+└── build.gradle.kts
+    dependencies {
+        implementation(project(":pianoflow-core"))
+    }
+
+pianoflow-web/               # Веб-приложение
+├── app/
+│   ├── presentation/        # Web UI (React, Vue, или Compose for Web)
+│   └── data/                # Web-адаптеры (Web MIDI API)
+└── build.gradle.kts
+    dependencies {
+        implementation(project(":pianoflow-core"))
+    }
+```
+
+### 9.3. Адаптеры для разных платформ
+
+Каждая платформа реализует свои адаптеры для работы с MIDI:
+
+| Платформа | MIDI API | Реализация адаптера |
+|-----------|----------|---------------------|
+| **Android** | Android MIDI API (`android.media.midi`) | `AndroidMidiRepositoryImpl` |
+| **Windows** | Windows MIDI API (WinMM или UWP MIDI) | `WindowsMidiRepositoryImpl` |
+| **Web** | Web MIDI API (`navigator.requestMIDIAccess`) | `WebMidiRepositoryImpl` |
+
+Все адаптеры реализуют один и тот же интерфейс `MidiRepository` из Domain-слоя, что обеспечивает единообразное использование ядра на всех платформах.
+
+### 9.4. Схема C4: Контекст и контейнеры
+
+#### C4 Level 1: Системный контекст
+
+```plantuml
+@startuml
+!define RECTANGLE class
+
+title C4 Level 1: Системный контекст - PianoFlow Core
+
+actor "Пользователь" as User
+
+rectangle "Android приложение\nPianoFlow" as AndroidApp {
+}
+
+rectangle "Windows приложение\nPianoFlow" as WindowsApp {
+}
+
+rectangle "Веб-приложение\nPianoFlow" as WebApp {
+}
+
+rectangle "PianoFlow Core\n(Ядро - библиотека)" as Core {
+}
+
+rectangle "MIDI-устройство\n(Пианино/Клавиатура)" as MidiDevice
+
+User --> AndroidApp : Использует
+User --> WindowsApp : Использует
+User --> WebApp : Использует
+
+AndroidApp --> Core : Использует ядро
+WindowsApp --> Core : Использует ядро
+WebApp --> Core : Использует ядро
+
+AndroidApp --> MidiDevice : Подключение через USB
+WindowsApp --> MidiDevice : Подключение через USB
+WebApp --> MidiDevice : Подключение через браузер
+
+@enduml
+```
+
+#### C4 Level 2: Контейнеры
+
+```plantuml
+@startuml
+!define RECTANGLE class
+
+title C4 Level 2: Контейнеры - PianoFlow Core
+
+actor "Пользователь" as User
+
+package "Android приложение" {
+    rectangle "Android UI\n(Activities, Fragments)" as AndroidUI
+    rectangle "Android ViewModels" as AndroidVM
+    rectangle "Android Data Adapters\n(Android MIDI API)" as AndroidData
+}
+
+package "Windows приложение" {
+    rectangle "Desktop UI\n(Compose Multiplatform)" as WindowsUI
+    rectangle "Desktop ViewModels" as WindowsVM
+    rectangle "Windows Data Adapters\n(Windows MIDI API)" as WindowsData
+}
+
+package "Веб-приложение" {
+    rectangle "Web UI\n(React/Vue/Compose)" as WebUI
+    rectangle "Web ViewModels" as WebVM
+    rectangle "Web Data Adapters\n(Web MIDI API)" as WebData
+}
+
+package "PianoFlow Core\n(Библиотека)" {
+    rectangle "Domain Layer\n(Use Cases, Models)" as Domain
+    rectangle "Repository Interfaces" as RepoInterfaces
+}
+
+rectangle "MIDI-устройство" as MidiDevice
+
+User --> AndroidUI
+User --> WindowsUI
+User --> WebUI
+
+AndroidUI --> AndroidVM
+AndroidVM --> Domain
+AndroidVM --> RepoInterfaces
+AndroidData ..> RepoInterfaces : реализует
+AndroidData --> MidiDevice
+
+WindowsUI --> WindowsVM
+WindowsVM --> Domain
+WindowsVM --> RepoInterfaces
+WindowsData ..> RepoInterfaces : реализует
+WindowsData --> MidiDevice
+
+WebUI --> WebVM
+WebVM --> Domain
+WebVM --> RepoInterfaces
+WebData ..> RepoInterfaces : реализует
+WebData --> MidiDevice
+
+note right of Domain
+  Ядро независимо от платформы
+  Чистый Kotlin код
+end note
+
+note right of RepoInterfaces
+  Интерфейсы определены в ядре
+  Каждая платформа реализует свои адаптеры
+end note
+
+@enduml
+```
+
+#### C4 Level 3: Компоненты ядра
+
+```plantuml
+@startuml
+!define RECTANGLE class
+
+title C4 Level 3: Компоненты PianoFlow Core
+
+package "PianoFlow Core (Библиотека)" {
+    
+    package "Domain Layer" {
+        rectangle "Use Cases" as UseCases {
+            [ProcessMidiMessageUseCase]
+            [ConnectMidiDeviceUseCase]
+            [AnalyzePerformanceUseCase]
+            [StartGameSessionUseCase]
+        }
+        
+        rectangle "Domain Models" as Models {
+            [MidiEvent]
+            [Note]
+            [GameSession]
+            [PerformanceAnalysis]
+        }
+        
+        rectangle "Repository Interfaces" as RepoInterfaces {
+            [MidiRepository]
+            [GameRepository]
+        }
+    }
+}
+
+package "Platform Adapters" {
+    rectangle "Android Adapter" as AndroidAdapter {
+        [AndroidMidiRepositoryImpl]
+        [AndroidMidiDataSource]
+    }
+    
+    rectangle "Windows Adapter" as WindowsAdapter {
+        [WindowsMidiRepositoryImpl]
+        [WindowsMidiDataSource]
+    }
+    
+    rectangle "Web Adapter" as WebAdapter {
+        [WebMidiRepositoryImpl]
+        [WebMidiDataSource]
+    }
+}
+
+UseCases --> Models
+UseCases --> RepoInterfaces
+
+AndroidAdapter ..> RepoInterfaces : реализует
+WindowsAdapter ..> RepoInterfaces : реализует
+WebAdapter ..> RepoInterfaces : реализует
+
+note right of UseCases
+  Бизнес-логика
+  Независима от платформы
+end note
+
+note right of RepoInterfaces
+  Абстракции для работы
+  с данными
+end note
+
+@enduml
+```
+
+### 9.5. Пример использования ядра в веб-приложении
+
+Аналогично сайту pianomarvel.com, веб-приложение может использовать Web MIDI API для подключения к MIDI-устройству:
+
+```kotlin
+// Web-адаптер для MIDI
+class WebMidiRepositoryImpl : MidiRepository {
+    private var midiAccess: MIDIAccess? = null
+    
+    override suspend fun getAvailableDevices(): List<MidiDevice> {
+        midiAccess = navigator.requestMIDIAccess().await()
+        return midiAccess!!.inputs.map { it.toDomainModel() }
+    }
+    
+    override fun observeMidiMessages(): Flow<MidiEvent> {
+        return callbackFlow {
+            midiAccess?.inputs?.forEach { input ->
+                input.onmidimessage = { event ->
+                    trySend(event.toDomainModel())
+                }
+            }
+            awaitClose()
+        }
+    }
+}
+
+// Использование в веб-приложении
+class WebMidiViewModel(
+    private val processMidiMessageUseCase: ProcessMidiMessageUseCase,
+    private val midiRepository: MidiRepository
+) {
+    fun startListening() {
+        viewModelScope.launch {
+            midiRepository.observeMidiMessages()
+                .collect { event ->
+                    processMidiMessageUseCase(event)
+                        .onSuccess { note ->
+                            // Обновление UI
+                        }
+                }
+        }
+    }
+}
+```
+
+### 9.6. Преимущества вынесения ядра
+
+1. **Единая бизнес-логика** — одна реализация для всех платформ
+2. **Легкое тестирование** — ядро тестируется независимо от платформы
+3. **Быстрая разработка** — новые функции добавляются один раз в ядро
+4. **Консистентность** — одинаковое поведение на всех платформах
+5. **Переиспользование** — ядро может быть использовано в других проектах
+
+### 9.7. Рекомендации по реализации
+
+1. **Вынести Domain-слой в отдельный модуль** на раннем этапе разработки
+2. **Использовать Kotlin Multiplatform** для поддержки нескольких платформ из одного кода
+3. **Определить четкие интерфейсы** для всех внешних зависимостей (MIDI, хранилище)
+4. **Создать платформо-специфичные адаптеры** для каждой целевой платформы
+5. **Покрыть ядро unit-тестами** для обеспечения качества при переиспользовании
+
+## 10. Заключение
 
 Данная архитектура обеспечивает:
 - **Минимальную связность** между компонентами
 - **Независимость ядра** от Android-специфичных компонентов
 - **Возможность переиспользования** Domain-слоя в других проектах
+- **Мультиплатформенность** — ядро может использоваться в Android, Windows и Web-приложениях
 - **Упрощение тестирования** за счет четкого разделения слоев
 - **Масштабируемость** — легко добавлять новые функции и источники данных
 
-При разработке новых функций необходимо следовать описанным принципам и структуре слоев, чтобы сохранить архитектурную целостность приложения.
+При разработке новых функций необходимо следовать описанным принципам и структуре слоев, чтобы сохранить архитектурную целостность приложения и возможность вынесения ядра как отдельной библиотеки.
 
 ## Связанные документы
 
