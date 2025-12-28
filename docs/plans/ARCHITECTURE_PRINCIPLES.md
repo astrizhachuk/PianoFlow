@@ -929,5 +929,4 @@ class WebMidiViewModel(
 ## Связанные документы
 
 - [Описание приложения](APPLICATION_DESCRIPTION.md) — общее описание PianoFlow
-- [План MIDI-тестирования](MIDI_TEST_PLAN.md) — план реализации MIDI-подключения
 

@@ -66,10 +66,9 @@
 - ✅ Настроена конфигурация сборки (Gradle, Kotlin)
 - ✅ Реализована базовая `MainActivity`
 - ✅ Подготовлена структура ресурсов (layouts, themes)
-- 🔄 Планируется реализация MIDI-подключения (см. [MIDI_TEST_PLAN.md](MIDI_TEST_PLAN.md) и [USB_MIDI_KEYBOARD.md](../uc/USB_MIDI_KEYBOARD.md))
+- 🔄 Планируется реализация MIDI-подключения (см. [USB_MIDI_KEYBOARD.md](../uc/USB_MIDI_KEYBOARD.md))
 
 ## Связанные документы
 
-- [План быстрой проверки MIDI-подключения](MIDI_TEST_PLAN.md) — описание шагов для реализации подключения к MIDI-устройствам
 - [Use case: USB MIDI клавиатура](../uc/USB_MIDI_KEYBOARD.md) — описание сценария использования приложения с USB MIDI-клавиатурой
 

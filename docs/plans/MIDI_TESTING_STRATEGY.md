@@ -599,5 +599,4 @@ class VirtualMidiDeviceHelper(
 
 - [Use Cases для USB MIDI-клавиатуры](../uc/USB_MIDI_KEYBOARD.md) — описание функциональных требований
 - [Архитектурные принципы](ARCHITECTURE_PRINCIPLES.md) — структура приложения
-- [План MIDI-тестирования](MIDI_TEST_PLAN.md) — план реализации подключения
 
