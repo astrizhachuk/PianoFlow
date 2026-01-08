@@ -7,9 +7,7 @@ plugins {
 
 android {
     namespace = "com.astrizhachuk.pianoflow"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.astrizhachuk.pianoflow"
