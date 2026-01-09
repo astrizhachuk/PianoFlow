@@ -1,99 +1,183 @@
-# Техническое задание: Реализация уведомлений о состоянии подключения MIDI-клавиатуры
+# Техническое задание: Реализация механизма уведомлений пользователя
 
 ## 1. Общая информация
 
-**Дата реализации:** 2024-12-28  
-**Версия:** 1.0  
-**Статус:** ✅ Реализовано и протестировано
-
 ### 1.1. Цель доработки
 
-Реализация функционала отображения уведомлений для пользователя о состоянии подключения USB MIDI-клавиатуры.
+Реализовать универсальный, переиспользуемый компонент для асинхронной отправки и отображения уведомлений пользователю (например, Toast/Snackbar).
 
 ### 1.2. Базовые документы
 
-- [Техническое задание: Отслеживание подключения USB MIDI-клавиатуры](./MIDI_CONNECTION.md) — основное техническое задание по подключению
-- [Use Cases: USB MIDI клавиатура](../uc/USB_MIDI_KEYBOARD.md) — описание функциональных требований
-- [Архитектурные принципы](../plans/ARCHITECTURE_PRINCIPLES.md) — принципы проектирования
+- [Архитектурные принципы](../plans/ARCHITECTURE_PRINCIPLES.md)
+- [Сценарии: Отслеживание состояния и уведомления](../uc/MIDI_KEYBOARD_CONNECTION_STATE.md)
+- [Техническое задание: Отслеживание подключения USB MIDI-клавиатуры](./MIDI_CONNECTION.md)
 
-## 2. Реализованный Use Case
+## 2. Архитектурное решение
 
-### 2.1. UC-002: Отображение уведомлений о состоянии подключения
+### 2.1. Компоненты
 
-**Статус:** ✅ Реализовано (упрощенная версия через Toast)
+Для уведомления пользователя в приложении вводится механизм, состоящий из следующих компонентов в `Presentation Layer`:
 
-**Реализованные сценарии:**
-- ✅ Преобразование состояний подключения в понятные сообщения
-- ✅ Отображение сообщения "MIDI-клавиатура подключена" при успешном подключении
-- ✅ Отображение сообщения "MIDI-клавиатура отключена" при отключении
-- ✅ Отображение понятных сообщений об ошибках для всех типов ошибок
-- ✅ Отображение сообщений только при изменении состояния
+*   `UserNotifier` (интерфейс) и `UserNotifierImpl` (реализация): Обеспечивают асинхронную передачу UI-событий от `ViewModel` к `View` (`Activity`/`Fragment`) по принципу "издатель-подписчик".
+*   `UserMessage`: Модель данных для сообщения, отображаемого пользователю.
+*   `NotificationModule`: Hilt-модуль, который предоставляет зависимость `UserNotifier` для использования в других компонентах.
 
-**Реализованные компоненты:**
-- `ShowConnectionNotificationUseCase` — Use Case для формирования сообщений
-- `NotificationMessage` — доменная модель сообщения
-- `MidiException` — иерархия исключений для различных типов ошибок
-- Отображение через `Toast` (упрощенная реализация)
-
-**Примечание:** Изначально планировалось использование системных уведомлений, но для упрощения реализации было решено использовать Toast. В будущем можно легко заменить на другой способ отображения.
-
-## 3. Архитектурные решения
-
-Реализация основана на общих архитектурных принципах проекта, описанных в [основном ТЗ](./MIDI_CONNECTION.md).
-
-Ключевые компоненты, задействованные в данном use case:
-
-- **`ShowConnectionNotificationUseCase` (Domain Layer):** Отвечает за преобразование `ConnectionState` в человеко-читаемое `NotificationMessage`. Не зависит от Android.
-- **`MidiConnectionViewModel` (Presentation Layer):** Использует `ShowConnectionNotificationUseCase` для получения сообщения и отображает его пользователю через `Toast`.
-- **`NotificationMessage` (Domain Layer):** Доменная модель, представляющая сообщение для пользователя.
-- **`MidiException` (Domain Layer):** Иерархия исключений, которая используется для создания информативных сообщений об ошибках.
-
-## 4. UML Диаграммы
-
-Для полного понимания взаимодействия компонентов, пожалуйста, обратитесь к диаграммам в [основном техническом задании](./MIDI_CONNECTION.md).
-
-Ниже представлена упрощенная диаграмма классов, относящихся к данному функционалу.
+Этот механизм позволяет `ViewModel` отправлять сообщения, не имея прямой ссылки на `View`, что соответствует принципам чистой архитектуры.
 
 ```plantuml
 @startuml
-!theme plain
-skinparam classAttributeIconSize 0
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-package "Domain Layer" {
-    class ShowConnectionNotificationUseCase {
-        + invoke(state: ConnectionState): NotificationMessage?
-        - getErrorMessage(exception: MidiException): String
-    }
-    
-    class ConnectionState <<sealed>> {
-        + Disconnected
-        + Connecting
-        + Connected(device: MidiDevice)
-        + Error(exception: MidiException)
-    }
+title C4 - Уровень 3: Компоненты механизма уведомлений
 
-    class NotificationMessage {
-        + message: String
-        + type: NotificationType
-    }
+Container_Boundary(presentation, "Presentation Layer") {
+    Component(vm, "MidiConnectionViewModel", "ViewModel", "Формирует и отправляет сообщение.")
+    Component(ui, "MainActivity", "Activity", "Отображает сообщение.")
+
+    Component(notifier, "UserNotifier", "Интерфейс", "Контракт для отправки и получения уведомлений.")
+    Component(impl, "UserNotifierImpl", "Singleton", "Реализация шины событий на SharedFlow.")
+    Component(message, "UserMessage", "Data Class", "Модель данных для UI.")
+    Component(di, "NotificationModule", "Hilt Module", "Предоставляет зависимость UserNotifier.")
+
+    Rel(impl, notifier, "Реализует")
+    Rel(di, notifier, "@Binds")
+
+    Rel(vm, notifier, "Использует для отправки")
+    Rel(ui, notifier, "Использует для подписки")
     
-    class MidiException <<sealed>> {
-         + message: String
-    }
+    Rel(vm, message, "Создает")
+    Rel(notifier, message, "Передает")
+}
+@enduml
+```
+
+### 2.2. API
+
+```kotlin
+// Модель для сообщения пользователю
+data class UserMessage(val text: String)
+
+// Интерфейс для отправки и получения сообщений
+interface UserNotifier {
+    val userMessages: Flow<UserMessage>
+    fun showMessage(message: UserMessage)
+}
+```
+
+### 2.3. Внедрение зависимостей
+
+Чтобы Hilt знал, что при запросе интерфейса `UserNotifier` нужно предоставлять экземпляр класса `UserNotifierImpl`, используется **@Module**.
+
+```kotlin
+// Файл: di/NotificationModule.kt
+@Module
+@InstallIn(SingletonComponent::class)
+interface NotificationModule {
+
+    @Binds
+    fun bindUserNotifier(impl: UserNotifierImpl): UserNotifier
 }
 
-package "Presentation Layer" {
-     class MidiConnectionViewModel {
-        - showConnectionNotificationUseCase: ShowConnectionNotificationUseCase
-        + handleStateChange(state: ConnectionState)
-        - showToast(message: String)
-    }
+// Файл: service/UserNotifierImpl.kt
+@Singleton
+class UserNotifierImpl @Inject constructor() : UserNotifier {
+    // ... реализация ...
+}
+```
+
+*   `@Singleton` на классе `UserNotifierImpl` указывает Hilt, что этот класс должен иметь один экземпляр на все приложение.
+*   `@Binds` в `NotificationModule` связывает запрос `UserNotifier` с его реализацией. Hilt автоматически применяет скоуп `@Singleton` из реализации к этому связыванию.
+
+```plantuml
+@startuml
+title Связывание интерфейса и реализации через Hilt
+
+class UserNotifier <<interface>>
+class UserNotifierImpl <<@Singleton>>
+
+class NotificationModule <<Hilt Module>> {
+  +bindUserNotifier(impl: UserNotifierImpl): UserNotifier
 }
 
-MidiConnectionViewModel --> ShowConnectionNotificationUseCase
-ShowConnectionNotificationUseCase --> ConnectionState
-ShowConnectionNotificationUseCase --> NotificationMessage
-ShowConnectionNotificationUseCase --> MidiException
+UserNotifierImpl .up.|> UserNotifier : реализует
+NotificationModule ..> UserNotifierImpl : предоставляет
+NotificationModule::bindUserNotifier ..> UserNotifier : "(@Binds)"
+@enduml
+```
+
+### 2.4. Реализация UserNotifierImpl
+
+Класс `UserNotifierImpl` использует `MutableSharedFlow` для создания шины событий. Поток сконфигурирован со следующими параметрами:
+
+*   `replay = 0`: Новые подписчики не получают предыдущие сообщения.
+*   `extraBufferCapacity = 1`: Хранит одно сообщение, если подписчик не успевает его обработать.
+*   `onBufferOverflow = BufferOverflow.DROP_OLDEST`: Отбрасывает самое старое сообщение при переполнении буфера.
+
+```plantuml
+@startuml
+title Внутреннее устройство UserNotifierImpl
+
+class UserNotifierImpl {
+  - _userMessages: MutableSharedFlow<UserMessage>
+  + userMessages: Flow<UserMessage>
+  + showMessage(message: UserMessage)
+}
+
+note right of UserNotifierImpl::showMessage
+  Вызов этого метода отправляет
+  сообщение в приватный поток `_userMessages`.
+end note
+
+note right of UserNotifierImpl::userMessages
+  Внешние подписчики получают
+  сообщения из этой публичной,
+  неизменяемой версии потока.
+end note
+@enduml
+```
+
+## 3. Проблема ленивой инициализации и ее решение
+
+### 3.1. Описание проблемы
+
+Делегат `by viewModels()` в Android является **ленивым**. Это означает, что экземпляр `MidiConnectionViewModel` не создается до первого обращения к нему. Так как `MainActivity` напрямую взаимодействовала только с `UserNotifier`, `ViewModel` не создавался, и вся логика отслеживания подключения не запускалась.
+
+### 3.2. Реализованное решение
+
+Для решения этой проблемы реализована **принудительная инициализация `ViewModel`**. В `onCreate` `MainActivity` запускается корутина, которая обращается к `viewModel.connectionState` и начинает собирать этот `Flow`, ничего не делая с результатом (`collect()`). Это обращение служит триггером, который гарантирует создание `MidiConnectionViewModel`.
+
+### 3.3. Диаграмма последовательности инициализации
+
+```plantuml
+@startuml
+title Схема инициализации компонентов
+
+participant "MainActivity" as UI
+participant "MidiConnectionViewModel" as VM
+participant "UserNotifier" as Notifier
+
+UI -> UI : onCreate()
+
+activate UI
+UI -> VM : Обращение к `viewModel.connectionState`
+
+note over UI, VM: Запуск ленивой инициализации ViewModel
+
+activate VM
+VM -> VM : init() (подписка на UseCase)
+deactivate VM
+
+UI -> Notifier : userMessages.collectLatest {..}
+
+note over UI, Notifier: UI начинает слушать сообщения
+
+deactivate UI
 
 @enduml
 ```
+
+## 4. Критерии приемки
+
+- ✅ При подключении MIDI-клавиатуры на экране появляется Toast с сообщением, содержащим ее имя.
+- ✅ При отключении MIDI-клавиатуры на экране появляется Toast с сообщением "MIDI-клавиатура отключена".
+- ✅ Принудительной инициализации `MidiConnectionViewModel` в `MainActivity` гарантирует, что отслеживание подключения запускается при старте приложения.
