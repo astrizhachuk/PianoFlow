@@ -73,6 +73,8 @@ PianoFlow представляет собой тренажер и систему
 - Зависит только от Domain-слоя
 - Не содержит бизнес-логики
 - Использует паттерн MVVM для разделения UI и логики
+- **Использует однонаправленный поток данных (Unidirectional Data Flow - UDF)**: Состояние (UI State) передается из ViewModel в UI, а события от UI передаются в ViewModel для обработки.
+- **UI-состояние инкапсулируется в отдельный объект**: ViewModel предоставляет единый объект состояния (например, `data class`), который содержит все данные для отрисовки экрана. Это состояние передается через `StateFlow`.
 
 **Пример структуры**:
 ```
@@ -216,65 +218,73 @@ class MidiConnectionViewModel(
 }
 ```
 
-### 4.2. Repository Pattern
+### 4.2. Repository Pattern (Слой данных)
 
-**Применение**: Абстракция доступа к данным
+**Применение**: Абстракция доступа к данным в Data Layer.
 
-**Описание**:
-- Интерфейсы Repository определены в Domain-слое
-- Реализации Repository находятся в Data-слое
-- Use Cases работают только с интерфейсами
+**Роль**: Repository является **единым источником истины (Single Source of Truth)** для определенных данных. Он инкапсулирует логику, которая решает, откуда брать данные (из локальной базы данных, из сети, из кэша) и предоставляет их остальной части приложения, в первую очередь Domain-слою.
 
-**Преимущества**:
-- Изоляция Domain-слоя от деталей источников данных
-- Возможность легко заменить источник данных
-- Упрощение тестирования (можно использовать mock-реализации)
+**Основные принципы**:
+- **Инкапсуляция источников данных**: Repository скрывает от `ViewModel` и Use Cases то, как данные хранятся и откуда они получаются.
+- **Предоставление данных**: Данные предоставляются в виде реактивных потоков (например, `Flow<T>`), чтобы UI мог автоматически обновляться при их изменении.
+- **Обработка операций с данными**: Repository содержит методы для чтения, записи, обновления и удаления данных.
+
+**Правила именования**:
+- **Repository**: Именуется по типу данных, за которые он отвечает.
+  - *Пример*: `MidiRepository`, `GameSettingsRepository`.
+- **Data Source**: Именуется с указанием типа данных и его источника.
+  - *Пример*: `MidiRemoteDataSource`, `GameSettingsLocalDataSource`.
 
 **Пример**:
 ```kotlin
 // Domain-слой: интерфейс
 interface MidiRepository {
+    // Предоставляет поток данных, который будет обновляться
+    fun observeMidiMessages(): Flow<MidiEvent>
+
     suspend fun getAvailableDevices(): List<MidiDevice>
-    suspend fun connectToDevice(deviceId: Int): Result<MidiConnection>
-    suspend fun observeMidiMessages(): Flow<MidiEvent>
 }
 
 // Data-слой: реализация
 class MidiRepositoryImpl(
-    private val midiDataSource: MidiDataSource
+    private val midiLocalDataSource: MidiLocalDataSource,
+    // private val midiRemoteDataSource: MidiRemoteDataSource // если бы был
 ) : MidiRepository {
-    override suspend fun getAvailableDevices(): List<MidiDevice> {
-        return midiDataSource.scanDevices()
+    override fun observeMidiMessages(): Flow<MidiEvent> {
+        // Логика, решающая, откуда брать данные.
+        // Здесь мы просто передаем поток из локального источника.
+        return midiLocalDataSource.observeMessages()
     }
     // ...
 }
 ```
 
-### 4.3. Use Cases (Interactors)
+### 4.3. Use Cases (Interactors) (Слой домена)
 
-**Применение**: Domain Layer
+**Применение**: Инкапсуляция бизнес-логики в Domain Layer.
 
-**Описание**:
-- Каждый Use Case представляет одну бизнес-операцию
-- Use Case координирует работу с Repository
-- Use Case содержит бизнес-логику и валидацию
+**Роль**: Use Case (или Interactor) — это класс, который содержит одну конкретную бизнес-операцию. Он вызывается из `ViewModel` и может использовать один или несколько репозиториев для выполнения своей задачи.
 
-**Преимущества**:
-- Четкое разделение бизнес-операций
-- Переиспользуемость логики
-- Простота тестирования
+**Основные принципы**:
+- **Принцип одиночной ответственности**: Каждый Use Case отвечает только за одну операцию.
+- **Переиспользуемость**: Сложная бизнес-логика, используемая в нескольких `ViewModel`, должна быть вынесена в Use Case.
+- **Простота и чистота**: Use Case не должен содержать логики, связанной с UI или жизненным циклом Android. Он не должен иметь собственного изменяемого состояния.
+- **Один публичный метод**: Use Case должен иметь только один публичный метод `invoke()`, что позволяет вызывать экземпляр класса как функцию.
+
+**Правила именования**:
+- Имя класса должно следовать шаблону: `Глагол в настоящем времени + Объект (опционально) + UseCase`.
+  - *Пример*: `ConnectMidiDeviceUseCase`, `FormatDateUseCase`.
 
 **Пример**:
 ```kotlin
 class ProcessMidiMessageUseCase(
-    private val midiRepository: MidiRepository,
     private val gameRepository: GameRepository
 ) {
     suspend operator fun invoke(message: MidiEvent): Result<ProcessedNote> {
-        // Бизнес-логика обработки MIDI-сообщения
+        // 1. Валидация и обработка MIDI-сообщения
         val note = parseMidiMessage(message)
-        
-        // Сохранение в текущую сессию игры
+
+        // 2. Взаимодействие с репозиторием
         return gameRepository.addNoteToSession(note)
             .map { ProcessedNote(note, it) }
     }
@@ -283,7 +293,7 @@ class ProcessMidiMessageUseCase(
 
 ### 4.4. Dependency Injection
 
-**Применение**: Управление зависимостями во всех слоях
+**Применение**: Управление зависимостями во всех слоях.
 
 **Описание**:
 - Использование DI-фреймворка (например, Hilt или Koin)
@@ -331,19 +341,22 @@ com.astrizhachuk.pianoflow/
 
 ```plantuml
 @startuml
-package "Presentation Layer\n(Android-специфичный)" {
+package "Presentation Layer
+(Android-специфичный)" {
     [Activity/Fragment] as Activity
     [ViewModel] as ViewModel
     [UI Components] as UI
 }
 
-package "Domain Layer\n(Ядро - независимо от Android)" {
+package "Domain Layer
+(Ядро - независимо от Android)" {
     [Use Cases] as UseCase
     [Domain Models] as DomainModel
     [Repository Interfaces] as RepoInterface
 }
 
-package "Data Layer\n(Реализация источников данных)" {
+package "Data Layer
+(Реализация источников данных)" {
     [Repository Implementations] as RepoImpl
     [MIDI Data Source] as MidiDS
     [Local Data Source] as LocalDS
@@ -437,6 +450,8 @@ Fragment -> User : визуальная обратная связь
 4. **Presentation не зависит напрямую от Data**
    - Все взаимодействие происходит через Domain-слой
    - ViewModels не знают о конкретных реализациях Repository
+
+5.  **Все операции в Data и Domain слоях должны быть безопасны для вызова из главного потока (Main-safe)**. Любые длительные или блокирующие операции (работа с сетью, базой данных) должны выполняться в фоновом потоке с использованием корутин (`Dispatchers.IO`). Функции репозиториев и Use Cases должны быть `suspend`-функциями или возвращать `Flow`.
 
 ### 7.2. Направление зависимостей
 
@@ -685,19 +700,24 @@ title C4 Level 1: Системный контекст - PianoFlow Core
 
 actor "Пользователь" as User
 
-rectangle "Android приложение\nPianoFlow" as AndroidApp {
+rectangle "Android приложение
+PianoFlow" as AndroidApp {
 }
 
-rectangle "Windows приложение\nPianoFlow" as WindowsApp {
+rectangle "Windows приложение
+PianoFlow" as WindowsApp {
 }
 
-rectangle "Веб-приложение\nPianoFlow" as WebApp {
+rectangle "Веб-приложение
+PianoFlow" as WebApp {
 }
 
-rectangle "PianoFlow Core\n(Ядро - библиотека)" as Core {
+rectangle "PianoFlow Core
+(Ядро - библиотека)" as Core {
 }
 
-rectangle "MIDI-устройство\n(Пианино/Клавиатура)" as MidiDevice
+rectangle "MIDI-устройство
+(Пианино/Клавиатура)" as MidiDevice
 
 User --> AndroidApp : Использует
 User --> WindowsApp : Использует
@@ -725,25 +745,33 @@ title C4 Level 2: Контейнеры - PianoFlow Core
 actor "Пользователь" as User
 
 package "Android приложение" {
-    rectangle "Android UI\n(Activities, Fragments)" as AndroidUI
+    rectangle "Android UI
+(Activities, Fragments)" as AndroidUI
     rectangle "Android ViewModels" as AndroidVM
-    rectangle "Android Data Adapters\n(Android MIDI API)" as AndroidData
+    rectangle "Android Data Adapters
+(Android MIDI API)" as AndroidData
 }
 
 package "Windows приложение" {
-    rectangle "Desktop UI\n(Compose Multiplatform)" as WindowsUI
+    rectangle "Desktop UI
+(Compose Multiplatform)" as WindowsUI
     rectangle "Desktop ViewModels" as WindowsVM
-    rectangle "Windows Data Adapters\n(Windows MIDI API)" as WindowsData
+    rectangle "Windows Data Adapters
+(Windows MIDI API)" as WindowsData
 }
 
 package "Веб-приложение" {
-    rectangle "Web UI\n(React/Vue/Compose)" as WebUI
+    rectangle "Web UI
+(React/Vue/Compose)" as WebUI
     rectangle "Web ViewModels" as WebVM
-    rectangle "Web Data Adapters\n(Web MIDI API)" as WebData
+    rectangle "Web Data Adapters
+(Web MIDI API)" as WebData
 }
 
-package "PianoFlow Core\n(Библиотека)" {
-    rectangle "Domain Layer\n(Use Cases, Models)" as Domain
+package "PianoFlow Core
+(Библиотека)" {
+    rectangle "Domain Layer
+(Use Cases, Models)" as Domain
     rectangle "Repository Interfaces" as RepoInterfaces
 }
 
