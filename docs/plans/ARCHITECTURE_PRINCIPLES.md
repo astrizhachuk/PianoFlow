@@ -9,6 +9,7 @@
 Документ определяет:
 - Высокоуровневые архитектурные принципы разработки
 - Структуру слоев приложения
+- Иерархию пакетов
 - Паттерны проектирования и их применение
 - Правила зависимостей между компонентами
 - Примеры реализации для типичных сценариев
@@ -64,31 +65,29 @@ PianoFlow представляет собой тренажер и систему
 **Назначение**: Отвечает за отображение данных пользователю и обработку пользовательского ввода.
 
 **Компоненты**:
-- **Activities и Fragments** — Android-компоненты для отображения UI
-- **ViewModels** — управление UI-состоянием и взаимодействие с Domain-слоем
-- **UI-компоненты** — пользовательский интерфейс (layouts, views)
-- **Навигация** — переходы между экранами
+- **UI (View)**: `Activities`, `Fragments` и `Composable`-экраны, отвечающие за отображение данных и передачу событий пользователя в `ViewModel`.
+- **ViewModel**: Управляет состоянием UI, обрабатывает события и взаимодействует с `Domain` слоем. Является источником состояния для UI.
+- **UI State**: Неизменяемые (immutable) классы данных, которые представляют собой полное состояние экрана для отображения.
+- **Навигация**: Компоненты, управляющие потоком экранов в приложении.
 
 **Характеристики**:
 - Зависит только от Domain-слоя
 - Не содержит бизнес-логики
-- Использует паттерн MVVM для разделения UI и логики
-- **Использует однонаправленный поток данных (Unidirectional Data Flow - UDF)**: Состояние (UI State) передается из ViewModel в UI, а события от UI передаются в ViewModel для обработки.
-- **UI-состояние инкапсулируется в отдельный объект**: ViewModel предоставляет единый объект состояния (например, `data class`), который содержит все данные для отрисовки экрана. Это состояние передается через `StateFlow`.
+- Использует паттерн MVVM и однонаправленный поток данных (UDF)
 
-**Пример структуры**:
+**Пример структуры пакетов**:
 ```
 presentation/
+├── di/
+│   └── PresentationModule.kt
 ├── ui/
 │   ├── main/
-│   │   ├── MainActivity.kt
-│   │   ├── MainFragment.kt
-│   │   └── MainViewModel.kt
+│   │   └── MainFragment.kt
 │   └── midi/
-│       ├── MidiConnectionFragment.kt
-│       └── MidiConnectionViewModel.kt
-└── navigation/
-    └── Navigation.kt
+│       └── MidiConnectionFragment.kt
+└── viewmodel/
+    ├── MainViewModel.kt
+    └── MidiConnectionViewModel.kt
 ```
 
 ### 3.2. Domain Layer (Слой домена / Ядро)
@@ -97,32 +96,29 @@ presentation/
 
 **Компоненты**:
 - **Use Cases** (Interactors) — конкретные бизнес-операции
-- **Domain Models** — бизнес-сущности (Note, MidiEvent, GameSession и т.д.)
+- **Domain Models** — бизнес-сущности (Note, MidiEvent)
 - **Repository Interfaces** — абстракции для доступа к данным
-- **Domain Exceptions** — бизнес-исключения
 
 **Характеристики**:
-- **Независим от Android** — не содержит Android-специфичных классов
-- **Независим от Data-слоя** — использует только интерфейсы
-- **Чистый Kotlin** — может быть переиспользован в других проектах
+- **Независим от Android** и от **Data-слоя**.
+- **Чистый Kotlin** — может быть переиспользован в других проектах.
 
-**Пример структуры**:
+**Пример структуры пакетов**:
 ```
 domain/
 ├── model/
 │   ├── Note.kt
-│   ├── MidiEvent.kt
-│   └── GameSession.kt
-├── usecase/
-│   ├── midi/
-│   │   ├── ConnectMidiDeviceUseCase.kt
-│   │   └── ProcessMidiMessageUseCase.kt
-│   └── game/
-│       ├── AnalyzePerformanceUseCase.kt
-│       └── StartGameSessionUseCase.kt
-└── repository/
-    ├── MidiRepository.kt (интерфейс)
-    └── GameRepository.kt (интерфейс)
+│   └── MidiEvent.kt
+├── repository/
+│   ├── MidiRepository.kt (интерфейс)
+│   └── GameRepository.kt (интерфейс)
+└── usecase/
+    ├── midi/
+    │   ├── ConnectMidiDeviceUseCase.kt
+    │   └── ProcessMidiMessageUseCase.kt
+    └── game/
+        ├── AnalyzePerformanceUseCase.kt
+        └── StartGameSessionUseCase.kt
 ```
 
 **Ссылки на описание подхода**:
@@ -147,37 +143,31 @@ domain/
 
 **Компоненты**:
 - **Repository Implementations** — реализация интерфейсов из Domain-слоя
-- **Data Sources** — конкретные источники данных:
-  - MIDI-источник (Android MIDI API)
-  - Локальное хранилище (Room, SharedPreferences)
-  - Сетевые источники (если потребуется в будущем)
-- **Data Models** — модели данных для хранения и передачи
-- **Mappers** — преобразование между Data Models и Domain Models
+- **Data Sources** — конкретные источники данных (MIDI, Room)
+- **Data Models** и **Mappers** — модели данных и их преобразователи в/из Domain Models.
 
 **Характеристики**:
-- Зависит от Domain-слоя (реализует его интерфейсы)
-- Может зависеть от Android-специфичных API (MidiManager, Room и т.д.)
-- Изолирует детали работы с данными от Domain-слоя
+- Зависит от Domain-слоя (реализует его интерфейсы).
+- Изолирует детали работы с данными (Android MIDI API, Room) от Domain-слоя.
 
-**Пример структуры**:
+**Пример структуры пакетов**:
 ```
 data/
-├── repository/
-│   ├── MidiRepositoryImpl.kt
-│   └── GameRepositoryImpl.kt
+├── di/
+│   └── DataModule.kt
 ├── datasource/
 │   ├── midi/
 │   │   ├── MidiDataSource.kt
 │   │   └── MidiReceiver.kt
 │   └── local/
-│       ├── GameDatabase.kt
-│       └── PreferencesDataSource.kt
+│       └── GameDatabase.kt
+├── mapper/
+│   └── MidiEventMapper.kt
 ├── model/
-│   ├── MidiEventEntity.kt
-│   └── GameSessionEntity.kt
-└── mapper/
-    ├── MidiEventMapper.kt
-    └── GameSessionMapper.kt
+│   └── MidiEventEntity.kt
+└── repository/
+    ├── MidiRepositoryImpl.kt
+    └── GameRepositoryImpl.kt
 ```
 
 ### 3.4. Диаграмма слоев архитектуры
@@ -185,228 +175,119 @@ data/
 ```plantuml
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
-
 title C4 Level 3: Компоненты архитектуры PianoFlow
-
 LAYOUT_WITH_LEGEND()
-
 Container_Boundary(presentation, "Presentation Layer (Android-специфичный)") {
     Component(activity, "Activity/Fragment", "Android Component", "Отображение UI и обработка ввода")
     Component(viewModel, "ViewModel", "Jetpack ViewModel", "Управление UI-состоянием, вызов Use Cases")
-    Component(ui, "UI Components", "XML/Compose", "Элементы пользовательского интерфейса")
 }
-
 Container_Boundary(domain, "Domain Layer (Ядро - независимо от Android)") {
     Component(useCase, "Use Cases", "Kotlin", "Бизнес-логика приложения")
     Component(domainModel, "Domain Models", "Kotlin", "Бизнес-сущности")
     Component(repoInterface, "Repository Interfaces", "Kotlin", "Абстракции для доступа к данным")
 }
-
 Container_Boundary(data, "Data Layer (Реализация источников данных)") {
     Component(repoImpl, "Repository Implementations", "Kotlin", "Реализация интерфейсов репозиториев")
-    Component(midiDs, "MIDI Data Source", "Android MIDI API", "Источник данных от MIDI-устройств")
-    Component(localDs, "Local Data Source", "Room/SharedPreferences", "Источник данных из локального хранилища")
+    Component(dataSource, "Data Source", "Android API, Room", "Источники данных (MIDI, БД)")
 }
-
-' Отношения
 Rel(activity, viewModel, "Использует", " ")
 Rel(viewModel, useCase, "Вызывает", " ")
 Rel(useCase, repoInterface, "Использует", " ")
 Rel_Back(useCase, domainModel, "Использует")
-
 Rel_Up(repoImpl, repoInterface, "Реализует", " ")
-Rel(repoImpl, midiDs, "Использует", " ")
-Rel(repoImpl, localDs, "Использует", " ")
-
+Rel(repoImpl, dataSource, "Использует", " ")
 @enduml
 ```
 
-## 4. Паттерны проектирования
+## 4. Принцип иерархии пакетов (Package Hierarchy)
 
-### 4.1. MVVM (Model-View-ViewModel)
+Для обеспечения единообразия и предсказуемости структуры проекта, все пакеты именуются в соответствии со следующим иерархическим принципом:
+
+**`{слой}.{тип_компонента}.{функциональность}`**
+
+1.  **Слой (Layer)**: Первый уровень определяет архитектурный слой (`presentation`, `domain`, `data`).
+2.  **Тип компонента (Component Type)**: Второй уровень указывает на назначение компонента в рамках слоя (`usecase`, `repository`, `viewmodel`, `ui`, `di`, и т.д.).
+3.  **Функциональность (Feature)**: Третий (опциональный) уровень группирует компоненты по фиче (`midi`, `game`). Используется, когда компонентов одного типа становится много.
+
+**Примеры**:
+-   **Правильно**: `domain.usecase.midi` (Слой: domain, Тип: usecase, Фича: midi)
+-   **Правильно**: `presentation.di` (Слой: presentation, Тип: di)
+-   **Неправильно**: `presentation.midi.viewmodel` (Нарушен порядок: фича перед типом)
+-   **Неправильно**: `domain.midi.MidiConnectionUseCase` (Файл `MidiConnectionUseCase.kt` должен быть в пакете `domain.usecase.midi`)
+
+Этот принцип применяется ко всем слоям для достижения максимальной консистентности.
+
+## 5. Паттерны проектирования
+
+### 5.1. MVVM (Model-View-ViewModel)
 
 **Применение**: Presentation Layer
 
 **Описание**:
 - **Model** — Domain-слой (Use Cases, Domain Models)
-- **View** — Activities, Fragments (отображают данные)
+- **View** — Activities, Fragments, Composables (отображают данные)
 - **ViewModel** — управляет UI-состоянием, вызывает Use Cases
 
-**Преимущества**:
-- Разделение UI и бизнес-логики
-- Сохранение состояния при изменениях конфигурации
-- Упрощение тестирования
+### 5.2. Repository Pattern (Слой данных)
 
-**Пример**:
-```kotlin
-// ViewModel вызывает Use Case из Domain-слоя
-class MidiConnectionViewModel(
-    private val connectMidiDeviceUseCase: ConnectMidiDeviceUseCase
-) : ViewModel() {
-    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
-    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
-    
-    fun connectDevice(deviceId: Int) {
-        viewModelScope.launch {
-            _connectionState.value = ConnectionState.Connecting
-            val result = connectMidiDeviceUseCase(deviceId)
-            _connectionState.value = result.fold(
-                onSuccess = { ConnectionState.Connected(it) },
-                onFailure = { ConnectionState.Error(it.message) }
-            )
-        }
-    }
-}
-```
+**Применение**: Абстракция доступа к данным в Data Layer. Является **единым источником истины (Single Source of Truth)**.
 
-### 4.2. Repository Pattern (Слой данных)
+### 5.3. Use Cases (Interactors) (Слой домена)
 
-**Применение**: Абстракция доступа к данным в Data Layer.
+**Применение**: Инкапсуляция бизнес-логики в Domain Layer. Каждый Use Case отвечает за **одну конкретную бизнес-операцию**.
 
-**Роль**: Repository является **единым источником истины (Single Source of Truth)** для определенных данных. Он инкапсулирует логику, которая решает, откуда брать данные (из локальной базы данных, из сети, из кэша) и предоставляет их остальной части приложения, в первую очередь Domain-слою.
+### 5.4. Dependency Injection
 
-**Основные принципы**:
-- **Инкапсуляция источников данных**: Repository скрывает от `ViewModel` и Use Cases то, как данные хранятся и откуда они получаются.
-- **Предоставление данных**: Данные предоставляются в виде реактивных потоков (например, `Flow<T>`), чтобы UI мог автоматически обновляться при их изменении.
-- **Обработка операций с данными**: Repository содержит методы для чтения, записи, обновления и удаления данных.
+**Применение**: Управление зависимостями во всех слоях с помощью Hilt.
 
-**Правила именования**:
-- **Repository**: Именуется по типу данных, за которые он отвечает.
-  - *Пример*: `MidiRepository`, `GameSettingsRepository`.
-- **Data Source**: Именуется с указанием типа данных и его источника.
-  - *Пример*: `MidiRemoteDataSource`, `GameSettingsLocalDataSource`.
+## 6. Общая структура пакетов
 
-**Пример**:
-```kotlin
-// Domain-слой: интерфейс
-interface MidiRepository {
-    // Предоставляет поток данных, который будет обновляться
-    fun observeMidiMessages(): Flow<MidiEvent>
-
-    suspend fun getAvailableDevices(): List<MidiDevice>
-}
-
-// Data-слой: реализация
-class MidiRepositoryImpl(
-    private val midiLocalDataSource: MidiLocalDataSource,
-    // private val midiRemoteDataSource: MidiRemoteDataSource // если бы был
-) : MidiRepository {
-    override fun observeMidiMessages(): Flow<MidiEvent> {
-        // Логика, решающая, откуда брать данные.
-        // Здесь мы просто передаем поток из локального источника.
-        return midiLocalDataSource.observeMessages()
-    }
-    // ...
-}
-```
-
-### 4.3. Use Cases (Interactors) (Слой домена)
-
-**Применение**: Инкапсуляция бизнес-логики в Domain Layer.
-
-**Роль**: Use Case (или Interactor) — это класс, который содержит одну конкретную бизнес-операцию. Он вызывается из `ViewModel` и может использовать один или несколько репозиториев для выполнения своей задачи.
-
-**Основные принципы**:
-- **Принцип одиночной ответственности**: Каждый Use Case отвечает только за одну операцию.
-- **Переиспользуемость**: Сложная бизнес-логика, используемая в нескольких `ViewModel`, должна быть вынесена в Use Case.
-- **Простота и чистота**: Use Case не должен содержать логики, связанной с UI или жизненным циклом Android. Он не должен иметь собственного изменяемого состояния.
-- **Один публичный метод**: Use Case должен иметь только один публичный метод `invoke()`, что позволяет вызывать экземпляр класса как функцию.
-
-**Правила именования**:
-- Имя класса должно следовать шаблону: `Глагол в настоящем времени + Объект (опционально) + UseCase`.
-  - *Пример*: `ConnectMidiDeviceUseCase`, `FormatDateUseCase`.
-
-**Пример**:
-```kotlin
-class ProcessMidiMessageUseCase(
-    private val gameRepository: GameRepository
-) {
-    suspend operator fun invoke(message: MidiEvent): Result<ProcessedNote> {
-        // 1. Валидация и обработка MIDI-сообщения
-        val note = parseMidiMessage(message)
-
-        // 2. Взаимодействие с репозиторием
-        return gameRepository.addNoteToSession(note)
-            .map { ProcessedNote(note, it) }
-    }
-}
-```
-
-### 4.4. Dependency Injection
-
-**Применение**: Управление зависимостями во всех слоях.
-
-**Описание**:
-- Использование DI-фреймворка (например, Hilt или Koin)
-- Зависимости предоставляются через конструкторы
-- Упрощает тестирование и управление зависимостями
-
-**Преимущества**:
-- Слабая связность между компонентами
-- Упрощение тестирования (легко подменить зависимости)
-- Централизованное управление зависимостями
-
-## 5. Структура модулей/пакетов
-
-Рекомендуемая структура пакетов для приложения PianoFlow:
+Итоговая структура пакетов, следующая описанному принципу:
 
 ```
 com.astrizhachuk.pianoflow/
-├── presentation/          # Android-специфичный слой
-│   ├── ui/
+├── presentation/              # Слой представления
+│   ├── di/                    # DI-модули для Presentation
+│   ├── model/                 # UI-модели (e.g., UI State)
+│   ├── ui/                    # UI-контроллеры, сгруппированные по фичам
 │   │   ├── main/
-│   │   ├── midi/
-│   │   └── game/
-│   ├── navigation/
-│   └── di/               # DI-модули для Presentation
-├── domain/               # Ядро (независимо от Android)
-│   ├── model/
-│   ├── usecase/
-│   │   ├── midi/
-│   │   └── game/
-│   ├── repository/
-│   └── exception/
-└── data/                 # Реализация источников данных
-    ├── repository/
-    ├── datasource/
-    │   ├── midi/
-    │   └── local/
-    ├── model/
-    ├── mapper/
-    └── di/               # DI-модули для Data
+│   │   └── midi/
+│   └── viewmodel/             # ViewModels, сгруппированные по фичам
+│       ├── main/
+│       └── midi/
+├── domain/                    # Слой домена (ядро)
+│   ├── exception/
+│   ├── model/                 # Бизнес-сущности
+│   ├── repository/            # Интерфейсы репозиториев
+│   └── usecase/               # Use cases, сгруппированные по фичам
+│       ├── midi/
+│       └── game/
+└── data/                      # Слой данных
+    ├── di/                    # DI-модули для Data
+    ├── datasource/            # Источники данных, сгруппированные по типу
+    │   ├── local/
+    │   └── midi/
+    ├── mapper/                # Мапперы моделей
+    ├── model/                 # Модели данных (сущности для БД, DTO и т.п.)
+    └── repository/            # Реализации репозиториев
 ```
 
-## 6. Правила зависимостей
+## 7. Правила зависимостей
 
-### 6.1. Основные правила
+### 7.1. Основные правила
 
-1. **Domain не зависит от Presentation и Data**
-   - Domain-слой не содержит импортов Android-классов
-   - Domain-слой не знает о деталях реализации источников данных
+1. **Domain не зависит от Presentation и Data**.
+2. **Presentation зависит от Domain**.
+3. **Data зависит от Domain**.
+4. **Presentation не зависит напрямую от Data**.
+5. Все операции в Data и Domain слоях **безопасны для вызова из главного потока (Main-safe)**.
 
-2. **Presentation зависит от Domain**
-   - ViewModels вызывают Use Cases
-   - UI отображает Domain Models
-
-3. **Data зависит от Domain**
-   - Repository-реализации реализуют интерфейсы из Domain-слоя
-   - Data Models преобразуются в Domain Models через мапперы
-
-4. **Presentation не зависит напрямую от Data**
-   - Все взаимодействие происходит через Domain-слой
-   - ViewModels не знают о конкретных реализациях Repository
-
-5.  **Все операции в Data и Domain слоях должны быть безопасны для вызова из главного потока (Main-safe)**. Любые длительные или блокирующие операции (работа с сетью, базой данных) должны выполняться в фоновом потоке с использованием корутин (`Dispatchers.IO`). Функции репозиториев и Use Cases должны быть `suspend`-функциями или возвращать `Flow`.
-
-### 6.2. Направление зависимостей
+### 7.2. Направление зависимостей
 
 ```
 Presentation → Domain ← Data
 ```
-
-- Зависимости направлены **к центру** (Domain)
-- Domain является **независимым ядром**
-- Presentation и Data могут быть заменены без изменения Domain
+Зависимости направлены **к центру** (Domain), который является независимым ядром.
 
 ```plantuml
 @startuml
@@ -441,60 +322,13 @@ end note
 @enduml
 ```
 
-## 7. Примеры применения
+## 8. Примеры применения
 
-### 7.1. Пример структуры для MIDI-обработки
-
-**Domain Model**:
-```kotlin
-// domain/model/MidiEvent.kt
-data class MidiEvent(
-    val note: Int,
-    val velocity: Int,
-    val channel: Int,
-    val timestamp: Long
-)
-```
-
-**Repository Interface**:
-```kotlin
-// domain/repository/MidiRepository.kt
-interface MidiRepository {
-    suspend fun getAvailableDevices(): List<MidiDevice>
-    suspend fun connectToDevice(deviceId: Int): Result<MidiConnection>
-    fun observeMidiMessages(): Flow<MidiEvent>
-}
-```
-
-**Use Case**:
-```kotlin
-// domain/usecase/midi/ProcessMidiMessageUseCase.kt
-class ProcessMidiMessageUseCase(
-    private val midiRepository: MidiRepository
-) {
-    suspend operator fun invoke(event: MidiEvent): Result<ProcessedNote> {
-        // Бизнес-логика обработки
-        return Result.success(ProcessedNote.from(event))
-    }
-}
-```
-
-**Repository Implementation**:
-```kotlin
-// data/repository/MidiRepositoryImpl.kt
-class MidiRepositoryImpl(
-    private val midiDataSource: MidiDataSource
-) : MidiRepository {
-    override fun observeMidiMessages(): Flow<MidiEvent> {
-        return midiDataSource.observeMessages()
-            .map { it.toDomainModel() }
-    }
-}
-```
+### 8.1. Пример структуры для MIDI-обработки
 
 **ViewModel**:
 ```kotlin
-// presentation/ui/midi/MidiConnectionViewModel.kt
+// presentation/viewmodel/midi/MidiConnectionViewModel.kt
 class MidiConnectionViewModel(
     private val processMidiMessageUseCase: ProcessMidiMessageUseCase
 ) : ViewModel() {
@@ -512,30 +346,7 @@ class MidiConnectionViewModel(
 }
 ```
 
-```plantuml
-@startuml
-participant "Пользователь" as User
-participant "MidiFragment" as Fragment
-participant "MidiViewModel" as ViewModel
-participant "ProcessMidiMessageUseCase" as UseCase
-participant "MidiRepository" as Repo
-participant "MidiDataSource" as DataSource
-participant "MIDI Device" as Device
-
-User -> Device : Нажимает клавишу
-Device -> DataSource : MIDI сообщение
-DataSource -> Repo : MidiEvent
-Repo -> UseCase : обработанное событие
-activate UseCase
-UseCase -> UseCase : бизнес-логика
-UseCase -> ViewModel : результат обработки
-deactivate UseCase
-ViewModel -> Fragment : обновление UI
-Fragment -> User : визуальная обратная связь
-@enduml
-```
-
-### 7.2. Пример Use Case для анализа игры
+### 8.2. Пример Use Case для анализа игры
 
 ```kotlin
 // domain/usecase/game/AnalyzePerformanceUseCase.kt
@@ -559,137 +370,42 @@ class AnalyzePerformanceUseCase(
 }
 ```
 
-### 7.3. Пример Repository для MIDI-данных
+## 9. Вынесение ядра как отдельной библиотеки
 
-```kotlin
-// data/repository/MidiRepositoryImpl.kt
-@Singleton
-class MidiRepositoryImpl @Inject constructor(
-    private val midiDataSource: MidiDataSource,
-    @ApplicationContext private val context: Context
-) : MidiRepository {
-    
-    private val midiManager: MidiManager by lazy {
-        context.getSystemService(Context.MIDI_SERVICE) as MidiManager
-    }
-    
-    override suspend fun getAvailableDevices(): List<MidiDevice> {
-        return midiManager.devices
-            .map { it.toDomainModel() }
-    }
-    
-    override suspend fun connectToDevice(deviceId: Int): Result<MidiConnection> {
-        return try {
-            val device = midiManager.getDevice(deviceId)
-            val connection = midiDataSource.connect(device)
-            Result.success(connection.toDomainModel())
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-    
-    override fun observeMidiMessages(): Flow<MidiEvent> {
-        return midiDataSource.observeMessages()
-            .map { it.toDomainModel() }
-    }
-}
-```
+Архитектура спроектирована с учетом принципа **независимости ядра от клиента**, что делает возможным использование Domain-слоя в различных контекстах (Android, Desktop, Web).
 
-## 8. Вынесение ядра как отдельной библиотеки
+### 9.1. Структура для мультиплатформенного использования
 
-### 8.1. Анализ возможности
-
-
-
-Архитектура спроектирована с учетом принципа **независимости ядра от клиента** (см. раздел 2.2), что делает возможным использование Domain-слоя в различных контекстах:
-
-#### Преимущества текущей архитектуры:
-
-1. **Domain-слой независим от платформы**
-   - Не содержит Android-специфичных классов
-   - Использует только чистый Kotlin и стандартные библиотеки
-   - Может быть скомпилирован как Kotlin Multiplatform библиотека
-
-2. **Четкое разделение через интерфейсы**
-   - Repository-интерфейсы определены в Domain-слое
-   - Каждая платформа реализует свои адаптеры для Data-слоя
-   - Use Cases работают только с абстракциями
-
-3. **Возможность переиспользования**
-   - Ядро может быть использовано в Android-приложении
-   - Ядро может быть использовано в Windows-приложении (Kotlin/Native или Kotlin/JVM)
-   - Ядро может быть использовано в веб-приложении (Kotlin/JS или через WebAssembly)
-
-#### Варианты реализации:
-
-**Вариант 1: Kotlin Multiplatform Library**
-- Domain-слой компилируется как KMP-модуль
-- Поддерживает Android, JVM (Windows), JS (Web)
-- Единый код для всех платформ
-
-**Вариант 2: Отдельный Gradle-модуль**
-- Domain-слой выносится в отдельный модуль `:core` или `:domain`
-- Может быть опубликован как библиотека (Maven/Gradle)
-- Каждая платформа подключает библиотеку и реализует свои адаптеры
-
-**Вариант 3: REST API сервис**
-- Ядро работает как backend-сервис
-- Клиенты (Android, Windows, Web) взаимодействуют через REST API
-- Подходит для централизованной обработки и синхронизации данных
-
-### 8.2. Структура для мультиплатформенного использования
-
-При вынесении ядра как библиотеки, структура проекта может выглядеть следующим образом:
+Принцип иерархии пакетов сохраняется внутри каждого модуля.
 
 ```
 pianoflow-core/              # Отдельная библиотека (ядро)
-├── domain/                  # Domain-слой (чистый Kotlin)
-│   ├── model/
-│   ├── usecase/
-│   └── repository/          # Интерфейсы
-└── build.gradle.kts
+└── src/
+    └── commonMain/
+        └── kotlin/
+            └── com/astrizhachuk/pianoflow/domain/
+                ├── model/
+                ├── usecase/
+                └── repository/
 
 pianoflow-android/           # Android-приложение
-├── app/
-│   ├── presentation/        # Android UI
-│   └── data/                # Android-адаптеры (Android MIDI API)
-└── build.gradle.kts
-    dependencies {
-        implementation(project(":pianoflow-core"))
-    }
-
-pianoflow-windows/           # Windows-приложение
-├── app/
-│   ├── presentation/         # Desktop UI (Compose Multiplatform)
-│   └── data/                # Windows-адаптеры (Windows MIDI API)
-└── build.gradle.kts
-    dependencies {
-        implementation(project(":pianoflow-core"))
-    }
-
-pianoflow-web/               # Веб-приложение
-├── app/
-│   ├── presentation/        # Web UI (React, Vue, или Compose for Web)
-│   └── data/                # Web-адаптеры (Web MIDI API)
-└── build.gradle.kts
-    dependencies {
-        implementation(project(":pianoflow-core"))
-    }
+└── app/src/main/java/com/astrizhachuk/pianoflow/
+    ├── presentation/
+    └── data/
 ```
 
-### 8.3. Адаптеры для разных платформ
+### 9.2. Адаптеры для разных платформ
 
-Каждая платформа реализует свои адаптеры для работы с MIDI:
+Каждая платформа реализует свои адаптеры (`data` слой) для работы с MIDI, реализуя интерфейсы из `domain` слоя.
 
 | Платформа | MIDI API | Реализация адаптера |
 |-----------|----------|---------------------|
-| **Android** | Android MIDI API (`android.media.midi`) | `AndroidMidiRepositoryImpl` |
-| **Windows** | Windows MIDI API (WinMM или UWP MIDI) | `WindowsMidiRepositoryImpl` |
-| **Web** | Web MIDI API (`navigator.requestMIDIAccess`) | `WebMidiRepositoryImpl` |
+| **Android** | Android MIDI API | `AndroidMidiRepositoryImpl` |
+| **Windows** | Windows MIDI API | `WindowsMidiRepositoryImpl` |
+| **Web** | Web MIDI API | `WebMidiRepositoryImpl` |
 
-Все адаптеры реализуют один и тот же интерфейс `MidiRepository` из Domain-слоя, что обеспечивает единообразное использование ядра на всех платформах.
 
-### 8.4. Схема C4: Контекст и контейнеры
+### 9.3. Схема C4: Контекст и контейнеры
 
 #### C4 Level 1: Системный контекст
 
@@ -809,80 +525,9 @@ Rel_Up(webAdapter, repoInterfaces, "Реализует")
 @enduml
 ```
 
-### 8.5. Пример использования ядра в веб-приложении
+## 10. Заключение
 
-Аналогично сайту pianomarvel.com, веб-приложение может использовать Web MIDI API для подключения к MIDI-устройству:
-
-```kotlin
-// Web-адаптер для MIDI
-class WebMidiRepositoryImpl : MidiRepository {
-    private var midiAccess: MIDIAccess? = null
-    
-    override suspend fun getAvailableDevices(): List<MidiDevice> {
-        midiAccess = navigator.requestMIDIAccess().await()
-        return midiAccess!!.inputs.map { it.toDomainModel() }
-    }
-    
-    override fun observeMidiMessages(): Flow<MidiEvent> {
-        return callbackFlow {
-            midiAccess?.inputs?.forEach { input ->
-                input.onmidimessage = { event ->
-                    trySend(event.toDomainModel())
-                }
-            }
-            awaitClose()
-        }
-    }
-}
-
-// Использование в веб-приложении
-class WebMidiViewModel(
-    private val processMidiMessageUseCase: ProcessMidiMessageUseCase,
-    private val midiRepository: MidiRepository
-) {
-    fun startListening() {
-        viewModelScope.launch {
-            midiRepository.observeMidiMessages()
-                .collect { event ->
-                    processMidiMessageUseCase(event)
-                        .onSuccess { note ->
-                            // Обновление UI
-                        }
-                }
-        }
-    }
-}
-```
-
-### 8.6. Преимущества вынесения ядра
-
-1. **Единая бизнес-логика** — одна реализация для всех платформ
-2. **Легкое тестирование** — ядро тестируется независимо от платформы
-3. **Быстрая разработка** — новые функции добавляются один раз в ядро
-4. **Консистентность** — одинаковое поведение на всех платформах
-5. **Переиспользование** — ядро может быть использовано в других проектах
-
-### 8.7. Рекомендации по реализации
-
-1. **Вынести Domain-слой в отдельный модуль** на раннем этапе разработки
-2. **Использовать Kotlin Multiplatform** для поддержки нескольких платформ из одного кода
-3. **Определить четкие интерфейсы** для всех внешних зависимостей (MIDI, хранилище)
-4. **Создать платформо-специфичные адаптеры** для каждой целевой платформы
-5. **Покрыть ядро unit-тестами** для обеспечения качества при переиспользовании
-
-## 9. Заключение
-
-Данная архитектура обеспечивает:
-- **Минимальную связность** между компонентами
-- **Независимость ядра** от Android-специфичных компонентов
-- **Возможность переиспользования** Domain-слоя в других проектах
-- **Мультиплатформенность** — ядро может использоваться в Android, Windows и Web-приложениях
-- **Упрощение тестирования** за счет четкого разделения слоев
-- **Масштабируемость** — легко добавлять новые функции и источники данных
-
-При разработке новых функций необходимо следовать описанным принципам и структуре слоев, чтобы сохранить архитектурную целостность приложения и возможность вынесения ядра как отдельной библиотеки.
+Данная архитектура обеспечивает минимальную связность, независимость ядра, переиспользуемость, мультиплатформенность и тестируемость. При разработке новых функций необходимо следовать описанным принципам.
 
 ## Связанные документы
-
-- [Описание приложения](APPLICATION_DESCRIPTION.md) — общее описание PianoFlow
-
+- [Описание приложения](APPLICATION_DESCRIPTION.md)
