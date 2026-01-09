@@ -180,6 +180,47 @@ data/
     └── GameSessionMapper.kt
 ```
 
+### 3.4. Диаграмма слоев архитектуры
+
+```plantuml
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title C4 Level 3: Компоненты архитектуры PianoFlow
+
+LAYOUT_WITH_LEGEND()
+
+Container_Boundary(presentation, "Presentation Layer (Android-специфичный)") {
+    Component(activity, "Activity/Fragment", "Android Component", "Отображение UI и обработка ввода")
+    Component(viewModel, "ViewModel", "Jetpack ViewModel", "Управление UI-состоянием, вызов Use Cases")
+    Component(ui, "UI Components", "XML/Compose", "Элементы пользовательского интерфейса")
+}
+
+Container_Boundary(domain, "Domain Layer (Ядро - независимо от Android)") {
+    Component(useCase, "Use Cases", "Kotlin", "Бизнес-логика приложения")
+    Component(domainModel, "Domain Models", "Kotlin", "Бизнес-сущности")
+    Component(repoInterface, "Repository Interfaces", "Kotlin", "Абстракции для доступа к данным")
+}
+
+Container_Boundary(data, "Data Layer (Реализация источников данных)") {
+    Component(repoImpl, "Repository Implementations", "Kotlin", "Реализация интерфейсов репозиториев")
+    Component(midiDs, "MIDI Data Source", "Android MIDI API", "Источник данных от MIDI-устройств")
+    Component(localDs, "Local Data Source", "Room/SharedPreferences", "Источник данных из локального хранилища")
+}
+
+' Отношения
+Rel(activity, viewModel, "Использует", " ")
+Rel(viewModel, useCase, "Вызывает", " ")
+Rel(useCase, repoInterface, "Использует", " ")
+Rel_Back(useCase, domainModel, "Использует")
+
+Rel_Up(repoImpl, repoInterface, "Реализует", " ")
+Rel(repoImpl, midiDs, "Использует", " ")
+Rel(repoImpl, localDs, "Использует", " ")
+
+@enduml
+```
+
 ## 4. Паттерны проектирования
 
 ### 4.1. MVVM (Model-View-ViewModel)
@@ -335,44 +376,37 @@ com.astrizhachuk.pianoflow/
     └── di/               # DI-модули для Data
 ```
 
-## 6. Диаграммы
+## 6. Правила зависимостей
 
-### 6.1. Диаграмма слоев архитектуры
+### 6.1. Основные правила
 
-```plantuml
-@startuml
-package "Presentation Layer
-(Android-специфичный)" {
-    [Activity/Fragment] as Activity
-    [ViewModel] as ViewModel
-    [UI Components] as UI
-}
+1. **Domain не зависит от Presentation и Data**
+   - Domain-слой не содержит импортов Android-классов
+   - Domain-слой не знает о деталях реализации источников данных
 
-package "Domain Layer
-(Ядро - независимо от Android)" {
-    [Use Cases] as UseCase
-    [Domain Models] as DomainModel
-    [Repository Interfaces] as RepoInterface
-}
+2. **Presentation зависит от Domain**
+   - ViewModels вызывают Use Cases
+   - UI отображает Domain Models
 
-package "Data Layer
-(Реализация источников данных)" {
-    [Repository Implementations] as RepoImpl
-    [MIDI Data Source] as MidiDS
-    [Local Data Source] as LocalDS
-}
+3. **Data зависит от Domain**
+   - Repository-реализации реализуют интерфейсы из Domain-слоя
+   - Data Models преобразуются в Domain Models через мапперы
 
-Activity --> ViewModel
-ViewModel --> UseCase
-UseCase --> RepoInterface
-UseCase --> DomainModel
-RepoImpl --> RepoInterface
-RepoImpl --> MidiDS
-RepoImpl --> LocalDS
-@enduml
+4. **Presentation не зависит напрямую от Data**
+   - Все взаимодействие происходит через Domain-слой
+   - ViewModels не знают о конкретных реализациях Repository
+
+5.  **Все операции в Data и Domain слоях должны быть безопасны для вызова из главного потока (Main-safe)**. Любые длительные или блокирующие операции (работа с сетью, базой данных) должны выполняться в фоновом потоке с использованием корутин (`Dispatchers.IO`). Функции репозиториев и Use Cases должны быть `suspend`-функциями или возвращать `Flow`.
+
+### 6.2. Направление зависимостей
+
+```
+Presentation → Domain ← Data
 ```
 
-### 6.2. Диаграмма зависимостей между слоями
+- Зависимости направлены **к центру** (Domain)
+- Domain является **независимым ядром**
+- Presentation и Data могут быть заменены без изменения Domain
 
 ```plantuml
 @startuml
@@ -384,6 +418,7 @@ package "Domain Layer" as Domain {
 
 package "Data Layer" as Data {
 }
+
 
 Presentation --> Domain : зависит от
 Data --> Domain : реализует интерфейсы
@@ -406,66 +441,9 @@ end note
 @enduml
 ```
 
-### 6.3. Пример потока данных для MIDI-обработки
+## 7. Примеры применения
 
-```plantuml
-@startuml
-participant "Пользователь" as User
-participant "MidiFragment" as Fragment
-participant "MidiViewModel" as ViewModel
-participant "ProcessMidiMessageUseCase" as UseCase
-participant "MidiRepository" as Repo
-participant "MidiDataSource" as DataSource
-participant "MIDI Device" as Device
-
-User -> Device : Нажимает клавишу
-Device -> DataSource : MIDI сообщение
-DataSource -> Repo : MidiEvent
-Repo -> UseCase : обработанное событие
-activate UseCase
-UseCase -> UseCase : бизнес-логика
-UseCase -> ViewModel : результат обработки
-deactivate UseCase
-ViewModel -> Fragment : обновление UI
-Fragment -> User : визуальная обратная связь
-@enduml
-```
-
-## 7. Правила зависимостей
-
-### 7.1. Основные правила
-
-1. **Domain не зависит от Presentation и Data**
-   - Domain-слой не содержит импортов Android-классов
-   - Domain-слой не знает о деталях реализации источников данных
-
-2. **Presentation зависит от Domain**
-   - ViewModels вызывают Use Cases
-   - UI отображает Domain Models
-
-3. **Data зависит от Domain**
-   - Repository-реализации реализуют интерфейсы из Domain-слоя
-   - Data Models преобразуются в Domain Models через мапперы
-
-4. **Presentation не зависит напрямую от Data**
-   - Все взаимодействие происходит через Domain-слой
-   - ViewModels не знают о конкретных реализациях Repository
-
-5.  **Все операции в Data и Domain слоях должны быть безопасны для вызова из главного потока (Main-safe)**. Любые длительные или блокирующие операции (работа с сетью, базой данных) должны выполняться в фоновом потоке с использованием корутин (`Dispatchers.IO`). Функции репозиториев и Use Cases должны быть `suspend`-функциями или возвращать `Flow`.
-
-### 7.2. Направление зависимостей
-
-```
-Presentation → Domain ← Data
-```
-
-- Зависимости направлены **к центру** (Domain)
-- Domain является **независимым ядром**
-- Presentation и Data могут быть заменены без изменения Domain
-
-## 8. Примеры применения
-
-### 8.1. Пример структуры для MIDI-обработки
+### 7.1. Пример структуры для MIDI-обработки
 
 **Domain Model**:
 ```kotlin
@@ -534,7 +512,30 @@ class MidiConnectionViewModel(
 }
 ```
 
-### 8.2. Пример Use Case для анализа игры
+```plantuml
+@startuml
+participant "Пользователь" as User
+participant "MidiFragment" as Fragment
+participant "MidiViewModel" as ViewModel
+participant "ProcessMidiMessageUseCase" as UseCase
+participant "MidiRepository" as Repo
+participant "MidiDataSource" as DataSource
+participant "MIDI Device" as Device
+
+User -> Device : Нажимает клавишу
+Device -> DataSource : MIDI сообщение
+DataSource -> Repo : MidiEvent
+Repo -> UseCase : обработанное событие
+activate UseCase
+UseCase -> UseCase : бизнес-логика
+UseCase -> ViewModel : результат обработки
+deactivate UseCase
+ViewModel -> Fragment : обновление UI
+Fragment -> User : визуальная обратная связь
+@enduml
+```
+
+### 7.2. Пример Use Case для анализа игры
 
 ```kotlin
 // domain/usecase/game/AnalyzePerformanceUseCase.kt
@@ -558,7 +559,7 @@ class AnalyzePerformanceUseCase(
 }
 ```
 
-### 8.3. Пример Repository для MIDI-данных
+### 7.3. Пример Repository для MIDI-данных
 
 ```kotlin
 // data/repository/MidiRepositoryImpl.kt
@@ -594,9 +595,9 @@ class MidiRepositoryImpl @Inject constructor(
 }
 ```
 
-## 9. Вынесение ядра как отдельной библиотеки
+## 8. Вынесение ядра как отдельной библиотеки
 
-### 9.1. Анализ возможности
+### 8.1. Анализ возможности
 
 
 
@@ -636,7 +637,7 @@ class MidiRepositoryImpl @Inject constructor(
 - Клиенты (Android, Windows, Web) взаимодействуют через REST API
 - Подходит для централизованной обработки и синхронизации данных
 
-### 9.2. Структура для мультиплатформенного использования
+### 8.2. Структура для мультиплатформенного использования
 
 При вынесении ядра как библиотеки, структура проекта может выглядеть следующим образом:
 
@@ -676,7 +677,7 @@ pianoflow-web/               # Веб-приложение
     }
 ```
 
-### 9.3. Адаптеры для разных платформ
+### 8.3. Адаптеры для разных платформ
 
 Каждая платформа реализует свои адаптеры для работы с MIDI:
 
@@ -688,49 +689,40 @@ pianoflow-web/               # Веб-приложение
 
 Все адаптеры реализуют один и тот же интерфейс `MidiRepository` из Domain-слоя, что обеспечивает единообразное использование ядра на всех платформах.
 
-### 9.4. Схема C4: Контекст и контейнеры
+### 8.4. Схема C4: Контекст и контейнеры
 
 #### C4 Level 1: Системный контекст
 
 ```plantuml
 @startuml
-!define RECTANGLE class
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
 
-title C4 Level 1: Системный контекст - PianoFlow Core
+title C4 Level 1: Системный контекст - PianoFlow
 
-actor "Пользователь" as User
+LAYOUT_WITH_LEGEND()
 
-rectangle "Android приложение
-PianoFlow" as AndroidApp {
+Person(user, "Пользователь", "Человек, который хочет научиться играть на пианино.")
+
+System_Boundary(clients, "Клиентские приложения") {
+    System(androidApp, "Android приложение", "Позволяет пользователю тренироваться на Android-устройстве.")
+    System(windowsApp, "Windows приложение", "Позволяет пользователю тренироваться на ПК с Windows.")
+    System(webApp, "Веб-приложение", "Позволяет пользователю тренироваться в браузере.")
 }
 
-rectangle "Windows приложение
-PianoFlow" as WindowsApp {
-}
+System(core, "PianoFlow Core", "Kotlin Multiplatform библиотека, содержащая основную бизнес-логику.")
+System_Ext(midiDevice, "MIDI-устройство", "Физическое пианино или MIDI-клавиатура.")
 
-rectangle "Веб-приложение
-PianoFlow" as WebApp {
-}
+Rel(user, androidApp, "Использует")
+Rel(user, windowsApp, "Использует")
+Rel(user, webApp, "Использует")
 
-rectangle "PianoFlow Core
-(Ядро - библиотека)" as Core {
-}
+Rel(androidApp, core, "Использует ядро")
+Rel(windowsApp, core, "Использует ядро")
+Rel(webApp, core, "Использует ядро")
 
-rectangle "MIDI-устройство
-(Пианино/Клавиатура)" as MidiDevice
-
-User --> AndroidApp : Использует
-User --> WindowsApp : Использует
-User --> WebApp : Использует
-
-AndroidApp --> Core : Использует ядро
-WindowsApp --> Core : Использует ядро
-WebApp --> Core : Использует ядро
-
-AndroidApp --> MidiDevice : Подключение через USB
-WindowsApp --> MidiDevice : Подключение через USB
-WebApp --> MidiDevice : Подключение через браузер
-
+Rel(androidApp, midiDevice, "Подключается через", "USB/MIDI")
+Rel(windowsApp, midiDevice, "Подключается через", "USB/MIDI")
+Rel(webApp, midiDevice, "Подключается через", "Web MIDI API")
 @enduml
 ```
 
@@ -738,77 +730,50 @@ WebApp --> MidiDevice : Подключение через браузер
 
 ```plantuml
 @startuml
-!define RECTANGLE class
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-title C4 Level 2: Контейнеры - PianoFlow Core
+title C4 Level 2: Контейнеры - Мультиплатформенная архитектура PianoFlow
 
-actor "Пользователь" as User
+LAYOUT_WITH_LEGEND()
 
-package "Android приложение" {
-    rectangle "Android UI
-(Activities, Fragments)" as AndroidUI
-    rectangle "Android ViewModels" as AndroidVM
-    rectangle "Android Data Adapters
-(Android MIDI API)" as AndroidData
+Person(user, "Пользователь", "Ученик игры на фортепиано.")
+
+System_Ext(midiDevice, "MIDI-устройство", "Физическое пианино или MIDI-клавиатура.")
+
+System_Boundary(coreBoundary, "PianoFlow Core (KMP Библиотека)") {
+    Container(domain, "Domain Layer", "Kotlin", "Use Cases, Domain Models, Repository Interfaces.")
 }
 
-package "Windows приложение" {
-    rectangle "Desktop UI
-(Compose Multiplatform)" as WindowsUI
-    rectangle "Desktop ViewModels" as WindowsVM
-    rectangle "Windows Data Adapters
-(Windows MIDI API)" as WindowsData
+System_Boundary(androidBoundary, "Android приложение") {
+    Container(androidUi, "UI (Activities, Fragments, Compose)", "Android UI Toolkit", "Отображает интерфейс, обрабатывает ввод.")
+    Container(androidData, "Data Adapters", "Kotlin", "Реализует репозитории с использованием Android MIDI API.")
+    
+    Rel(androidUi, domain, "Использует", "Kotlin API")
+    Rel(androidData, domain, "Реализует", "Kotlin API")
+    Rel(androidData, midiDevice, "Читает MIDI-события из", "Android MIDI API")
 }
 
-package "Веб-приложение" {
-    rectangle "Web UI
-(React/Vue/Compose)" as WebUI
-    rectangle "Web ViewModels" as WebVM
-    rectangle "Web Data Adapters
-(Web MIDI API)" as WebData
+System_Boundary(windowsBoundary, "Windows приложение") {
+    Container(windowsUi, "UI (Compose for Desktop)", "Jetpack Compose", "Отображает интерфейс, обрабатывает ввод.")
+    Container(windowsData, "Data Adapters", "Kotlin/JVM", "Реализует репозитории с использованием Windows MIDI API.")
+    
+    Rel(windowsUi, domain, "Использует", "Kotlin API")
+    Rel(windowsData, domain, "Реализует", "Kotlin API")
+    Rel(windowsData, midiDevice, "Читает MIDI-события из", "Windows MIDI API")
 }
 
-package "PianoFlow Core
-(Библиотека)" {
-    rectangle "Domain Layer
-(Use Cases, Models)" as Domain
-    rectangle "Repository Interfaces" as RepoInterfaces
+System_Boundary(webBoundary, "Веб-приложение") {
+    Container(webUi, "UI (React, Compose for Web)", "JavaScript/WASM", "Отображает интерфейс в браузере.")
+    Container(webData, "Data Adapters", "Kotlin/JS", "Реализует репозитории с использованием Web MIDI API.")
+
+    Rel(webUi, domain, "Использует", "Kotlin API")
+    Rel(webData, domain, "Реализует", "Kotlin API")
+    Rel(webData, midiDevice, "Читает MIDI-события из", "Web MIDI API")
 }
 
-rectangle "MIDI-устройство" as MidiDevice
-
-User --> AndroidUI
-User --> WindowsUI
-User --> WebUI
-
-AndroidUI --> AndroidVM
-AndroidVM --> Domain
-AndroidVM --> RepoInterfaces
-AndroidData ..> RepoInterfaces : реализует
-AndroidData --> MidiDevice
-
-WindowsUI --> WindowsVM
-WindowsVM --> Domain
-WindowsVM --> RepoInterfaces
-WindowsData ..> RepoInterfaces : реализует
-WindowsData --> MidiDevice
-
-WebUI --> WebVM
-WebVM --> Domain
-WebVM --> RepoInterfaces
-WebData ..> RepoInterfaces : реализует
-WebData --> MidiDevice
-
-note right of Domain
-  Ядро независимо от платформы
-  Чистый Kotlin код
-end note
-
-note right of RepoInterfaces
-  Интерфейсы определены в ядре
-  Каждая платформа реализует свои адаптеры
-end note
-
+Rel(user, androidUi, "Использует")
+Rel(user, windowsUi, "Использует")
+Rel(user, webUi, "Использует")
 @enduml
 ```
 
@@ -816,72 +781,35 @@ end note
 
 ```plantuml
 @startuml
-!define RECTANGLE class
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title C4 Level 3: Компоненты PianoFlow Core
+title C4 Level 3: Компоненты ядра PianoFlow Core
 
-package "PianoFlow Core (Библиотека)" {
-    
-    package "Domain Layer" {
-        rectangle "Use Cases" as UseCases {
-            [ProcessMidiMessageUseCase]
-            [ConnectMidiDeviceUseCase]
-            [AnalyzePerformanceUseCase]
-            [StartGameSessionUseCase]
-        }
-        
-        rectangle "Domain Models" as Models {
-            [MidiEvent]
-            [Note]
-            [GameSession]
-            [PerformanceAnalysis]
-        }
-        
-        rectangle "Repository Interfaces" as RepoInterfaces {
-            [MidiRepository]
-            [GameRepository]
-        }
-    }
+LAYOUT_WITH_LEGEND()
+
+Container_Boundary(core, "PianoFlow Core (Библиотека)") {
+    Component(useCases, "Use Cases", "Kotlin", "Инкапсулирует бизнес-логику (анализ игры, обработка MIDI).")
+    Component(models, "Domain Models", "Kotlin", "Представление бизнес-сущностей (ноты, сессии, события).")
+    Component(repoInterfaces, "Repository Interfaces", "Kotlin", "Абстракции для доступа к данным (MidiRepository, GameRepository).")
+
+    Rel(useCases, models, "Использует")
+    Rel(useCases, repoInterfaces, "Использует")
 }
 
-package "Platform Adapters" {
-    rectangle "Android Adapter" as AndroidAdapter {
-        [AndroidMidiRepositoryImpl]
-        [AndroidMidiDataSource]
-    }
-    
-    rectangle "Windows Adapter" as WindowsAdapter {
-        [WindowsMidiRepositoryImpl]
-        [WindowsMidiDataSource]
-    }
-    
-    rectangle "Web Adapter" as WebAdapter {
-        [WebMidiRepositoryImpl]
-        [WebMidiDataSource]
-    }
+Container_Boundary(platform, "Platform Adapters (Вне ядра)") {
+    Component(androidAdapter, "Android Adapter", "Kotlin", "Реализует Repository Interfaces, используя Android MIDI API.")
+    Component(windowsAdapter, "Windows Adapter", "Kotlin/JVM", "Реализует Repository Interfaces, используя Windows MIDI API.")
+    Component(webAdapter, "Web Adapter", "Kotlin/JS", "Реализует Repository Interfaces, используя Web MIDI API.")
 }
 
-UseCases --> Models
-UseCases --> RepoInterfaces
 
-AndroidAdapter ..> RepoInterfaces : реализует
-WindowsAdapter ..> RepoInterfaces : реализует
-WebAdapter ..> RepoInterfaces : реализует
-
-note right of UseCases
-  Бизнес-логика
-  Независима от платформы
-end note
-
-note right of RepoInterfaces
-  Абстракции для работы
-  с данными
-end note
-
+Rel_Up(androidAdapter, repoInterfaces, "Реализует")
+Rel_Up(windowsAdapter, repoInterfaces, "Реализует")
+Rel_Up(webAdapter, repoInterfaces, "Реализует")
 @enduml
 ```
 
-### 9.5. Пример использования ядра в веб-приложении
+### 8.5. Пример использования ядра в веб-приложении
 
 Аналогично сайту pianomarvel.com, веб-приложение может использовать Web MIDI API для подключения к MIDI-устройству:
 
@@ -926,7 +854,7 @@ class WebMidiViewModel(
 }
 ```
 
-### 9.6. Преимущества вынесения ядра
+### 8.6. Преимущества вынесения ядра
 
 1. **Единая бизнес-логика** — одна реализация для всех платформ
 2. **Легкое тестирование** — ядро тестируется независимо от платформы
@@ -934,7 +862,7 @@ class WebMidiViewModel(
 4. **Консистентность** — одинаковое поведение на всех платформах
 5. **Переиспользование** — ядро может быть использовано в других проектах
 
-### 9.7. Рекомендации по реализации
+### 8.7. Рекомендации по реализации
 
 1. **Вынести Domain-слой в отдельный модуль** на раннем этапе разработки
 2. **Использовать Kotlin Multiplatform** для поддержки нескольких платформ из одного кода
@@ -942,7 +870,7 @@ class WebMidiViewModel(
 4. **Создать платформо-специфичные адаптеры** для каждой целевой платформы
 5. **Покрыть ядро unit-тестами** для обеспечения качества при переиспользовании
 
-## 10. Заключение
+## 9. Заключение
 
 Данная архитектура обеспечивает:
 - **Минимальную связность** между компонентами
