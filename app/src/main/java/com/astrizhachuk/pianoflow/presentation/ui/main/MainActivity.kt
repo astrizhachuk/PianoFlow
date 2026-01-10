@@ -12,8 +12,8 @@ import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.presentation.service.UserNotifier
 import com.astrizhachuk.pianoflow.presentation.viewmodel.midi.MidiConnectionViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -35,15 +35,27 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        // Принудительная инициализация ViewModel
-        lifecycleScope.launch {
-            viewModel.connectionState.collect()
-        }
-
-        // Наблюдение за уведомлениями от UserNotifier
+        observeConnectionState()
         observeNotifications()
     }
 
+    /**
+     * Запускает отслеживание состояния MIDI-подключения.
+     *
+     * Эта подписка необходима, чтобы StateFlow в [MidiConnectionViewModel] стал активным
+     * и начал получать обновления от UseCase.
+     */
+    private fun observeConnectionState() {
+        viewModel.connectionState.launchIn(lifecycleScope)
+    }
+
+    /**
+     * Подписывается на UI-уведомления от [UserNotifier].
+     *
+     * Запускает корутину, которая собирает сообщения из потока [UserNotifier.userMessages]
+     * и отображает их пользователю в виде Toast. Используется `collectLatest`, чтобы
+     * избежать очереди из уведомлений, если они приходят слишком быстро.
+     */
     private fun observeNotifications() {
         lifecycleScope.launch {
             userNotifier.userMessages.collectLatest { message ->
