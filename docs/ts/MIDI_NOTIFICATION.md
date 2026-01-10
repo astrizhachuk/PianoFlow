@@ -168,7 +168,7 @@ activate UI
 note left of UI : Hilt внедряет `UserNotifier`
 UI -> UI : onCreate()
 UI -> UI : observeNotifications()
-UI -> Notifier : userMessages.collect()
+UI -> Notifier : userMessages.collectLatest()
 note right of UI : Activity начинает слушать\nсообщения
 
 ... Спустя какое-то время ...
@@ -208,4 +208,4 @@ deactivate UI
 
 - ✅ При подключении MIDI-клавиатуры на экране появляется Toast с сообщением, содержащим ее имя.
 - ✅ При отключении MIDI-клавиатуры на экране появляется Toast с сообщением "MIDI-клавиатура отключена".
-- ✅ Принудительной инициализации `MidiConnectionViewModel` в `Activity` (например, в MainActivity) гарантирует, что отслеживание подключения запускается при старте приложения.
+
