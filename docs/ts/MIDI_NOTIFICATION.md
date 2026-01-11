@@ -152,60 +152,85 @@ end note
 
 ### 3.2. Последовательность событий
 
-Диаграмма ниже иллюстрирует типичный сценарий: `MidiConnectionViewModel` (издатель) отправляет уведомление о подключении устройства, а `Activity` (подписчик) его отображает.
+Диаграмма ниже иллюстрирует типичный сценарий с учетом `repeatOnLifecycle`.
 
 ```plantuml
 @startuml
-title Сценарий: Отображение уведомления
+title Сценарий: Отображение уведомления (финальная версия)
 
 participant "Activity" as UI
-participant "UserNotifier" as Notifier
-participant "MidiConnectionViewModel" as VM
+participant "UserNotifier (Singleton)" as Notifier
+participant "ViewModel" as VM
 
-note over Notifier: Singleton, живет с приложением
+activate Notifier #Gainsboro
+note over Notifier: Singleton, существует в течение всего\nжизненного цикла приложения.
 
 activate UI
-note left of UI : Hilt внедряет `UserNotifier`
 UI -> UI : onCreate()
-UI -> UI : observeNotifications()
-UI -> Notifier : userMessages.collectLatest()
-note right of UI : Activity начинает слушать\nсообщения
 
-... Спустя какое-то время ...
+== UI переходит в состояние STARTED ==
+UI -> Notifier : подписывается на userMessages.collect()
+activate UI #LightBlue
+note right of UI: **Корутина-сборщик** запущена.\nОна будет активна, пока UI > STARTED.
 
-== Происходит событие (например, подключение MIDI) ==
+loop пока UI в состоянии STARTED
 
-UI -> VM : <<create>> первое обращение
-activate VM
-note over VM
- Hilt внедряет тот же `UserNotifier`.
- Выполняется `init` блок и внутренняя логика.
- VM решает показать сообщение.
-end note
-VM -> Notifier : showMessage(UserMessage)
-activate Notifier
-Notifier -> Notifier : Помещает сообщение в SharedFlow
-Notifier -> UI : Отправляет сообщение подписчику
-deactivate Notifier
-deactivate VM
+    note over UI, VM : Происходит событие, и VM отправляет уведомление
+    activate VM
+    VM -> Notifier : showMessage(message)
+    deactivate VM
 
-UI -> UI : Отображает Toast
+    Notifier -> UI : (message)
+    note right of UI: Корутина возобновляется (resume),\nобрабатывает сообщение...
+    UI -> UI: Отображает Toast
+    note right of UI: ...и **снова приостанавливается** (suspend)\nв ожидании следующего сообщения.
+
+end
+
+== UI переходит в состояние STOPPED ==
+note right of UI: `repeatOnLifecycle` отменяет\nкорутину-сборщик.
+deactivate UI #LightBlue
+
+== UI переходит в состояние DESTROYED ==
 deactivate UI
+deactivate Notifier
 @enduml
 ```
 
 ### 3.3. Управление жизненным циклом
 
-Правильное управление жизненным циклом гарантирует, что система работает эффективно и без утечек памяти.
+Правильное управление жизненным циклом подписки — ключ к эффективной и безопасной работе с UI. С добавлением `repeatOnLifecycle` он становится строго детерминированным.
 
-*   **Издатель (`MidiConnectionViewModel`)**: Его жизненный цикл привязан к `Activity`. Он может отправлять сообщения в `UserNotifier` в любой момент, пока существует.
-*   **Шина событий (`UserNotifier`)**: Так как это **синглтон** (`@Singleton`), он живет на протяжении всего жизненного цикла приложения. Это гарантирует, что он всегда доступен для отправки и получения сообщений, выступая стабильным посредником.
-*   **Подписчик (`Activity`)**: Подписка на сообщения происходит внутри `lifecycleScope`. Это означает, что как только `Activity` будет уничтожена, подписка автоматически отменится. Это ключевой момент, который предотвращает попытки обновить уже не существующий UI и защищает от утечек памяти.
+*   **Издатель (`MidiConnectionViewModel`)**: Его жизненный цикл привязан к графу навигации или `Activity`. Он может отправлять сообщения в `UserNotifier` в любой момент, пока существует.
+*   **Шина событий (`UserNotifier`)**: Является синглтоном (`@Singleton`), поэтому живет на протяжении всего жизненного цикла приложения. Это гарантирует, что он всегда доступен для отправки и получения сообщений.
+*   **Подписчик (`Activity`)**: Подписка на сообщения (`userMessages.collect`) выполняется внутри блока `repeatOnLifecycle(Lifecycle.State.STARTED)`. Это определяет точный и однозначный жизненный цикл подписки:
+    *   **Подписка создается и становится активной**: когда `Activity` переходит в состояние `STARTED` (сразу после вызова `onStart()`). Именно в этот момент `Activity` начинает слушать и обрабатывать сообщения.
+    *   **Подписка умирает (отменяется)**: когда `Activity` уходит с экрана и переходит в состояние `STOPPED` (сразу после вызова `onStop()`). Сбор сообщений полностью прекращается.
 
-Таким образом, `ViewModel` ничего не знает о `View`, а `View` безопасно подписывается на события, жизненный цикл которых управляется автоматически.
+Диаграмма состояний ниже наглядно иллюстрирует жизненный цикл подписки в `Activity`. 
+
+```plantuml
+@startuml
+title Жизненный цикл подписки в Activity
+hide empty description
+
+state "Подписка неактивна" as Inactive
+state "Подписка активна" as Active
+
+[*] --> Inactive : onCreate
+Inactive --> Active : onStart
+Active --> Inactive : onStop
+
+Active --> [*] : onDestroy
+Inactive --> [*] : onDestroy
+@enduml
+```
+
+При возвращении пользователя в `Activity` (повторный вызов `onStart`), `repeatOnLifecycle` запускает блок с подпиской **заново**. Окончательно вся корутина, запущенная в `lifecycleScope`, отменяется при уничтожении `Activity` (после вызова `onDestroy`).
+
+Таким образом, мы имеем гарантию, что UI обновляется только тогда, когда он виден пользователю, что предотвращает бесполезную работу в фоновом режиме и ошибки, связанные с обновлением невидимого интерфейса.
 
 ## 4. Критерии приемки
 
 - ✅ При подключении MIDI-клавиатуры на экране появляется Toast с сообщением, содержащим ее имя.
 - ✅ При отключении MIDI-клавиатуры на экране появляется Toast с сообщением "MIDI-клавиатура отключена".
-
