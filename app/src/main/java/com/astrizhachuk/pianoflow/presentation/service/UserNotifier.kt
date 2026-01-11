@@ -22,5 +22,5 @@ interface UserNotifier {
      *
      * @param message Объект сообщения, которое необходимо показать.
      */
-    fun showMessage(message: UserMessage)
+    fun sendMessage(message: UserMessage)
 }

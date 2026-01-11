@@ -19,11 +19,11 @@ class UserNotifierImplTest {
     }
 
     @Test
-    fun `when message is shown, it is received by the collector`() = runTest {
+    fun `when message is sent, it is received by the collector`() = runTest {
         val message = UserMessage("Test message")
 
         notifier.userMessages.test {
-            notifier.showMessage(message)
+            notifier.sendMessage(message)
             assertEquals(message, awaitItem())
         }
     }
@@ -31,7 +31,7 @@ class UserNotifierImplTest {
     @Test
     fun `new subscriber does not receive old messages`() = runTest {
         val message = UserMessage("Old message")
-        notifier.showMessage(message)
+        notifier.sendMessage(message)
 
         notifier.userMessages.test {
             expectNoEvents()
@@ -53,9 +53,9 @@ class UserNotifierImplTest {
 
         yield()
 
-        notifier.showMessage(message1)
-        notifier.showMessage(message2)
-        notifier.showMessage(message3)
+        notifier.sendMessage(message1)
+        notifier.sendMessage(message2)
+        notifier.sendMessage(message3)
 
         yield()
 
@@ -77,7 +77,7 @@ class UserNotifierImplTest {
 
         yield()
 
-        notifier.showMessage(message)
+        notifier.sendMessage(message)
 
         yield()
 
@@ -104,7 +104,7 @@ class UserNotifierImplTest {
 
         yield()
 
-        notifier.showMessage(message1)
+        notifier.sendMessage(message1)
 
         yield()
 
@@ -115,7 +115,7 @@ class UserNotifierImplTest {
 
         yield()
 
-        notifier.showMessage(message2)
+        notifier.sendMessage(message2)
 
         yield()
 

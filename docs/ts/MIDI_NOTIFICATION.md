@@ -60,7 +60,7 @@ data class UserMessage(val text: String)
 // Интерфейс для отправки и получения сообщений
 interface UserNotifier {
     val userMessages: Flow<UserMessage>
-    fun showMessage(message: UserMessage)
+    fun sendMessage(message: UserMessage)
 }
 ```
 
@@ -120,10 +120,10 @@ title Внутреннее устройство UserNotifierImpl
 class UserNotifierImpl {
   - _userMessages: MutableSharedFlow<UserMessage>
   + userMessages: Flow<UserMessage>
-  + showMessage(message: UserMessage)
+  + sendMessage(message: UserMessage)
 }
 
-note right of UserNotifierImpl::showMessage
+note right of UserNotifierImpl::sendMessage
   Вызов этого метода отправляет
   сообщение в приватный поток `_userMessages`.
 end note
@@ -177,7 +177,7 @@ loop пока UI в состоянии STARTED
 
     note over UI, VM : Происходит событие, и VM отправляет уведомление
     activate VM
-    VM -> Notifier : showMessage(message)
+    VM -> Notifier : sendMessage(message)
     deactivate VM
 
     Notifier -> UI : (message)

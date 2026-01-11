@@ -48,7 +48,7 @@ class UserNotifierImpl @Inject constructor() : UserNotifier {
      * Внутри использует [tryEmit] для неблокирующей отправки сообщения в приватный
      * поток [_userMessages]. Сообщение будет доставлено всем активным подписчикам.
      */
-    override fun showMessage(message: UserMessage) {
+    override fun sendMessage(message: UserMessage) {
         _userMessages.tryEmit(message)
     }
 }
