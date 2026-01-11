@@ -59,7 +59,7 @@ data class UserMessage(val text: String)
 
 // Интерфейс для отправки и получения сообщений
 interface UserNotifier {
-    val userMessages: Flow<UserMessage>
+    val messages: Flow<UserMessage>
     fun sendMessage(message: UserMessage)
 }
 ```
@@ -118,17 +118,17 @@ NotificationModule::bindUserNotifier ..> UserNotifier : "(@Binds)"
 title Внутреннее устройство UserNotifierImpl
 
 class UserNotifierImpl {
-  - _userMessages: MutableSharedFlow<UserMessage>
-  + userMessages: Flow<UserMessage>
+  - _messages: MutableSharedFlow<UserMessage>
+  + messages: Flow<UserMessage>
   + sendMessage(message: UserMessage)
 }
 
 note right of UserNotifierImpl::sendMessage
   Вызов этого метода отправляет
-  сообщение в приватный поток `_userMessages`.
+  сообщение в приватный поток `_messages`.
 end note
 
-note right of UserNotifierImpl::userMessages
+note right of UserNotifierImpl::messages
   Внешние подписчики получают
   сообщения из этой публичной,
   неизменяемой версии потока.
@@ -147,7 +147,7 @@ end note
 
 1.  **Издатель** (например, `MidiConnectionViewModel`) на основе своей внутренней логики решает, что нужно уведомить пользователя. Например, изменилось состояние подключения MIDI-клавиатуры.
 2.  Он создает объект `UserMessage` и отправляет его в `UserNotifier`, который является синглтоном и доступен во всем приложении.
-3.  **Подписчик** (`Activity`) при своем создании подписывается на поток сообщений `userMessages` из `UserNotifier`.
+3.  **Подписчик** (`Activity`) при своем создании подписывается на поток сообщений `messages` из `UserNotifier`.
 4.  Как только издатель отправляет новое сообщение, `Activity` немедленно его получает и отображает на экране (например, в виде `Toast`).
 
 ### 3.2. Последовательность событий
@@ -169,7 +169,7 @@ activate UI
 UI -> UI : onCreate()
 
 == UI переходит в состояние STARTED ==
-UI -> Notifier : подписывается на userMessages.collect()
+UI -> Notifier : подписывается на messages.collect()
 activate UI #LightBlue
 note right of UI: **Корутина-сборщик** запущена.\nОна будет активна, пока UI > STARTED.
 
@@ -203,7 +203,7 @@ deactivate Notifier
 
 *   **Издатель (`MidiConnectionViewModel`)**: Его жизненный цикл привязан к графу навигации или `Activity`. Он может отправлять сообщения в `UserNotifier` в любой момент, пока существует.
 *   **Шина событий (`UserNotifier`)**: Является синглтоном (`@Singleton`), поэтому живет на протяжении всего жизненного цикла приложения. Это гарантирует, что он всегда доступен для отправки и получения сообщений.
-*   **Подписчик (`Activity`)**: Подписка на сообщения (`userMessages.collect`) выполняется внутри блока `repeatOnLifecycle(Lifecycle.State.STARTED)`. Это определяет точный и однозначный жизненный цикл подписки:
+*   **Подписчик (`Activity`)**: Подписка на сообщения (`messages.collect`) выполняется внутри блока `repeatOnLifecycle(Lifecycle.State.STARTED)`. Это определяет точный и однозначный жизненный цикл подписки:
     *   **Подписка создается и становится активной**: когда `Activity` переходит в состояние `STARTED` (сразу после вызова `onStart()`). Именно в этот момент `Activity` начинает слушать и обрабатывать сообщения.
     *   **Подписка умирает (отменяется)**: когда `Activity` уходит с экрана и переходит в состояние `STOPPED` (сразу после вызова `onStop()`). Сбор сообщений полностью прекращается.
 

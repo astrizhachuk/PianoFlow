@@ -59,7 +59,7 @@ class MainActivity : AppCompatActivity() {
     private fun observeNotifications(view: android.view.View) {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                userNotifier.userMessages.collectLatest { message ->
+                userNotifier.messages.collectLatest { message ->
                     Snackbar.make(view, message.text, Snackbar.LENGTH_SHORT).show()
                 }
             }

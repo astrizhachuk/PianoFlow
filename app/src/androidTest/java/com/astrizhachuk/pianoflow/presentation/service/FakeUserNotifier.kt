@@ -13,14 +13,14 @@ class FakeUserNotifier @Inject constructor() : UserNotifier {
      * Это делает тест более надежным, устраняя состояние гонки, когда подписчик
      * может активироваться чуть позже, чем было отправлено сообщение.
      */
-    private val _userMessages = MutableSharedFlow<UserMessage>(
+    private val _messages = MutableSharedFlow<UserMessage>(
         replay = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
-    override val userMessages: Flow<UserMessage> = _userMessages
+    override val messages: Flow<UserMessage> = _messages
 
-    override fun showMessage(message: UserMessage) {
+    override fun sendMessage(message: UserMessage) {
         // tryEmit никогда не упадет с этой конфигурацией буфера
-        _userMessages.tryEmit(message)
+        _messages.tryEmit(message)
     }
 }

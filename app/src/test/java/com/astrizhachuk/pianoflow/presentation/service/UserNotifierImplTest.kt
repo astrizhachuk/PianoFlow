@@ -22,7 +22,7 @@ class UserNotifierImplTest {
     fun `when message is sent, it is received by the collector`() = runTest {
         val message = UserMessage("Test message")
 
-        notifier.userMessages.test {
+        notifier.messages.test {
             notifier.sendMessage(message)
             assertEquals(message, awaitItem())
         }
@@ -33,7 +33,7 @@ class UserNotifierImplTest {
         val message = UserMessage("Old message")
         notifier.sendMessage(message)
 
-        notifier.userMessages.test {
+        notifier.messages.test {
             expectNoEvents()
         }
     }
@@ -46,7 +46,7 @@ class UserNotifierImplTest {
         val receivedItems = mutableListOf<UserMessage>()
 
         backgroundScope.launch {
-            notifier.userMessages.collect {
+            notifier.messages.collect {
                 receivedItems.add(it)
             }
         }
@@ -72,8 +72,8 @@ class UserNotifierImplTest {
         val collector1Received = mutableListOf<UserMessage>()
         val collector2Received = mutableListOf<UserMessage>()
 
-        backgroundScope.launch { notifier.userMessages.collect { collector1Received.add(it) } }
-        backgroundScope.launch { notifier.userMessages.collect { collector2Received.add(it) } }
+        backgroundScope.launch { notifier.messages.collect { collector1Received.add(it) } }
+        backgroundScope.launch { notifier.messages.collect { collector2Received.add(it) } }
 
         yield()
 
@@ -96,10 +96,10 @@ class UserNotifierImplTest {
         val collector2Received = mutableListOf<UserMessage>()
 
         val job1 = backgroundScope.launch {
-            notifier.userMessages.collect { collector1Received.add(it) }
+            notifier.messages.collect { collector1Received.add(it) }
         }
         backgroundScope.launch {
-            notifier.userMessages.collect { collector2Received.add(it) }
+            notifier.messages.collect { collector2Received.add(it) }
         }
 
         yield()

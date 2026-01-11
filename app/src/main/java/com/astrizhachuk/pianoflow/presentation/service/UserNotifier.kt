@@ -15,7 +15,7 @@ interface UserNotifier {
      * Асинхронный поток [UserMessage], на который могут подписаться UI-компоненты
      * для получения и отображения сообщений.
      */
-    val userMessages: Flow<UserMessage>
+    val messages: Flow<UserMessage>
 
     /**
      * Отправляет сообщение для отображения пользователю.

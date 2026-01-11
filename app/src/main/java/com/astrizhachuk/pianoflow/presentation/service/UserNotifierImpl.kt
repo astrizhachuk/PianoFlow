@@ -28,7 +28,7 @@ class UserNotifierImpl @Inject constructor() : UserNotifier {
      * - `onBufferOverflow = BufferOverflow.DROP_OLDEST`: Отбрасывает самое старое сообщение
      * при переполнении буфера.
      */
-    private val _userMessages = MutableSharedFlow<UserMessage>(
+    private val _messages = MutableSharedFlow<UserMessage>(
         replay = 0,
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
@@ -40,15 +40,15 @@ class UserNotifierImpl @Inject constructor() : UserNotifier {
      * Использование [asSharedFlow] обеспечивает инкапсуляцию, позволяя внешним
      * классам только подписываться на сообщения, но не отправлять их.
      */
-    override val userMessages: Flow<UserMessage> = _userMessages.asSharedFlow()
+    override val messages: Flow<UserMessage> = _messages.asSharedFlow()
 
     /**
      * Отправляет сообщение для отображения пользователю.
      *
      * Внутри использует [tryEmit] для неблокирующей отправки сообщения в приватный
-     * поток [_userMessages]. Сообщение будет доставлено всем активным подписчикам.
+     * поток [_messages]. Сообщение будет доставлено всем активным подписчикам.
      */
     override fun sendMessage(message: UserMessage) {
-        _userMessages.tryEmit(message)
+        _messages.tryEmit(message)
     }
 }
