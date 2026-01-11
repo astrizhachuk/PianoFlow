@@ -1,16 +1,18 @@
 package com.astrizhachuk.pianoflow.presentation.ui.main
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.presentation.service.UserNotifier
 import com.astrizhachuk.pianoflow.presentation.viewmodel.midi.MidiConnectionViewModel
+import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.launchIn
@@ -29,37 +31,37 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+
+        val mainView = findViewById<android.view.View>(R.id.main)
+
+        ViewCompat.setOnApplyWindowInsetsListener(mainView) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
 
         observeConnectionState()
-        observeNotifications()
+        observeNotifications(mainView)
     }
 
     /**
      * Запускает отслеживание состояния MIDI-подключения.
-     *
-     * Эта подписка необходима, чтобы StateFlow в [MidiConnectionViewModel] стал активным
-     * и начал получать обновления от UseCase.
      */
     private fun observeConnectionState() {
         viewModel.connectionState.launchIn(lifecycleScope)
     }
 
     /**
-     * Подписывается на UI-уведомления от [UserNotifier].
-     *
-     * Запускает корутину, которая собирает сообщения из потока [UserNotifier.userMessages]
-     * и отображает их пользователю в виде Toast. Используется `collectLatest`, чтобы
-     * избежать очереди из уведомлений, если они приходят слишком быстро.
+     * Подписывается на UI-уведомления от [UserNotifier] и отображает их в виде Snackbar.
+     * Сбор данных происходит только когда Activity находится в состоянии STARTED или выше,
+     * что предотвращает работу в фоновом режиме.
      */
-    private fun observeNotifications() {
+    private fun observeNotifications(view: android.view.View) {
         lifecycleScope.launch {
-            userNotifier.userMessages.collectLatest { message ->
-                Toast.makeText(this@MainActivity, message.text, Toast.LENGTH_SHORT).show()
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                userNotifier.userMessages.collectLatest { message ->
+                    Snackbar.make(view, message.text, Snackbar.LENGTH_SHORT).show()
+                }
             }
         }
     }
