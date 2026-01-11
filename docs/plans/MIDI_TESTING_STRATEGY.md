@@ -252,21 +252,37 @@ class VirtualMidiDeviceHelper {
 
 ## Зависимости для тестирования
 
+Ниже приведены основные зависимости, используемые для различных видов тестирования в проекте, как указано в файле `build.gradle.kts`.
+
 ```kotlin
 dependencies {
-    // ... основные зависимости ...
+    // ...
 
-    // Hilt for Android
-    implementation("com.google.dagger:hilt-android:2.51.1")
-    kapt("com.google.dagger:hilt-compiler:2.51.1")
+    // --- Unit-тесты (test) ---
 
-    // Hilt For instrumentation tests
-    androidTestImplementation("com.google.dagger:hilt-android-testing:2.51.1")
-    kaptAndroidTest("com.google.dagger:hilt-compiler:2.51.1")
+    // Основной фреймворк для тестов
+    testImplementation(libs.junit)
 
-    // Hilt For local unit tests
-    testImplementation("com.google.dagger:hilt-android-testing:2.51.1")
-    kaptTest("com.google.dagger:hilt-compiler:2.51.1")
+    // Создание моков и стабов
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.mockito.kotlin)
+
+    // Тестирование корутин и Flow
+    testImplementation(libs.coroutines.test)
+    testImplementation(libs.turbine)
+
+
+    // --- Инструментальные тесты (androidTest) ---
+
+    // JUnit и правила для тестов на Android
+    androidTestImplementation(libs.androidx.junit)
+
+    // Фреймворк для UI-тестирования
+    androidTestImplementation(libs.androidx.espresso.core)
+
+    // Hilt для тестирования на Android
+    androidTestImplementation(libs.hilt.android.testing)
+    kspAndroidTest(libs.hilt.compiler)
 }
 ```
 
