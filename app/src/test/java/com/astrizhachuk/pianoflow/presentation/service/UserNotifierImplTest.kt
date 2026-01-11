@@ -1,8 +1,8 @@
-
 package com.astrizhachuk.pianoflow.presentation.service
 
 import app.cash.turbine.test
 import com.astrizhachuk.pianoflow.presentation.model.UserMessage
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
@@ -44,25 +44,30 @@ class UserNotifierImplTest {
         val message1 = UserMessage("First")
         val message2 = UserMessage("Second")
         val message3 = UserMessage("Third")
+        val receivedItems = mutableListOf<UserMessage>()
 
-        notifier.userMessages.test {
-            // Отправляем и потребляем первое сообщение
+        val job = launch {
+            notifier.userMessages.collect {
+                receivedItems.add(it)
+            }
+        }
+
+        try {
+            yield()
+
             notifier.showMessage(message1)
-            assertEquals(message1, awaitItem())
-
-            // ВАЖНО: В тестовой среде с Turbine коллектор работает очень быстро.
-            // Из-за этого буфер SharedFlow (extraBufferCapacity) на самом деле не переполняется,
-            // и политика onBufferOverflow = DROP_OLDEST не срабатывает.
-            // Этот тест по факту проверяет простое FIFO (First-In-First-Out) поведение.
             notifier.showMessage(message2)
             notifier.showMessage(message3)
 
-            // Проверяем, что сообщения приходят в том порядке, в котором были отправлены.
-            assertEquals(message2, awaitItem())
-            assertEquals(message3, awaitItem())
+            yield()
 
-            // Убеждаемся, что других сообщений нет.
-            expectNoEvents()
+            assertEquals(
+                "The received messages should match the expected ones",
+                listOf(message3),
+                receivedItems
+            )
+        } finally {
+            job.cancel()
         }
     }
 
@@ -72,30 +77,25 @@ class UserNotifierImplTest {
         val collector1Received = mutableListOf<UserMessage>()
         val collector2Received = mutableListOf<UserMessage>()
 
-        val job1 = launch {
-            notifier.userMessages.collect { collector1Received.add(it) }
+        val job1 = launch { notifier.userMessages.collect { collector1Received.add(it) } }
+        val job2 = launch { notifier.userMessages.collect { collector2Received.add(it) } }
+
+        try {
+            yield()
+
+            notifier.showMessage(message)
+
+            yield()
+
+            assertEquals(1, collector1Received.size)
+            assertEquals(message, collector1Received.first())
+
+            assertEquals(1, collector2Received.size)
+            assertEquals(message, collector2Received.first())
+        } finally {
+            job1.cancel()
+            job2.cancel()
         }
-        val job2 = launch {
-            notifier.userMessages.collect { collector2Received.add(it) }
-        }
-
-        // Даем коллекторам шанс запуститься
-        yield()
-
-        notifier.showMessage(message)
-
-        // Даем коллекторам шанс обработать сообщение
-        yield()
-
-        // Убеждаемся, что оба коллектора получили сообщение
-        assertEquals(1, collector1Received.size)
-        assertEquals(message, collector1Received.first())
-
-        assertEquals(1, collector2Received.size)
-        assertEquals(message, collector2Received.first())
-
-        job1.cancel()
-        job2.cancel()
     }
 
     @Test
@@ -105,36 +105,38 @@ class UserNotifierImplTest {
         val collector1Received = mutableListOf<UserMessage>()
         val collector2Received = mutableListOf<UserMessage>()
 
-        val job1 = launch {
+        val job1: Job = launch {
             notifier.userMessages.collect { collector1Received.add(it) }
         }
-        val job2 = launch {
+        val job2: Job = launch {
             notifier.userMessages.collect { collector2Received.add(it) }
         }
 
-        // Запускаем коллекторы и отправляем первое сообщение
-        yield()
-        notifier.showMessage(message1)
-        yield()
+        try {
+            yield()
+            notifier.showMessage(message1)
+            yield()
 
-        // Оба должны были получить первое сообщение
-        assertEquals(1, collector1Received.size)
-        assertEquals(1, collector2Received.size)
+            assertEquals(1, collector1Received.size)
+            assertEquals(1, collector2Received.size)
 
-        // Отменяем первый коллектор
-        job1.cancel()
-        yield() // Позволяем отмене завершиться
+            job1.cancel()
+            yield()
 
-        // Отправляем второе сообщение
-        notifier.showMessage(message2)
-        yield()
+            notifier.showMessage(message2)
+            yield()
 
-        // Убеждаемся, что только второй коллектор получил новое сообщение
-        assertEquals("Collector 1 should not receive new messages after cancellation", 1, collector1Received.size)
+            assertEquals(
+                "Collector 1 should not receive new messages after cancellation",
+                1,
+                collector1Received.size
+            )
 
-        assertEquals(2, collector2Received.size)
-        assertEquals(message2, collector2Received.last())
-
-        job2.cancel()
+            assertEquals(2, collector2Received.size)
+            assertEquals(message2, collector2Received.last())
+        } finally {
+            job1.cancel() // Повторный вызов безопасен
+            job2.cancel()
+        }
     }
 }
