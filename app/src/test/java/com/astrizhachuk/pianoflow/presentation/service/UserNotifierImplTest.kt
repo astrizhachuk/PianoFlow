@@ -103,16 +103,20 @@ class UserNotifierImplTest {
         }
 
         yield()
+
         notifier.showMessage(message1)
+
         yield()
 
         assertEquals(1, collector1Received.size)
         assertEquals(1, collector2Received.size)
 
         job1.cancel()
+
         yield()
 
         notifier.showMessage(message2)
+
         yield()
 
         assertEquals(
