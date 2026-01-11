@@ -6,7 +6,7 @@ import androidx.test.runner.AndroidJUnitRunner
 import dagger.hilt.android.testing.HiltTestApplication
 
 /**
- * Кастомный Runner для запуска инструментальных тестов с Hilt.
+ * Runner для запуска инструментальных тестов с Hilt.
  * Он подменяет стандартный класс Application на HiltTestApplication,
  * который необходим для корректной работы Hilt в тестах.
  */

@@ -15,8 +15,6 @@ import javax.inject.Singleton
 )
 object TestNotificationModule {
 
-    // Эта аннотация гарантирует, что Hilt создаст ОДИН экземпляр FakeUserNotifier
-    // и будет переиспользовать его для всех инъекций в рамках этого теста.
     @Provides
     @Singleton
     fun provideUserNotifier(): UserNotifier {

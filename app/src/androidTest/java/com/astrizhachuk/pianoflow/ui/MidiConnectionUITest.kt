@@ -41,7 +41,7 @@ class MidiConnectionUITest {
         val testMessage = "This is a test message"
 
         activityRule.scenario.onActivity {
-            (userNotifier as com.astrizhachuk.pianoflow.presentation.service.FakeUserNotifier).showMessage(UserMessage(testMessage))
+            (userNotifier as com.astrizhachuk.pianoflow.presentation.service.FakeUserNotifier).sendMessage(UserMessage(testMessage))
         }
 
         onView(withText(testMessage))
