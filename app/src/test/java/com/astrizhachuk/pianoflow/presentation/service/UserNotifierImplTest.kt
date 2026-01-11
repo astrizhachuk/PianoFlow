@@ -2,7 +2,6 @@ package com.astrizhachuk.pianoflow.presentation.service
 
 import app.cash.turbine.test
 import com.astrizhachuk.pianoflow.presentation.model.UserMessage
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
@@ -46,29 +45,25 @@ class UserNotifierImplTest {
         val message3 = UserMessage("Third")
         val receivedItems = mutableListOf<UserMessage>()
 
-        val job = launch {
+        backgroundScope.launch {
             notifier.userMessages.collect {
                 receivedItems.add(it)
             }
         }
 
-        try {
-            yield()
+        yield()
 
-            notifier.showMessage(message1)
-            notifier.showMessage(message2)
-            notifier.showMessage(message3)
+        notifier.showMessage(message1)
+        notifier.showMessage(message2)
+        notifier.showMessage(message3)
 
-            yield()
+        yield()
 
-            assertEquals(
-                "The received messages should match the expected ones",
-                listOf(message3),
-                receivedItems
-            )
-        } finally {
-            job.cancel()
-        }
+        assertEquals(
+            "The received messages should match the expected ones",
+            listOf(message3),
+            receivedItems
+        )
     }
 
     @Test
@@ -77,67 +72,56 @@ class UserNotifierImplTest {
         val collector1Received = mutableListOf<UserMessage>()
         val collector2Received = mutableListOf<UserMessage>()
 
-        val job1 = launch { notifier.userMessages.collect { collector1Received.add(it) } }
-        val job2 = launch { notifier.userMessages.collect { collector2Received.add(it) } }
+        backgroundScope.launch { notifier.userMessages.collect { collector1Received.add(it) } }
+        backgroundScope.launch { notifier.userMessages.collect { collector2Received.add(it) } }
 
-        try {
-            yield()
+        yield()
 
-            notifier.showMessage(message)
+        notifier.showMessage(message)
 
-            yield()
+        yield()
 
-            assertEquals(1, collector1Received.size)
-            assertEquals(message, collector1Received.first())
+        assertEquals(1, collector1Received.size)
+        assertEquals(message, collector1Received.first())
 
-            assertEquals(1, collector2Received.size)
-            assertEquals(message, collector2Received.first())
-        } finally {
-            job1.cancel()
-            job2.cancel()
-        }
+        assertEquals(1, collector2Received.size)
+        assertEquals(message, collector2Received.first())
     }
 
     @Test
     fun `cancelled collector stops receiving messages`() = runTest {
-
         val message1 = UserMessage("First Broadcast")
         val message2 = UserMessage("Second Broadcast")
         val collector1Received = mutableListOf<UserMessage>()
         val collector2Received = mutableListOf<UserMessage>()
 
-        val job1: Job = launch {
+        val job1 = backgroundScope.launch {
             notifier.userMessages.collect { collector1Received.add(it) }
         }
-        val job2: Job = launch {
+        backgroundScope.launch {
             notifier.userMessages.collect { collector2Received.add(it) }
         }
 
-        try {
-            yield()
-            notifier.showMessage(message1)
-            yield()
+        yield()
+        notifier.showMessage(message1)
+        yield()
 
-            assertEquals(1, collector1Received.size)
-            assertEquals(1, collector2Received.size)
+        assertEquals(1, collector1Received.size)
+        assertEquals(1, collector2Received.size)
 
-            job1.cancel()
-            yield()
+        job1.cancel()
+        yield()
 
-            notifier.showMessage(message2)
-            yield()
+        notifier.showMessage(message2)
+        yield()
 
-            assertEquals(
-                "Collector 1 should not receive new messages after cancellation",
-                1,
-                collector1Received.size
-            )
+        assertEquals(
+            "Collector 1 should not receive new messages after cancellation",
+            1,
+            collector1Received.size
+        )
 
-            assertEquals(2, collector2Received.size)
-            assertEquals(message2, collector2Received.last())
-        } finally {
-            job1.cancel()
-            job2.cancel()
-        }
+        assertEquals(2, collector2Received.size)
+        assertEquals(message2, collector2Received.last())
     }
 }
