@@ -100,6 +100,7 @@ class UserNotifierImplTest {
 
     @Test
     fun `cancelled collector stops receiving messages`() = runTest {
+
         val message1 = UserMessage("First Broadcast")
         val message2 = UserMessage("Second Broadcast")
         val collector1Received = mutableListOf<UserMessage>()
@@ -135,7 +136,7 @@ class UserNotifierImplTest {
             assertEquals(2, collector2Received.size)
             assertEquals(message2, collector2Received.last())
         } finally {
-            job1.cancel() // Повторный вызов безопасен
+            job1.cancel()
             job2.cancel()
         }
     }
