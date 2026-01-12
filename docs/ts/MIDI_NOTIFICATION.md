@@ -66,7 +66,7 @@ interface UserNotifier {
 
 ### 2.3. Внедрение зависимостей
 
-Чтобы Hilt знал, что при запросе интерфейса `UserNotifier` нужно предоставлять экземпляр класса `UserNotifierImpl`, используется **@Module**.
+Чтобы Hilt знал, что при запросе интерфейса `UserNotifier` нужно предоставлять экземпляр класса `UserNotifierImpl`, используется `NotificationModule`.
 
 ```kotlin
 // Файл: di/NotificationModule.kt

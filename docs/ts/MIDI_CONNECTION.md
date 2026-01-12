@@ -4,128 +4,216 @@
 
 ### 1.1. Цель доработки
 
-Реализация функционала автоматического отслеживания состояния подключения MIDI-клавиатуры к Android-устройству.
+Реализовать функционал для автоматического отслеживания состояния подключения MIDI-клавиатуры к Android-устройству и информирования пользователя об изменениях этого состояния.
 
 ### 1.2. Базовые документы
 
-- [Описание приложения](../plans/APPLICATION_DESCRIPTION.md)
 - [Архитектурные принципы](../plans/ARCHITECTURE_PRINCIPLES.md)
-- [Сценарии отслеживания состояния подключения MIDI-клавиатуры](../uc/MIDI_KEYBOARD_CONNECTION_STATE.md)
-- [Техническое задание: Реализация уведомлений](./MIDI_NOTIFICATION.md)
+- [Сценарии: Отслеживание состояния и уведомления](../uc/MIDI_KEYBOARD_CONNECTION_STATE.md)
+- [Техническое задание: Реализация механизма уведомлений](./MIDI_NOTIFICATION.md)
 
-## 2. Реализованный сценарий
+## 2. Архитектурное решение
 
-### 2.1. UC-001: Отслеживание состояния подключения MIDI-клавиатуры
+### 2.1. Компоненты
 
-**Статус:** ✅ Реализовано
+Система отслеживания будет построена на принципах многоуровневой архитектуры (Clean Architecture) и разделена на следующие компоненты, сгруппированные по слоям:
 
-**Реализованные сценарии:**
-- ✅ Автоматическое отслеживание подключенных MIDI-устройств при запуске приложения
-- ✅ Автоматическое подключение к первому найденному устройству
-- ✅ Обнаружение устройства, уже подключенного при запуске приложения
-- ✅ Обнаружение отключения устройства
-- ✅ Поддержка только одного устройства одновременно
-- ✅ Обработка случая, когда MIDI не поддерживается на устройстве
+**Domain Layer**
+- **`MidiRepository`:** Абстракция над источником данных, определяющая контракт для получения состояния подключения.
+- **`MidiDevice`:** Доменная модель, представляющая информацию о подключенном MIDI-устройстве.
+- **`TrackMidiConnectionUseCase`:** Бизнес-логика, предоставляющая `Flow<ConnectionState>` для `Presentation Layer`.
+- **`ShowConnectionNotificationUseCase`:** Компонент, который используется для отображения уведомлений пользователю.
 
-**Реализованные компоненты:**
-- `TrackMidiConnectionUseCase` (`Domain Layer`)
-- `MidiRepository` (Интерфейс в `Domain Layer`, реализация в `Data Layer`)
-- `MidiDataSource` (`Data Layer`)
-- `MidiConnectionViewModel` (`Presentation Layer`)
+**Data Layer**
+- **`MidiDataSource`:** Инкапсулирует всю работу с Android MIDI API (`MidiManager`), отслеживает подключения и отключения, транслируя их в `Flow`.
+- **`MidiDeviceMapper`:** Преобразует модели данных MIDI API в доменную модель `MidiDevice`.
 
-## 3. Архитектурные решения
+**Presentation Layer**
+- **`MidiConnectionViewModel`:** `ViewModel`, которая подписывается на `Flow` из `UseCase` и инициирует отображение уведомлений.
 
-### 3.1. Архитектурные слои
-
-Реализация разделена на три слоя:
-
-- **`Domain Layer`** — независим от Android, содержит бизнес-логику.
-- **`Data Layer`** — реализует источники данных через Android MIDI API.
-- **`Presentation Layer`** — Android-специфичный слой для UI.
-
-### 3.2. Диаграмма слоев и компонентов
-
-Ниже представлена диаграмма взаимодействия компонентов.
 
 ```plantuml
 @startuml
-!theme plain
-skinparam packageStyle rectangle
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-package "Presentation Layer" {
-    class MainActivity
-    class MidiConnectionViewModel {
-        - trackMidiConnectionUseCase: TrackMidiConnectionUseCase
-        + connectionState: StateFlow<ConnectionState>
-    }
+title C4 - Уровень 3: Компоненты системы отслеживания MIDI
+
+Container_Boundary(presentation, "Presentation Layer") {
+    Component(vm, "MidiConnectionViewModel", "ViewModel", "Подписывается на изменения и инициирует уведомления.")
+    Component(activity, "MainActivity", "UI", "Запускает ViewModel и отображает UI.")
 }
 
-package "Domain Layer" {
-    class TrackMidiConnectionUseCase {
-        - midiRepository: MidiRepository
-        + invoke(): Flow<ConnectionState>
-    }
-    interface MidiRepository {
-        + observeConnectionState(): Flow<ConnectionState>
-        + connectToDevice(deviceId?): Result<MidiDevice>
-        // ... другие методы
-    }
-    class ConnectionState <<sealed>>
-    class MidiDevice
+Container_Boundary(domain, "Domain Layer") {
+    Component(track_uc, "TrackMidiConnectionUseCase", "Use Case", "Предоставляет Flow состояния.")
+    Component(notify_uc, "ShowConnectionNotificationUseCase", "Use Case", "Отображает уведомления.")
+    Component(repo, "MidiRepository", "Интерфейс", "Контракт для получения данных.")
+    Component(state, "ConnectionState", "Sealed Interface", "Модель состояния.")
+    Component(device, "MidiDevice", "Data Class", "Доменная модель устройства.")
 }
 
-package "Data Layer" {
-    class MidiRepositoryImpl {
-        - midiDataSource: MidiDataSource
-        + observeConnectionState(): Flow<ConnectionState>
-        // ... другие методы
-    }
-    class MidiDataSource {
-        - midiManager: MidiManager
-        + connectionState: StateFlow<ConnectionState>
-        // ... другие методы
-    }
+Container_Boundary(data, "Data Layer") {
+    Component(repo_impl, "MidiRepositoryImpl", "Реализация", "Проксирует данные из DataSource.")
+    Component(ds, "MidiDataSource", "Источник данных", "Работает с Android MIDI API.")
+    Component(mapper, "MidiDeviceMapper", "Mapper", "Преобразует DTO в доменную модель.")
 }
 
-MainActivity --> MidiConnectionViewModel
-MidiConnectionViewModel --> TrackMidiConnectionUseCase
-TrackMidiConnectionUseCase --> MidiRepository
-MidiRepositoryImpl ..|> MidiRepository
-MidiRepositoryImpl --> MidiDataSource
+' Связи
+Rel(activity, vm, "Использует")
+Rel(vm, track_uc, "Вызывает")
+Rel(vm, notify_uc, "Вызывает")
+Rel(track_uc, repo, "Зависит от")
+Rel(repo_impl, repo, "@Binds")
+Rel(repo_impl, ds, "Зависит от")
+Rel(ds, mapper, "Использует")
+Rel(track_uc, state, "Возвращает Flow<ConnectionState>")
 
-note right of MidiRepository
-  `Domain Layer` не зависит
-  от Android и может быть
-  переиспользован.
-end note
+Rel(state, device, "Содержит")
+Rel(mapper, device, "Создает")
 
 @enduml
 ```
 
-## 4. Структура компонентов по слоям
+### 2.2. API и Модели данных
 
-### 4.1. Domain Layer
+**Domain Layer:**
 
-- **Модели**: `MidiDevice`, `ConnectionState`
-- **Интерфейсы репозиториев**: `MidiRepository`
-- **Сценарии (Use Cases)**: `TrackMidiConnectionUseCase`
+```kotlin
+// com.astrizhachuk.pianoflow.domain.model.ConnectionState.kt
+sealed interface ConnectionState {
+    data class Connected(val device: MidiDevice) : ConnectionState
+    data object Disconnected : ConnectionState
+    data class Error(val message: String) : ConnectionState
+    data object NoDevice : ConnectionState
+}
 
-### 4.2. Data Layer
+// com.astrizhachuk.pianoflow.domain.model.MidiDevice.kt
+data class MidiDevice(val id: Int, val name: String, val vendor: String)
 
-- **Источники данных (Data Sources)**: `MidiDataSource` (работает с Android MIDI API)
-- **Реализации репозиториев**: `MidiRepositoryImpl`
-- **DI-модули**: `DataModule`
+// com.astrizhachuk.pianoflow.domain.repository.MidiRepository.kt
+interface MidiRepository {
+    fun observeConnectionState(): Flow<ConnectionState>
+}
+```
 
-### 4.3. Presentation Layer
+### 2.3. Внедрение зависимостей
 
-- **ViewModels**: `MidiConnectionViewModel`
-- **UI Components (Activities/Fragments)**: `MainActivity`
+Чтобы Hilt знал, что при запросе интерфейса `MidiRepository` необходимо предоставлять экземпляр `MidiRepositoryImpl`, используется `DataModule`. 
 
-## 5. Зависимости
+```kotlin
+// com.astrizhachuk.pianoflow.data.di.DataModule.kt
 
-...
-(раздел без изменений)
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class DataModule {
 
-## 6. Заключение
+    @Binds
+    abstract fun bindMidiRepository(impl: MidiRepositoryImpl): MidiRepository
 
-Реализован полный функционал отслеживания состояния подключения MIDI-клавиатуры. Реализация использует Clean Architecture, покрыта unit-тестами и готова к использованию.
+    companion object {
+        @Provides
+        @Singleton
+        fun provideApplicationScope(): CoroutineScope { 
+            return CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        }
+
+        @Provides
+        @Singleton
+        fun provideMidiDataSource(
+            @ApplicationContext context: Context,
+            scope: CoroutineScope
+        ): MidiDataSource {
+            return MidiDataSource(context, scope)
+        }
+    }
+}
+```
+
+- **`@Binds`** в `bindMidiRepository` эффективно сообщает Hilt, что реализацией для интерфейса `MidiRepository` является `MidiRepositoryImpl`.
+- **`@Provides`** используется для `provideMidiDataSource` и `provideApplicationScope`, поскольку для создания этих объектов требуется логика (вызов конструкторов с параметрами). 
+- **`provideApplicationScope`** создает `CoroutineScope` уровня приложения. Он необходим для `MidiDataSource`, чтобы отслеживание состояния подключения работало в фоновом режиме на протяжении всего жизненного цикла приложения, а не только когда активен UI.
+- **`provideMidiDataSource`** создает `MidiDataSource`, внедряя в него контекст приложения и `CoroutineScope`, созданный ранее. Этот компонент является центральной точкой, инкапсулирующей всю логику работы с Android MIDI API.
+- **`@Singleton`** гарантирует, что для каждого из этих компонентов будет создан только один экземпляр.
+
+```plantuml
+@startuml
+title Связывание зависимостей через Hilt
+
+class MidiRepository <<interface>>
+class MidiRepositoryImpl <<@Singleton>>
+class MidiDataSource <<@Singleton>>
+class CoroutineScope
+
+class DataModule <<Hilt Module>> {
+  +bindMidiRepository(impl): MidiRepository
+  +provideApplicationScope(): CoroutineScope
+  +provideMidiDataSource(...): MidiDataSource
+}
+
+MidiRepositoryImpl .up.|> MidiRepository : реализует
+MidiRepositoryImpl --> MidiDataSource : зависит от
+MidiDataSource --> CoroutineScope : зависит от
+
+DataModule::bindMidiRepository ..> MidiRepository : "(@Binds)"
+DataModule::provideMidiDataSource ..> MidiDataSource : "(@Provides)"
+DataModule::provideApplicationScope ..> CoroutineScope : "(@Provides)"
+
+@enduml
+```
+
+## 3. Жизненный цикл и взаимодействие
+
+### 3.1. Принцип работы
+
+1.  **`MidiDataSource`** при инициализации регистрирует `DeviceCallback` у `MidiManager` и немедленно проверяет наличие уже подключенных устройств.
+2.  Любое изменение (подключение/отключение) транслируется в `StateFlow<ConnectionState>`.
+3.  **`MidiConnectionViewModel`** через `TrackMidiConnectionUseCase` и `MidiRepository` получает этот `Flow`.
+4.  С помощью оператора `stateIn` `ViewModel` превращает холодный `Flow` в горячий `StateFlow`, который кеширует последнее состояние. Это позволяет `MainActivity` и другим подписчикам безопасно подключаться к потоку данных.
+5.  В операторе `onEach` `ViewModel` вызывает `ShowConnectionNotificationUseCase` для каждого нового состояния, инициируя показ уведомления.
+
+### 3.2. Последовательность событий
+
+Диаграмма иллюстрирует процесс от момента подключения устройства до отображения уведомления.
+
+```plantuml
+@startuml
+title Сценарий: Обнаружение и уведомление о подключении
+
+participant "Android System" as System
+participant "MidiDataSource" as DS
+participant "MidiConnectionViewModel" as VM
+participant "ShowConnectionNotificationUseCase" as NotifyUC
+
+activate DS
+System -> DS : onDeviceAdded(deviceInfo)
+
+DS -> DS : openDevice(deviceInfo)
+DS -> System: MidiManager.openDevice()
+System --> DS: Устройство успешно открыто
+
+DS -> DS : _connectionState.value = Connected(...)
+
+activate VM
+DS -> VM : new ConnectionState.Connected
+VM -> VM : onEach { ... }
+
+VM -> NotifyUC : invoke(state)
+deactivate VM
+
+activate NotifyUC
+NotifyUC -> System: Показывает уведомление (Toast/Snackbar)
+deactivate NotifyUC
+
+deactivate DS
+
+@enduml
+```
+
+## 4. Критерии приемки
+
+- ✅ При подключении MIDI-клавиатуры система автоматически подключается к ней.
+- ✅ Пользователь видит уведомление об успешном подключении с именем устройства.
+- ✅ При отключении клавиатуры пользователь видит соответствующее уведомление.
+- ✅ При возникновении ошибок (например, MIDI API недоступен) пользователь информируется через уведомление.
+- ✅ Логика отслеживания и уведомления корректно работает при перезапусках `Activity` (с учетом `stateIn` и `WhileSubscribed`).
+
+---
