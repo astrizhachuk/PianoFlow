@@ -144,30 +144,34 @@ abstract class DataModule {
 @startuml
 title Связывание зависимостей через Hilt
 
-class MidiRepository <<interface>>
+interface MidiRepository
 class MidiRepositoryImpl <<@Singleton>>
-class MidiDeviceMapper <<interface>>
+interface MidiDeviceMapper
 class MidiDeviceMapperImpl
 class MidiDataSource <<@Singleton>>
-class CoroutineScope
+interface CoroutineScope
 
-class DataModule <<Hilt Module>> {
+abstract class DataModule <<Hilt Module>> {
   +bindMidiRepository(impl): MidiRepository
   +bindMidiDeviceMapper(impl): MidiDeviceMapper
   +provideApplicationScope(): CoroutineScope
   +provideMidiDataSource(...): MidiDataSource
 }
 
-MidiRepositoryImpl .up.|> MidiRepository : реализует
-MidiDeviceMapperImpl .up.|> MidiDeviceMapper : реализует
-MidiRepositoryImpl --> MidiDataSource : зависит от
-MidiDataSource --> CoroutineScope : зависит от
-MidiDataSource --> MidiDeviceMapper : зависит от
+' Реализация
+MidiRepositoryImpl .up.|> MidiRepository
+MidiDeviceMapperImpl .up.|> MidiDeviceMapper
 
-DataModule::bindMidiRepository ..> MidiRepository : "(@Binds)"
-DataModule::bindMidiDeviceMapper ..> MidiDeviceMapper : "(@Binds)"
-DataModule::provideMidiDataSource ..> MidiDataSource : "(@Provides)"
-DataModule::provideApplicationScope ..> CoroutineScope : "(@Provides)"
+' Ассоциация
+MidiRepositoryImpl --> MidiDataSource
+MidiDataSource --> CoroutineScope
+MidiDataSource --> MidiDeviceMapper
+
+' Зависимость
+DataModule::bindMidiRepository ..> MidiRepository : <<@Binds>>
+DataModule::bindMidiDeviceMapper ..> MidiDeviceMapper : <<@Binds>>
+DataModule::provideMidiDataSource ..> MidiDataSource : <<@Provides>>
+DataModule::provideApplicationScope ..> CoroutineScope : <<@Provides>>
 
 @enduml
 ```

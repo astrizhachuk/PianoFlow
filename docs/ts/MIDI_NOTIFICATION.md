@@ -92,16 +92,20 @@ class UserNotifierImpl @Inject constructor() : UserNotifier {
 @startuml
 title Связывание интерфейса и реализации через Hilt
 
-class UserNotifier <<interface>>
+interface UserNotifier
 class UserNotifierImpl <<@Singleton>>
 
-class NotificationModule <<Hilt Module>> {
+interface NotificationModule <<Hilt Module>> {
   +bindUserNotifier(impl: UserNotifierImpl): UserNotifier
 }
 
-UserNotifierImpl .up.|> UserNotifier : реализует
-NotificationModule ..> UserNotifierImpl : предоставляет
-NotificationModule::bindUserNotifier ..> UserNotifier : "(@Binds)"
+' Реализация
+UserNotifierImpl .up.|> UserNotifier
+
+' Зависимость
+NotificationModule ..> UserNotifierImpl
+NotificationModule ..> UserNotifier : <<@Binds>>
+
 @enduml
 ```
 
