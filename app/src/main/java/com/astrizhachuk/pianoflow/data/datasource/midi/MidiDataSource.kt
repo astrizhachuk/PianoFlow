@@ -1,198 +1,109 @@
 package com.astrizhachuk.pianoflow.data.datasource.midi
 
-import android.media.midi.MidiDevice
+import android.content.Context
+import android.content.pm.PackageManager
 import android.media.midi.MidiDeviceInfo
 import android.media.midi.MidiManager
-import com.astrizhachuk.pianoflow.domain.exception.MidiException
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import com.astrizhachuk.pianoflow.domain.mapper.midi.MidiDeviceMapper
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
-import javax.inject.Singleton
+import android.media.midi.MidiDevice as MidiDeviceApi
 
-/**
- * Data Source для работы с Android MIDI API.
- * Инкапсулирует работу с MidiManager и MidiDevice.
- */
-@Singleton
+private const val TAG = "MidiDataSource"
+
 class MidiDataSource @Inject constructor(
-    private val midiManager: MidiManager?
+    private val context: Context,
+    private val scope: CoroutineScope,
+    private val midiDeviceMapper: MidiDeviceMapper
 ) {
-    
-    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
-    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
-    
-    private var currentDevice: MidiDevice? = null
-    private var currentDeviceInfo: MidiDeviceInfo? = null
-    
+    private val midiManager = context.getSystemService(MidiManager::class.java)
+    private var openedDevice: MidiDeviceApi? = null
+
+    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.NoDevice)
+    val connectionState = _connectionState.asStateFlow()
+
     private val deviceCallback = object : MidiManager.DeviceCallback() {
         override fun onDeviceAdded(device: MidiDeviceInfo) {
-            // Автоматически подключаемся к первому найденному устройству
-            if (_connectionState.value is ConnectionState.Disconnected) {
-                connectToFirstAvailableDevice()
+            Log.d(TAG, "onDeviceAdded: ${device.properties.getString(MidiDeviceInfo.PROPERTY_NAME)}")
+            if (_connectionState.value !is ConnectionState.Connected) {
+                Log.d(TAG, "Current state is not Connected, attempting to open a device.")
+                openFirstAvailableDevice()
             }
         }
-        
+
         override fun onDeviceRemoved(device: MidiDeviceInfo) {
-            // Если отключилось текущее устройство, обновляем состояние
-            if (currentDeviceInfo?.id == device.id) {
-                disconnect()
+            Log.d(TAG, "onDeviceRemoved: ${device.properties.getString(MidiDeviceInfo.PROPERTY_NAME)}")
+            if (openedDevice?.info?.id == device.id) {
+                Log.d(TAG, "The removed device is our current device, closing it.")
+                closeDevice()
             }
         }
     }
-    
+
     init {
-        if (midiManager == null) {
-            _connectionState.value = ConnectionState.Error(
-                MidiException.MidiNotSupportedException()
-            )
+        Log.d(TAG, "Initializing MidiDataSource.")
+        if (context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI)) {
+            Log.d(TAG, "MIDI feature is supported on this device.")
+            val handler = Handler(Looper.getMainLooper())
+            midiManager?.registerDeviceCallback(deviceCallback, handler)
+            openFirstAvailableDevice()
         } else {
-            // Регистрируем callback для отслеживания изменений устройств
-            midiManager.registerDeviceCallback(deviceCallback, null)
-            
-            // Проверяем наличие уже подключенных устройств при инициализации
-            checkForConnectedDevices()
+            Log.e(TAG, "MIDI feature is NOT supported on this device. Check AndroidManifest.xml")
+            _connectionState.value = ConnectionState.Error("MIDI API is not supported on this device.")
         }
     }
-    
-    /**
-     * Проверить наличие уже подключенных устройств.
-     */
-    private fun checkForConnectedDevices() {
-        val devices = getAvailableDevices()
-        if (devices.isNotEmpty() && _connectionState.value is ConnectionState.Disconnected) {
-            // Автоматически подключаемся к первому устройству
-            connectToFirstAvailableDevice()
+
+    private fun openFirstAvailableDevice() {
+        Log.d(TAG, "openFirstAvailableDevice: looking for devices.")
+        val firstDevice = midiManager?.devices?.firstOrNull()
+        if (firstDevice != null) {
+            Log.d(TAG, "Found device: ${firstDevice.properties.getString(MidiDeviceInfo.PROPERTY_NAME)}, attempting to open.")
+            openDevice(firstDevice)
+        } else {
+            Log.d(TAG, "No MIDI devices found.")
+            _connectionState.value = ConnectionState.NoDevice
         }
     }
-    
-    /**
-     * Подключиться к первому доступному устройству.
-     */
-    private fun connectToFirstAvailableDevice() {
-        val devices = getAvailableDevices()
-        if (devices.isNotEmpty()) {
-            connectToDevice(devices.first().id) {}
-        }
-    }
-    
-    /**
-     * Получить список доступных MIDI-устройств.
-     */
-    fun getAvailableDevices(): List<MidiDeviceInfo> {
-        if (midiManager == null) {
-            return emptyList()
-        }
-        return try {
-            midiManager.devices.toList()
-        } catch (e: Exception) {
-            handleException(e)
-            emptyList()
-        }
-    }
-    
-    /**
-     * Подключиться к устройству по ID.
-     */
-    fun connectToDevice(deviceId: Int, callback: (Result<MidiDeviceInfo>) -> Unit) {
-        if (midiManager == null) {
-            val exception = MidiException.MidiNotSupportedException()
-            _connectionState.value = ConnectionState.Error(exception)
-            callback(Result.failure(exception))
+
+    private fun openDevice(deviceInfo: MidiDeviceInfo) {
+        Log.d(TAG, "openDevice: trying to open ${deviceInfo.properties.getString(MidiDeviceInfo.PROPERTY_NAME)}")
+        if (openedDevice?.info?.id == deviceInfo.id) {
+            Log.d(TAG, "Device is already open. Skipping.")
             return
         }
         
-        try {
-            val deviceInfo = midiManager.devices.find { it.id == deviceId }
-                ?: run {
-                    callback(Result.failure(MidiException.DeviceUnavailableException()))
-                    return
-                }
-            
-            _connectionState.value = ConnectionState.Connecting
-            
-            midiManager.openDevice(deviceInfo, { device ->
-                if (device == null) {
-                    _connectionState.value = ConnectionState.Error(
-                        MidiException.ConnectionException()
-                    )
-                    callback(Result.failure(MidiException.ConnectionException()))
-                    return@openDevice
-                }
-                
-                currentDevice = device
-                currentDeviceInfo = deviceInfo
-                _connectionState.value = ConnectionState.Connected(
-                    deviceInfo.toDomainModel()
-                )
-                callback(Result.success(deviceInfo))
-            }, null)
-            
-        } catch (e: SecurityException) {
-            val exception = MidiException.PermissionDeniedException(cause = e)
-            _connectionState.value = ConnectionState.Error(exception)
-            callback(Result.failure(exception))
-        } catch (e: Exception) {
-            val exception = handleException(e)
-            _connectionState.value = ConnectionState.Error(exception)
-            callback(Result.failure(exception))
+        closeDevice()
+
+        midiManager?.openDevice(deviceInfo, {
+            if (it == null) {
+                Log.e(TAG, "Failed to open MIDI device.")
+                _connectionState.value = ConnectionState.Error("Failed to open MIDI device.")
+                return@openDevice
+            }
+            Log.d(TAG, "Successfully opened device. Setting state to Connected.")
+            openedDevice = it
+            _connectionState.value = ConnectionState.Connected(midiDeviceMapper.toDomain(deviceInfo))
+        }, null)
+    }
+
+    private fun closeDevice() {
+        if (openedDevice != null) {
+            Log.d(TAG, "closeDevice: Closing current device.")
+            openedDevice?.close()
+            openedDevice = null
+            _connectionState.value = ConnectionState.Disconnected
         }
     }
-    
-    /**
-     * Отключиться от текущего устройства.
-     */
-    fun disconnect() {
-        currentDevice?.close()
-        currentDevice = null
-        currentDeviceInfo = null
-        _connectionState.value = ConnectionState.Disconnected
-    }
-    
-    /**
-     * Освобождение ресурсов.
-     */
-    fun cleanup() {
+
+    fun close() {
+        Log.d(TAG, "close: Unregistering callback and closing device.")
         midiManager?.unregisterDeviceCallback(deviceCallback)
-        disconnect()
-    }
-    
-    /**
-     * Получить текущее состояние подключения.
-     */
-    fun getCurrentConnectionState(): ConnectionState {
-        return _connectionState.value
-    }
-    
-    /**
-     * Обработка исключений и преобразование в Domain исключения.
-     */
-    private fun handleException(e: Exception): MidiException {
-        return when (e) {
-            is SecurityException -> MidiException.PermissionDeniedException(cause = e)
-            is UnsupportedOperationException -> MidiException.MidiNotSupportedException(cause = e)
-            else -> MidiException.UnknownException(cause = e)
-        }
-    }
-    
-    /**
-     * Расширение для преобразования MidiDeviceInfo в Domain модель.
-     */
-    private fun MidiDeviceInfo.toDomainModel(): com.astrizhachuk.pianoflow.domain.model.MidiDevice {
-        val properties = properties
-        val name = properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "Unknown Device"
-        val manufacturer = properties.getString(MidiDeviceInfo.PROPERTY_MANUFACTURER)
-        val isInput = inputPortCount > 0
-        val isOutput = outputPortCount > 0
-        
-        return com.astrizhachuk.pianoflow.domain.model.MidiDevice(
-            id = id,
-            name = name,
-            manufacturer = manufacturer,
-            isInput = isInput,
-            isOutput = isOutput
-        )
+        closeDevice()
     }
 }
-

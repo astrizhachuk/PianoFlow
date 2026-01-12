@@ -32,9 +32,9 @@ title C4 - Уровень 3: Компоненты механизма уведо�
 
 Container_Boundary(presentation, "Presentation Layer") {
     Component(vm, "MidiConnectionViewModel", "ViewModel", "Формирует и отправляет сообщение.")
-    Component(ui, "Activity", "UI-компонент, например, MainActivity", "Отображает сообщение.")
+    Component(ui, "Activity", "UI", "Отображает сообщение.")
 
-    Component(notifier, "UserNotifier", "Интерфейс", "Контракт для отправки и получения уведомлений.")
+    Component(notifier, "UserNotifier", "Interface", "Контракт для отправки и получения уведомлений.")
     Component(impl, "UserNotifierImpl", "Singleton", "Реализация шины событий на SharedFlow.")
     Component(message, "UserMessage", "Data Class", "Модель данных для UI.")
     Component(di, "NotificationModule", "Hilt Module", "Предоставляет зависимость UserNotifier.")
