@@ -15,7 +15,7 @@ import javax.inject.Inject
 import android.media.midi.MidiDevice as MidiDeviceApi
 
 class MidiDataSource @Inject constructor(
-    private val context: Context,
+    context: Context,
     private val midiDeviceMapper: MidiDeviceMapper
 ) {
     private val midiManager = context.getSystemService(MidiManager::class.java)
