@@ -258,34 +258,34 @@ class VirtualMidiDeviceHelper {
 dependencies {
     // ...
 
-    // --- Unit-тесты (test) ---
+    // --- Unit-тесты (локальные, src/test) ---
 
-    // Основной фреймворк для тестов
+    // Основной фреймворк для написания и запуска тестов
     testImplementation(libs.junit)
 
-    // Создание моков и стабов
+    // Создание моков (mock-объектов) для изоляции зависимостей
     testImplementation(libs.mockito.core)
-    testImplementation(libs.mockito.kotlin)
+    testImplementation(libs.mockito.kotlin) // Kotlin-специфичные расширения для Mockito
 
-    // Тестирование корутин и Flow
+    // Тестирование корутин и асинхронного кода
     testImplementation(libs.coroutines.test)
+
+    // Утилита для тестирования Kotlin Flow
     testImplementation(libs.turbine)
+    
+    // Эмуляция Android-окружения для запуска тестов на JVM
+    testImplementation(libs.robolectric)
 
+    // --- Инструментальные тесты (на устройстве/эмуляторе, src/androidTest) ---
 
-    // --- Инструментальные тесты (androidTest) ---
-
-    // JUnit и правила для тестов на Android
+    // Расширения JUnit для Android-тестов
     androidTestImplementation(libs.androidx.junit)
 
     // Фреймворк для UI-тестирования
     androidTestImplementation(libs.androidx.espresso.core)
 
-    // Hilt для тестирования на Android
+    // Поддержка Hilt в инструментальных тестах для внедрения зависимостей
     androidTestImplementation(libs.hilt.android.testing)
     kspAndroidTest(libs.hilt.compiler)
 }
 ```
-
-## Заключение
-
-Использование Hilt для подмены зависимостей в инструментальных тестах — ключ к надежному и полностью автоматизированному тестированию MIDI-функционала. Эта стратегия позволяет изолировать UI от реальной системной логики, симулируя любые сценарии подключения и взаимодействия с устройствами. Ручное тестирование на реальных устройствах остается необходимым, но его роль сводится к финальной проверке.
