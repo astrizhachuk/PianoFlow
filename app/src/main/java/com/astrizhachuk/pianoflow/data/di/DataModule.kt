@@ -12,9 +12,6 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import javax.inject.Singleton
 
 /**
@@ -29,6 +26,7 @@ abstract class DataModule {
      * с его конкретной реализацией [MidiRepositoryImpl] из слоя данных.
      */
     @Binds
+    @Suppress("unused")
     abstract fun bindMidiRepository(impl: MidiRepositoryImpl): MidiRepository
 
     /**
@@ -36,19 +34,10 @@ abstract class DataModule {
      * с его конкретной реализацией [MidiDeviceMapperImpl] из слоя данных.
      */
     @Binds
+    @Suppress("unused")
     abstract fun bindMidiDeviceMapper(impl: MidiDeviceMapperImpl): MidiDeviceMapper
 
     companion object {
-        /**
-         * Предоставляет [CoroutineScope] уровня приложения. Этот скоуп должен использоваться
-         * для корутин, которые должны выполняться в течение всего жизненного цикла приложения.
-         */
-        @Provides
-        @Singleton
-        fun provideApplicationScope(): CoroutineScope {
-            return CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        }
-
         /**
          * Предоставляет [MidiDataSource] как синглтон. Этот источник данных является
          * основной точкой взаимодействия с Android MIDI API.
@@ -57,10 +46,9 @@ abstract class DataModule {
         @Singleton
         fun provideMidiDataSource(
             @ApplicationContext context: Context,
-            scope: CoroutineScope,
             midiDeviceMapper: MidiDeviceMapper
         ): MidiDataSource {
-            return MidiDataSource(context, scope, midiDeviceMapper)
+            return MidiDataSource(context, midiDeviceMapper)
         }
     }
 }

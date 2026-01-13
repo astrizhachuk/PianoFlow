@@ -117,27 +117,19 @@ abstract class DataModule {
     companion object {
         @Provides
         @Singleton
-        fun provideApplicationScope(): CoroutineScope { 
-            return CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        }
-
-        @Provides
-        @Singleton
         fun provideMidiDataSource(
             @ApplicationContext context: Context,
-            scope: CoroutineScope,
             midiDeviceMapper: MidiDeviceMapper
         ): MidiDataSource {
-            return MidiDataSource(context, scope, midiDeviceMapper)
+            return MidiDataSource(context, midiDeviceMapper)
         }
     }
 }
 ```
 
 - **`@Binds`** эффективно сообщает Hilt, какие реализации использовать для каких интерфейсов (`MidiRepository` и `MidiDeviceMapper`).
-- **`@Provides`** используется для `provideMidiDataSource` и `provideApplicationScope`, поскольку для создания этих объектов требуется логика.
-- **`provideApplicationScope`** создает `CoroutineScope` уровня приложения. Он необходим для `MidiDataSource`, чтобы отслеживание состояния подключения работало на протяжении всего жизненного цикла приложения, независимо от состояния UI.
-- **`provideMidiDataSource`** создает `MidiDataSource`, внедряя в него контекст приложения, `CoroutineScope` и `MidiDeviceMapper`. Этот компонент является центральной точкой, инкапсулирующей всю логику работы с Android MIDI API.
+- **`@Provides`** используется для `provideMidiDataSource`, поскольку для создания этого объекта требуется логика.
+- **`provideMidiDataSource`** создает `MidiDataSource`, внедряя в него контекст приложения и `MidiDeviceMapper`. Этот компонент является центральной точкой, инкапсулирующей всю логику работы с Android MIDI API.
 - **`@Singleton`** гарантирует, что для каждого из этих компонентов будет создан только один экземпляр.
 
 ```plantuml
@@ -149,12 +141,10 @@ class MidiRepositoryImpl <<@Singleton>>
 interface MidiDeviceMapper
 class MidiDeviceMapperImpl
 class MidiDataSource <<@Singleton>>
-interface CoroutineScope
 
 abstract class DataModule <<Hilt Module>> {
   +bindMidiRepository(impl): MidiRepository
   +bindMidiDeviceMapper(impl): MidiDeviceMapper
-  +provideApplicationScope(): CoroutineScope
   +provideMidiDataSource(...): MidiDataSource
 }
 
@@ -164,14 +154,12 @@ MidiDeviceMapperImpl .up.|> MidiDeviceMapper
 
 ' Ассоциация
 MidiRepositoryImpl --> MidiDataSource
-MidiDataSource --> CoroutineScope
 MidiDataSource --> MidiDeviceMapper
 
 ' Зависимость
 DataModule::bindMidiRepository ..> MidiRepository : <<@Binds>>
 DataModule::bindMidiDeviceMapper ..> MidiDeviceMapper : <<@Binds>>
 DataModule::provideMidiDataSource ..> MidiDataSource : <<@Provides>>
-DataModule::provideApplicationScope ..> CoroutineScope : <<@Provides>>
 
 @enduml
 ```

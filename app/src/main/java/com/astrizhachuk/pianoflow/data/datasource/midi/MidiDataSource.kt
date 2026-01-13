@@ -8,7 +8,6 @@ import android.os.Handler
 import android.os.Looper
 import com.astrizhachuk.pianoflow.domain.mapper.midi.MidiDeviceMapper
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
@@ -17,7 +16,6 @@ import android.media.midi.MidiDevice as MidiDeviceApi
 
 class MidiDataSource @Inject constructor(
     private val context: Context,
-    private val scope: CoroutineScope,
     private val midiDeviceMapper: MidiDeviceMapper
 ) {
     private val midiManager = context.getSystemService(MidiManager::class.java)
