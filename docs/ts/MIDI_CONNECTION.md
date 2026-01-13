@@ -174,9 +174,11 @@ DataModule::provideMidiDataSource ..> MidiDataSource : <<@Provides>>
 ### 3.1. Принцип работы
 
 1.  **Инициализация и жизненный цикл**:
-    *   `MidiDataSource` внедряется как **синглтон** (`@Singleton`) на уровне всего приложения. Это означает, что он создается один раз при первом запуске и существует на протяжении всего жизненного цикла приложения.
-    *   Для своей работы он использует **контекст приложения** (`ApplicationContext`), а не контекст `Activity`. Это гарантирует, что отслеживание MIDI-устройств продолжается в фоновом режиме, независимо от жизненного цикла конкретных экранов.
-    *   В `init`-блоке `MidiDataSource` немедленно регистрирует `MidiManager.DeviceCallback`. Эта подписка на системные события остается активной до тех пор, пока живо приложение, обеспечивая непрерывное отслеживание подключений и отключений.
+    *   `MidiDataSource` внедряется как **синглтон** (`@Singleton`). При создании он в первую очередь выполняет **проверку предусловий**:
+        *   Он проверяет, доступен ли MIDI API на устройстве через `context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI)`. Если нет, он немедленно отправляет состояние `ConnectionState.Error("MIDI API не поддерживается на этом устройстве.")` и прекращает дальнейшую инициализацию.
+        *   Все дальнейшие взаимодействия с `MidiManager` (получение списка устройств, регистрация коллбэка) обернуты в блок `try-catch` для отлова `SecurityException`. В случае его возникновения отправляется состояние `ConnectionState.Error("Отсутствуют необходимые разрешения для работы с MIDI.")`.
+    *   Для своей работы он использует **контекст приложения** (`ApplicationContext`), а не контекст `Activity`. Это гарантирует, что отслеживание MIDI-устройств продолжается в фоновом режиме.
+    *   При успешном прохождении проверок, в `init`-блоке `MidiDataSource` немедленно регистрирует `MidiManager.DeviceCallback`.
     *   Сразу после регистрации `MidiDataSource` пытается подключиться к любому уже подключенному устройству.
 
 2.  **Обнаружение и подключение**:
@@ -187,7 +189,7 @@ DataModule::provideMidiDataSource ..> MidiDataSource : <<@Provides>>
     *   Метод `openDevice()` вызывает `midiManager.openDevice()`, который работает асинхронно.
     *   В качестве коллбэка передается лямбда-функция, которая будет выполнена по завершении попытки открытия.
     *   **Успех**: Если `MidiDevice` успешно получен (не `null`), он сохраняется в `openedDevice`, а в `_connectionState` отправляется `ConnectionState.Connected`.
-    *   **Неудача**: Если устройство не удалось открыть (`null`), в `_connectionState` отправляется `ConnectionState.Error`.
+    *   **Неудача**: Если устройство не удалось открыть (`null`), в `_connectionState` отправляется `ConnectionState.Error("Не удалось подключиться к устройству: ${deviceInfo.name}")`, где `deviceInfo.name` — имя устройства, которое не удалось открыть.
 
 4.  **Отключение устройства**:
     *   Когда пользователь физически отключает MIDI-устройство, срабатывает `DeviceCallback.onDeviceRemoved()`.
@@ -199,118 +201,118 @@ DataModule::provideMidiDataSource ..> MidiDataSource : <<@Provides>>
     *   Она преобразует этот поток в `StateFlow`, который хранит последнее полученное состояние. Это позволяет `Activity` (или `Fragment`) подписываться на него и всегда иметь актуальные данные.
     *   `ViewModel` следит за состоянием и реагирует на его изменения (например, вызывая `ShowConnectionNotificationUseCase` для отображения уведомлений) только тогда, когда UI (например, `Activity`) активен и подписывается на `StateFlow`. Сам `MidiDataSource` при этом продолжает работать в фоне.
 
-### 3.2. Диаграммы взаимодействия
+### 3.2. Сводная диаграмма взаимодействия
 
-#### Сценарий №1: Первичная инициализация и подключение к существующему устройству
-
-Эта диаграмма показывает, что происходит при первом запуске `MidiDataSource`, когда MIDI-устройство уже подключено к телефону.
+Эта диаграмма объединяет все ключевые сценарии: инициализацию, подключение, отключение и обработку ошибок. Она показывает, как `MidiDataSource` реагирует на различные события и изменяет свое состояние, а также как `MidiConnectionViewModel` инициирует уведомления для пользователя.
 
 ```plantuml
 @startuml
-title Сценарий: Инициализация с уже подключенным устройством
+title Сводная диаграмма: Жизненный цикл и взаимодействие
+
+box "API Android" #LightGray
+    participant "Application Context" as System
+    participant "MidiManager" as MidiManager
+end box
 
 participant "MidiDataSource" as DS
-participant "Android MidiManager" as MidiManager
-
-activate DS
-DS -> MidiManager : registerDeviceCallback(callback)
-DS -> DS : openFirstAvailableDevice()
-activate DS
-
-DS -> MidiManager : getDevices()
-MidiManager --> DS : List<MidiDeviceInfo>
-
-alt Устройство найдено
-    DS -> DS : openDevice(deviceInfo)
-    activate DS
-    
-    DS -> MidiManager : openDevice(deviceInfo, onOpened)
-    
-    ...Некоторое время спустя...
-    
-    MidiManager -> DS : onOpened(midiDevice)
-    activate DS
-    DS -> DS : _connectionState.value = Connected
-    deactivate DS
-    
-    deactivate DS
-else Устройств нет
-    DS -> DS : _connectionState.value = NoDevice
-    deactivate DS
-end
-
-deactivate DS
-@enduml
-```
-
-#### Сценарий №2: Подключение нового устройства во время работы приложения
-
-Эта диаграмма иллюстрирует реакцию системы на подключение нового MIDI-устройства "на лету".
-
-```plantuml
-@startuml
-title Сценарий: Подключение нового устройства
-
-participant "Android System" as System
-participant "MidiDataSource" as DS
-participant "Android MidiManager" as MidiManager
 participant "MidiConnectionViewModel" as VM
+participant "UI (Activity)" as UI
 
-System -> DS : onDeviceAdded(deviceInfo)
-activate DS
+== Инициализация и подключение ==
 
-alt Нет активного подключения
-    DS -> DS : openFirstAvailableDevice()
+alt MIDI API не поддерживается на устройстве
     activate DS
+    DS -> System : context.packageManager.hasSystemFeature(FEATURE_MIDI)
+    System --> DS : false
+    DS -> DS : _connectionState.value = Error("MIDI API не поддерживается...")
+    deactivate DS
     
-    DS -> MidiManager : openDevice(deviceInfo, onOpened)
-    ...Некоторое время спустя...
-    
-    MidiManager -> DS : onOpened(midiDevice)
-    activate DS
-    DS -> DS : _connectionState.value = Connected
-    
-    DS -> VM : new ConnectionState.Connected
+    DS -> VM : new ConnectionState.Error
     activate VM
-    VM -> System : Показывает уведомление
+    VM -> UI : Показывает уведомление
     deactivate VM
+
+else Отсутствуют необходимые разрешения
+    activate DS
+    DS -> MidiManager : getDevices()
+    MidiManager --> DS : throws SecurityException
+    note right of DS : (перехвачено в try-catch)
+    DS -> DS : _connectionState.value = Error("Отсутствуют необходимые разрешения...")
+    deactivate DS
+
+    DS -> VM : new ConnectionState.Error
+    activate VM
+    VM -> UI : Показывает уведомление
+    deactivate VM
+
+else Устройство уже подключено или подключается новое
+    alt Устройство уже подключено при старте
+        activate DS
+        DS -> MidiManager : registerDeviceCallback(callback)
+        DS -> DS : openFirstAvailableDevice()
+    else Новое устройство подключено во время работы
+        System -> DS : onDeviceAdded(deviceInfo)
+        activate DS
+        DS -> DS: openFirstAvailableDevice()
+    end
     
+    activate DS
+    DS -> MidiManager : getDevices()
+    MidiManager --> DS : List<MidiDeviceInfo>
+    
+    alt Устройство найдено
+        DS -> DS : openDevice(deviceInfo)
+        activate DS
+        DS -> MidiManager : openDevice(deviceInfo, onOpened)
+        
+        ...Некоторое время спустя...
+        
+        alt Успешное открытие
+            MidiManager -> DS : onOpened(midiDevice)
+            activate DS
+            DS -> DS : _connectionState.value = Connected
+            deactivate DS
+            
+            DS -> VM : new ConnectionState.Connected
+            activate VM
+            VM -> UI : Показывает уведомление
+            deactivate VM
+            
+        else Ошибка открытия устройства
+            MidiManager -> DS : onOpened(null)
+            activate DS
+            DS -> DS : _connectionState.value = Error("Не удалось подключиться...")
+            deactivate DS
+            
+            DS -> VM : new ConnectionState.Error
+            activate VM
+            VM -> UI : Показывает уведомление
+            deactivate VM
+        end
+        deactivate DS
+        
+    else Устройств нет
+        DS -> DS : _connectionState.value = NoDevice
+    end
     deactivate DS
     deactivate DS
-else Есть активное подключение
-    DS -> DS : (ничего не делает)
+
 end
 
-deactivate DS
-@enduml
-```
-
-#### Сценарий №3: Отключение устройства
-
-Эта диаграмма показывает, что происходит при физическом отключении текущего активного устройства.
-
-```plantuml
-@startuml
-title Сценарий: Отключение устройства
-
-participant "Android System" as System
-participant "MidiDataSource" as DS
-participant "MidiConnectionViewModel" as VM
-
+== Отключение устройства ==
 System -> DS : onDeviceRemoved(deviceInfo)
 activate DS
 
 alt Отключено активное устройство
     DS -> DS : closeDevice()
     activate DS
-    
     DS -> DS : openedDevice.close()
     DS -> DS : _connectionState.value = Disconnected
     deactivate DS
 
     DS -> VM : new ConnectionState.Disconnected
     activate VM
-    VM -> System : Показывает уведомление
+    VM -> UI : Показывает уведомление
     deactivate VM
 else Отключено другое устройство
     DS -> DS : (ничего не делает)
@@ -325,7 +327,9 @@ deactivate DS
 - ✅ При подключении MIDI-клавиатуры система автоматически подключается к ней.
 - ✅ Пользователь видит уведомление об успешном подключении с именем устройства.
 - ✅ При отключении клавиатуры пользователь видит соответствующее уведомление.
-- ✅ При возникновении ошибок (например, MIDI API недоступен) пользователь информируется через уведомление.
+- ✅ При запуске на устройстве, не поддерживающем MIDI, пользователь видит уведомление: "MIDI API не поддерживается на этом устройстве".
+- ✅ В случае отсутствия у приложения необходимых разрешений пользователь видит уведомление: "Отсутствуют необходимые разрешения для работы с MIDI".
+- ✅ При сбое во время открытия соединения с конкретной клавиатурой пользователь видит уведомление: "Не удалось подключиться к устройству: [имя устройства]".
 - ✅ Логика отслеживания и уведомления корректно работает при перезапусках `Activity` (с учетом `stateIn` и `WhileSubscribed`).
 
 ---
