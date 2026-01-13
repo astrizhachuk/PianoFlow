@@ -26,7 +26,7 @@
 - **`ShowConnectionNotificationUseCase`:** Компонент, который используется для отображения уведомлений пользователю.
 
 **Data Layer**
-- **`MidiDataSource`:** Инкапсулирует всю работу с Android MIDI API (`MidiManager`), отслеживает подключения и отключения, транслируя их в `Flow`.
+- **`MidiDataSource`:** Инкапсулирует всю работу с Android MIDI API (`MidiManager`), используя `Context` для доступа к системным сервисам. Отслеживает подключения и отключения, транслируя их в `Flow`.
 - **`MidiDeviceMapperImpl`:** Реализация интерфейса `MidiDeviceMapper`.
 
 **Presentation Layer**
@@ -37,6 +37,8 @@
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
 title C4 - Level 3: Компоненты системы отслеживания MIDI
+
+System_Ext(android_sdk, "Android SDK", "Контекст и системные сервисы (MidiManager)")
 
 Container_Boundary(presentation, "Presentation Layer") {
     Component(vm, "MidiConnectionViewModel", "ViewModel", "Подписывается на изменения и инициирует уведомления.")
@@ -54,7 +56,7 @@ Container_Boundary(domain, "Domain Layer") {
 
 Container_Boundary(data, "Data Layer") {
     Component(repo_impl, "MidiRepositoryImpl", "Implementation", "Проксирует данные из DataSource.")
-    Component(ds, "MidiDataSource", "Data Source", "Работает с Android MIDI API.")
+    Component(ds, "MidiDataSource", "Data Source", "Работает с Android MIDI API, используя Context.")
     Component(mapper_impl, "MidiDeviceMapperImpl", "Implementation", "Преобразует DTO в доменную модель.")
 }
 
@@ -66,6 +68,7 @@ Rel(track_uc, repo, "Зависит от")
 Rel(repo_impl, repo, "@Binds")
 Rel(repo_impl, ds, "Зависит от")
 Rel(ds, mapper, "Зависит от")
+Rel(ds, android_sdk, "Использует", "MidiManager, Context")
 Rel(mapper_impl, mapper, "@Binds")
 Rel(track_uc, state, "Возвращает Flow<ConnectionState>")
 
@@ -136,6 +139,7 @@ abstract class DataModule {
 @startuml
 title Связывание зависимостей через Hilt
 
+class Context <<Android Framework>> #LightGrey
 interface MidiRepository
 class MidiRepositoryImpl <<@Singleton>>
 interface MidiDeviceMapper
@@ -145,7 +149,7 @@ class MidiDataSource <<@Singleton>>
 abstract class DataModule <<Hilt Module>> {
   +bindMidiRepository(impl): MidiRepository
   +bindMidiDeviceMapper(impl): MidiDeviceMapper
-  +provideMidiDataSource(...): MidiDataSource
+  +provideMidiDataSource(Context, MidiDeviceMapper): MidiDataSource
 }
 
 ' Реализация
@@ -155,6 +159,7 @@ MidiDeviceMapperImpl .up.|> MidiDeviceMapper
 ' Ассоциация
 MidiRepositoryImpl --> MidiDataSource
 MidiDataSource --> MidiDeviceMapper
+MidiDataSource --> Context
 
 ' Зависимость
 DataModule::bindMidiRepository ..> MidiRepository : <<@Binds>>
