@@ -322,59 +322,98 @@ end note
 @enduml
 ```
 
-## 8. Примеры применения
+## 8. Оптимизация сборки (R8/ProGuard)
 
-### 8.1. Пример структуры для MIDI-обработки
+Для уменьшения размера приложения, повышения производительности и защиты кода от реверс-инжиниринга используется инструмент **R8**, который включен в Android Gradle Plugin.
 
-**ViewModel**:
-```kotlin
-// presentation/viewmodel/midi/MidiConnectionViewModel.kt
-class MidiConnectionViewModel(
-    private val processMidiMessageUseCase: ProcessMidiMessageUseCase
-) : ViewModel() {
-    private val _notes = MutableStateFlow<List<ProcessedNote>>(emptyList())
-    val notes: StateFlow<List<ProcessedNote>> = _notes.asStateFlow()
-    
-    fun processMessage(event: MidiEvent) {
-        viewModelScope.launch {
-            processMidiMessageUseCase(event)
-                .onSuccess { note -> 
-                    _notes.value = _notes.value + note
-                }
+### 8.1. Принципы настройки
+
+1.  **Release-сборка**:
+    -   Всегда включается минимизация (`isMinifyEnabled = true`). Это активирует три процесса:
+        -   **Сокращение (Shrinking)**: R8 определяет и удаляет неиспользуемые классы, поля, методы и атрибуты.
+        -   **Оптимизация (Optimization)**: R8 анализирует и переписывает код для дальнейшего уменьшения размера приложения.
+        -   **Обфускация (Obfuscation)**: R8 переименовывает классы, поля и методы, используя короткие и бессмысленные имена, что затрудняет анализ кода.
+
+2.  **Debug-сборка**:
+    -   Минимизация отключена (`isMinifyEnabled = false`) для ускорения сборки и сохранения возможности полноценной отладки (сохраняются имена методов, классов и номера строк).
+
+### 8.2. Файлы правил ProGuard
+
+Некоторый код, используемый через рефлексию (например, при сериализации данных, DI-фреймворками), может быть ошибочно удален R8. Чтобы этого избежать, используются файлы правил (`proguard-rules.pro`).
+
+**Основные правила**:
+-   Сохранять классы моделей данных (DTO), которые используются для сериализации/десериализации (например, с помощью Gson/Moshi).
+-   Сохранять классы, генерируемые Hilt/Dagger для внедрения зависимостей.
+-   Сохранять кастомные `View`, `Serializable`/`Parcelable` классы.
+
+**Пример правила (`-keep`):**
+```proguard
+# Сохранить все публичные классы и их публичные члены в пакете model
+-keep public class com.astrizhachuk.pianoflow.data.model.** {
+    public *;
+}
+```
+
+## 9. Система логирования
+
+Для сбора и анализа информации о работе приложения используется стандартизированная система логирования.
+
+### 9.1. Инструмент: Timber
+
+В качестве основной библиотеки для логирования используется **Timber**.
+**Преимущества**:
+-   Предоставляет удобный API.
+-   Автоматически добавляет тег класса, из которого был вызван лог.
+-   Позволяет легко настраивать разное поведение для `debug` и `release` сборок.
+
+### 9.2. Принципы логирования
+
+1.  **Инициализация**: В классе `PianoFlowApplication` происходит "посадка деревьев" (planting trees) для Timber.
+    -   В `debug`-сборке используется `Timber.DebugTree()`, который выводит логи в Logcat.
+    -   В `release`-сборке сажается кастомное дерево (`ReleaseTree`), которое либо ничего не делает, либо отправляет критические ошибки в систему аналитики (например, Firebase Crashlytics).
+
+    ```kotlin
+    // PianoFlowApplication.kt
+    class PianoFlowApplication : Application() {
+        override fun onCreate() {
+            super.onCreate()
+            if (BuildConfig.DEBUG) {
+                Timber.plant(Timber.DebugTree())
+            } else {
+                Timber.plant(CrashReportingTree()) // Пример для Crashlytics
+            }
         }
     }
-}
-```
+    ```
 
-### 8.2. Пример Use Case для анализа игры
+2.  **Использование уровней логирования**:
 
-```kotlin
-// domain/usecase/game/AnalyzePerformanceUseCase.kt
-class AnalyzePerformanceUseCase(
-    private val gameRepository: GameRepository
-) {
-    suspend operator fun invoke(sessionId: String): Result<PerformanceAnalysis> {
-        return gameRepository.getSession(sessionId)
-            .map { session ->
-                PerformanceAnalysis(
-                    accuracy = calculateAccuracy(session.notes),
-                    timing = analyzeTiming(session.notes),
-                    mistakes = identifyMistakes(session.notes, session.expectedNotes)
-                )
-            }
-    }
-    
-    private fun calculateAccuracy(notes: List<Note>): Float {
-        // Бизнес-логика расчета точности
-    }
-}
-```
+    -   `Timber.v(message: String)` (Verbose)
+        -   **Не используется** в проекте для поддержания чистоты логов.
 
-## 9. Вынесение ядра как отдельной библиотеки
+    -   `Timber.d(message: String)` (Debug)
+        -   **Назначение**: Детальная информация для отладки. Используется для трассировки выполнения кода, вывода состояний переменных, шагов алгоритма.
+        -   **Пример**: `Timber.d("Processing MIDI event: $event")`
+        -   **Правило**: Эти логи должны быть полезны только разработчику во время отладки.
+
+    -   `Timber.i(message: String)` (Info)
+        -   **Назначение**: Важные, но ожидаемые события в жизненном цикле приложения. Позволяет отследить общий ход выполнения.
+        -   **Пример**: `Timber.i("MIDI device connected: ${device.name}")`, `Timber.i("Starting game session for track: ${track.id}")`
+
+    -   `Timber.w(message: String, throwable: Throwable? = null)` (Warning)
+        -   **Назначение**: Потенциальные проблемы или некритичные ошибки, которые не прерывают работу приложения, но на которые стоит обратить внимание.
+        -   **Пример**: `Timber.w("Received an unexpected MIDI message type. Skipping.")`
+
+    -   `Timber.e(throwable: Throwable, message: String)` (Error)
+        -   **Назначение**: Критические ошибки и исключения, которые привели к сбою в работе функции или всего приложения.
+        -   **Пример**: `catch (e: IOException) { Timber.e(e, "Failed to read MIDI data from source.") }`
+        -   **Правило**: Всегда должен передаваться объект `Throwable`. В `release`-сборках эти логи должны отправляться в систему краш-репортинга.
+
+## 10. Вынесение ядра как отдельной библиотеки
 
 Архитектура спроектирована с учетом принципа **независимости ядра от клиента**, что делает возможным использование Domain-слоя в различных контекстах (Android, Desktop, Web).
 
-### 9.1. Структура для мультиплатформенного использования
+### 10.1. Структура для мультиплатформенного использования
 
 Принцип иерархии пакетов сохраняется внутри каждого модуля.
 
@@ -394,7 +433,7 @@ pianoflow-android/           # Android-приложение
     └── data/
 ```
 
-### 9.2. Адаптеры для разных платформ
+### 10.2. Адаптеры для разных платформ
 
 Каждая платформа реализует свои адаптеры (`data` слой) для работы с MIDI, реализуя интерфейсы из `domain` слоя.
 
@@ -405,7 +444,7 @@ pianoflow-android/           # Android-приложение
 | **Web** | Web MIDI API | `WebMidiRepositoryImpl` |
 
 
-### 9.3. Схема C4: Контекст и контейнеры
+### 10.3. Схема C4: Контекст и контейнеры
 
 #### C4 Level 1: Системный контекст
 
@@ -525,7 +564,7 @@ Rel_Up(webAdapter, repoInterfaces, "Реализует")
 @enduml
 ```
 
-## 10. Заключение
+## 11. Заключение
 
 Данная архитектура обеспечивает минимальную связность, независимость ядра, переиспользуемость, мультиплатформенность и тестируемость. При разработке новых функций необходимо следовать описанным принципам.
 
