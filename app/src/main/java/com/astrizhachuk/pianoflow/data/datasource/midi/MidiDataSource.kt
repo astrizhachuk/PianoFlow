@@ -79,14 +79,19 @@ class MidiDataSource @Inject constructor(
 
     init {
         Timber.i("init: Initializing.")
-        if (context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI)) {
-            Timber.i("init: MIDI feature supported.")
-            val handler = Handler(Looper.getMainLooper())
-            midiManager?.registerDeviceCallback(deviceCallback, handler)
-            openFirstAvailableDevice()
+        if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI)) {
+            Timber.e("init: MIDI feature NOT supported.")
+            _connectionState.value = ConnectionState.Error("MIDI API не поддерживается на этом устройстве.")
         } else {
-            Timber.e("init: MIDI feature NOT supported. Check AndroidManifest.xml.")
-            _connectionState.value = ConnectionState.Error("MIDI API is not supported on this device.")
+            try {
+                Timber.i("init: MIDI feature supported.")
+                val handler = Handler(Looper.getMainLooper())
+                midiManager?.registerDeviceCallback(deviceCallback, handler)
+                openFirstAvailableDevice()
+            } catch (e: SecurityException) {
+                Timber.e(e, "init: SecurityException during initialization.")
+                _connectionState.value = ConnectionState.Error("Отсутствуют необходимые разрешения для работы с MIDI.")
+            }
         }
     }
 
@@ -96,13 +101,18 @@ class MidiDataSource @Inject constructor(
      */
     private fun openFirstAvailableDevice() {
         Timber.d("openFirstAvailableDevice: Looking for devices.")
-        val firstDevice = midiManager?.devices?.firstOrNull()
-        if (firstDevice != null) {
-            Timber.i("openFirstAvailableDevice: Found device: %s. Attempting to open.", firstDevice.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
-            openDevice(firstDevice)
-        } else {
-            Timber.i("openFirstAvailableDevice: No MIDI devices found.")
-            _connectionState.value = ConnectionState.NoDevice
+        try {
+            val firstDevice = midiManager?.devices?.firstOrNull()
+            if (firstDevice != null) {
+                Timber.i("openFirstAvailableDevice: Found device: %s. Attempting to open.", firstDevice.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
+                openDevice(firstDevice)
+            } else {
+                Timber.i("openFirstAvailableDevice: No MIDI devices found.")
+                _connectionState.value = ConnectionState.NoDevice
+            }
+        } catch (e: SecurityException) {
+            Timber.e(e, "openFirstAvailableDevice: SecurityException while getting devices.")
+            _connectionState.value = ConnectionState.Error("Отсутствуют необходимые разрешения для работы с MIDI.")
         }
     }
 
@@ -124,8 +134,9 @@ class MidiDataSource @Inject constructor(
 
         midiManager?.openDevice(deviceInfo, {
             if (it == null) {
-                Timber.e("openDevice: Failed to open device.")
-                _connectionState.value = ConnectionState.Error("Failed to open MIDI device.")
+                val deviceName = deviceInfo.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "Unknown Device"
+                Timber.e("openDevice: Failed to open device: %s", deviceName)
+                _connectionState.value = ConnectionState.Error("Не удалось подключиться к устройству: $deviceName")
                 return@openDevice
             }
             Timber.i("openDevice: Device opened successfully.")
