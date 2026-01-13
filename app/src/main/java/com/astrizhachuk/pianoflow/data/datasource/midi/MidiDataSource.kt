@@ -14,6 +14,20 @@ import timber.log.Timber
 import javax.inject.Inject
 import android.media.midi.MidiDevice as MidiDeviceApi
 
+/**
+ * Источник данных, инкапсулирующий всю логику работы с Android MIDI API.
+ *
+ * Этот класс отвечает за:
+ * - Регистрацию и отмену регистрации обратных вызовов для отслеживания подключения/отключения MIDI-устройств.
+ * - Открытие и закрытие соединения с MIDI-устройствами.
+ * - Предоставление состояния подключения в виде `Flow` для остальной части приложения.
+ *
+ * Является синглтоном (@Singleton), так как должен существовать в единственном экземпляре на протяжении
+ * всего жизненного цикла приложения, чтобы непрерывно отслеживать состояние MIDI-устройств.
+ *
+ * @param context Контекст приложения, необходимый для доступа к системным сервисам, таким как [MidiManager].
+ * @param midiDeviceMapper Маппер для преобразования системной модели [MidiDeviceInfo] в доменную модель.
+ */
 class MidiDataSource @Inject constructor(
     context: Context,
     private val midiDeviceMapper: MidiDeviceMapper
@@ -22,55 +36,87 @@ class MidiDataSource @Inject constructor(
     private var openedDevice: MidiDeviceApi? = null
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.NoDevice)
+    /**
+     * Публичный поток (Flow), представляющий текущее состояние подключения MIDI-устройства.
+     *
+     * Подписчики могут отслеживать изменения и реагировать на состояния:
+     * - [ConnectionState.NoDevice]: Устройства не найдены.
+     * - [ConnectionState.Connected]: Устройство успешно подключено.
+     * - [ConnectionState.Disconnected]: Устройство было отключено.
+     * - [ConnectionState.Error]: Произошла ошибка.
+     */
     val connectionState = _connectionState.asStateFlow()
 
+    /**
+     * Обратный вызов для системного [MidiManager], который отслеживает физическое
+     * подключение и отключение MIDI-устройств к Android-устройству.
+     */
     private val deviceCallback = object : MidiManager.DeviceCallback() {
+        /**
+         * Вызывается системой при подключении нового MIDI-устройства.
+         * Если в данный момент нет активного подключения, пытается открыть новое устройство.
+         */
         override fun onDeviceAdded(device: MidiDeviceInfo) {
-            Timber.i("onDeviceAdded: %s", device.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
+            Timber.i("onDeviceAdded: Device detected: %s", device.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
             if (_connectionState.value !is ConnectionState.Connected) {
-                Timber.d("Current state is not Connected, attempting to open a device.")
+                Timber.d("onDeviceAdded: State not 'Connected', attempting to open.")
                 openFirstAvailableDevice()
             }
         }
 
+        /**
+         * Вызывается системой при отключении MIDI-устройства.
+         * Если отключенное устройство является текущим открытым устройством, закрывает его.
+         */
         override fun onDeviceRemoved(device: MidiDeviceInfo) {
-            Timber.i("onDeviceRemoved: %s", device.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
+            Timber.i("onDeviceRemoved: Device disconnected: %s", device.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
             if (openedDevice?.info?.id == device.id) {
-                Timber.d("The removed device is our current device, closing it.")
+                Timber.d("onDeviceRemoved: Disconnected device is current, closing.")
                 closeDevice()
             }
         }
     }
 
     init {
-        Timber.i("Initializing MidiDataSource.")
+        Timber.i("init: Initializing.")
         if (context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI)) {
-            Timber.i("MIDI feature is supported on this device.")
+            Timber.i("init: MIDI feature supported.")
             val handler = Handler(Looper.getMainLooper())
             midiManager?.registerDeviceCallback(deviceCallback, handler)
             openFirstAvailableDevice()
         } else {
-            Timber.e("MIDI feature is NOT supported on this device. Check AndroidManifest.xml")
+            Timber.e("init: MIDI feature NOT supported. Check AndroidManifest.xml.")
             _connectionState.value = ConnectionState.Error("MIDI API is not supported on this device.")
         }
     }
 
+    /**
+     * Ищет первое доступное MIDI-устройство в системе и инициирует его открытие.
+     * Если устройства не найдены, устанавливает состояние в [ConnectionState.NoDevice].
+     */
     private fun openFirstAvailableDevice() {
-        Timber.d("openFirstAvailableDevice: looking for devices.")
+        Timber.d("openFirstAvailableDevice: Looking for devices.")
         val firstDevice = midiManager?.devices?.firstOrNull()
         if (firstDevice != null) {
-            Timber.i("Found device: %s, attempting to open.", firstDevice.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
+            Timber.i("openFirstAvailableDevice: Found device: %s. Attempting to open.", firstDevice.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
             openDevice(firstDevice)
         } else {
-            Timber.i("No MIDI devices found.")
+            Timber.i("openFirstAvailableDevice: No MIDI devices found.")
             _connectionState.value = ConnectionState.NoDevice
         }
     }
 
+    /**
+     * Открывает соединение с указанным MIDI-устройством.
+     * Перед открытием нового устройства закрывает любое ранее открытое.
+     * Обрабатывает результат асинхронного вызова [MidiManager.openDevice].
+     *
+     * @param deviceInfo Информация о MIDI-устройстве, которое необходимо открыть.
+     */
     private fun openDevice(deviceInfo: MidiDeviceInfo) {
-        Timber.i("openDevice: trying to open %s", deviceInfo.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
+        Timber.i("openDevice: Opening device: %s", deviceInfo.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
         if (openedDevice?.info?.id == deviceInfo.id) {
-            Timber.d("Device is already open. Skipping.")
+            Timber.d("openDevice: Device already open, skipping.")
             return
         }
         
@@ -78,25 +124,39 @@ class MidiDataSource @Inject constructor(
 
         midiManager?.openDevice(deviceInfo, {
             if (it == null) {
-                Timber.e("Failed to open MIDI device.")
+                Timber.e("openDevice: Failed to open device.")
                 _connectionState.value = ConnectionState.Error("Failed to open MIDI device.")
                 return@openDevice
             }
-            Timber.i("Successfully opened device. Setting state to Connected.")
+            Timber.i("openDevice: Device opened successfully.")
             openedDevice = it
             _connectionState.value = ConnectionState.Connected(midiDeviceMapper.toDomain(deviceInfo))
         }, null)
     }
 
+    /**
+     * Корректно закрывает текущее открытое MIDI-устройство, освобождает ресурсы
+     * и обновляет состояние подключения на [ConnectionState.Disconnected].
+     */
     private fun closeDevice() {
         if (openedDevice != null) {
-            Timber.i("closeDevice: Closing current device.")
+            Timber.i("closeDevice: Closing device.")
             openedDevice?.close()
             openedDevice = null
             _connectionState.value = ConnectionState.Disconnected
         }
     }
 
+    /**
+     * Полностью освобождает все ресурсы, используемые [MidiDataSource].
+     * Отменяет регистрацию обратного вызова и закрывает открытое устройство.
+     *
+     * В текущей архитектуре, где [MidiDataSource] является синглтоном (@Singleton),
+     * этот метод не вызывается в обычном потоке работы приложения. Однако он предоставляет
+     * необходимый механизм для явного управления ресурсами в случаях, когда
+     * жизненным циклом этого компонента требуется управлять вручную.
+     */
+    @Suppress("unused")
     fun close() {
         Timber.i("close: Unregistering callback and closing device.")
         midiManager?.unregisterDeviceCallback(deviceCallback)
