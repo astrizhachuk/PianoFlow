@@ -26,6 +26,7 @@ mockitoKotlin = "5.4.0"
 androidxJunit = "1.2.1"
 espressoCore = "3.7.0"
 turbine = "1.2.1"
+robolectric = "4.12.1"
 
 [libraries]
 # AndroidX
@@ -60,6 +61,7 @@ mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", versio
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }

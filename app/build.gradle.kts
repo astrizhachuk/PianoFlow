@@ -73,6 +73,7 @@ dependencies {
     testImplementation(libs.mockito.kotlin)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.turbine)
+    testImplementation(libs.robolectric)
     
     // Android Testing
     androidTestImplementation(libs.androidx.junit)
