@@ -173,50 +173,150 @@ DataModule::provideMidiDataSource ..> MidiDataSource : <<@Provides>>
 
 ### 3.1. Принцип работы
 
-1.  **`MidiDataSource`** при инициализации регистрирует `DeviceCallback` у `MidiManager` и немедленно проверяет наличие уже подключенных устройств.
-2.  При получении системного `MidiDeviceInfo`, `MidiDataSource` использует внедренный `MidiDeviceMapper` для преобразования его в доменную модель `MidiDevice`.
-3.  Любое изменение (подключение/отключение) транслируется в `StateFlow<ConnectionState>`.
-4.  **`MidiConnectionViewModel`** через `TrackMidiConnectionUseCase` и `MidiRepository` получает этот `Flow`.
-5.  С помощью оператора `stateIn` `ViewModel` превращает холодный `Flow` в горячий `StateFlow`, который кеширует последнее состояние. Это позволяет `MainActivity` и другим подписчикам безопасно подключаться к потоку данных.
-6.  В операторе `onEach` `ViewModel` вызывает `ShowConnectionNotificationUseCase` для каждого нового состояния, инициируя показ уведомления.
+1.  **Инициализация и жизненный цикл**:
+    *   `MidiDataSource` внедряется как **синглтон** (`@Singleton`) на уровне всего приложения. Это означает, что он создается один раз при первом запуске и существует на протяжении всего жизненного цикла приложения.
+    *   Для своей работы он использует **контекст приложения** (`ApplicationContext`), а не контекст `Activity`. Это гарантирует, что отслеживание MIDI-устройств продолжается в фоновом режиме, независимо от жизненного цикла конкретных экранов.
+    *   В `init`-блоке `MidiDataSource` немедленно регистрирует `MidiManager.DeviceCallback`. Эта подписка на системные события остается активной до тех пор, пока живо приложение, обеспечивая непрерывное отслеживание подключений и отключений.
+    *   Сразу после регистрации `MidiDataSource` пытается подключиться к любому уже подключенному устройству.
 
-### 3.2. Последовательность событий
+2.  **Обнаружение и подключение**:
+    *   **При запуске**: `openFirstAvailableDevice()` запрашивает у `MidiManager` список устройств. Если устройства найдены, он берет первое и вызывает `openDevice()`.
+    *   **Во время работы**: Когда пользователь подключает новое MIDI-устройство, срабатывает `DeviceCallback.onDeviceAdded()`. Если в данный момент нет активного подключения, `onDeviceAdded` вызывает `openFirstAvailableDevice()`.
 
-Диаграмма иллюстрирует процесс от момента подключения устройства до отображения уведомления.
+3.  **Асинхронное открытие соединения**:
+    *   Метод `openDevice()` вызывает `midiManager.openDevice()`, который работает асинхронно.
+    *   В качестве коллбэка передается лямбда-функция, которая будет выполнена по завершении попытки открытия.
+    *   **Успех**: Если `MidiDevice` успешно получен (не `null`), он сохраняется в `openedDevice`, а в `_connectionState` отправляется `ConnectionState.Connected`.
+    *   **Неудача**: Если устройство не удалось открыть (`null`), в `_connectionState` отправляется `ConnectionState.Error`.
+
+4.  **Отключение устройства**:
+    *   Когда пользователь физически отключает MIDI-устройство, срабатывает `DeviceCallback.onDeviceRemoved()`.
+    *   Если `id` отключенного устройства совпадает с `id` текущего `openedDevice`, вызывается `closeDevice()`.
+    *   `closeDevice()` закрывает соединение (`openedDevice.close()`), обнуляет ссылку и отправляет в `_connectionState` значение `ConnectionState.Disconnected`.
+
+5.  **Потребление состояния на уровне UI**:
+    *   **`MidiConnectionViewModel`**, чей жизненный цикл привязан к `Activity`, получает `Flow<ConnectionState>` из `domain`-слоя.
+    *   Она преобразует этот поток в `StateFlow`, который хранит последнее полученное состояние. Это позволяет `Activity` (или `Fragment`) подписываться на него и всегда иметь актуальные данные.
+    *   `ViewModel` следит за состоянием и реагирует на его изменения (например, вызывая `ShowConnectionNotificationUseCase` для отображения уведомлений) только тогда, когда UI (например, `Activity`) активен и подписывается на `StateFlow`. Сам `MidiDataSource` при этом продолжает работать в фоне.
+
+### 3.2. Диаграммы взаимодействия
+
+#### Сценарий №1: Первичная инициализация и подключение к существующему устройству
+
+Эта диаграмма показывает, что происходит при первом запуске `MidiDataSource`, когда MIDI-устройство уже подключено к телефону.
 
 ```plantuml
 @startuml
-title Сценарий: Обнаружение и уведомление о подключении
+title Сценарий: Инициализация с уже подключенным устройством
+
+participant "MidiDataSource" as DS
+participant "Android MidiManager" as MidiManager
+
+activate DS
+DS -> MidiManager : registerDeviceCallback(callback)
+DS -> DS : openFirstAvailableDevice()
+activate DS
+
+DS -> MidiManager : getDevices()
+MidiManager --> DS : List<MidiDeviceInfo>
+
+alt Устройство найдено
+    DS -> DS : openDevice(deviceInfo)
+    activate DS
+    
+    DS -> MidiManager : openDevice(deviceInfo, onOpened)
+    
+    ...Некоторое время спустя...
+    
+    MidiManager -> DS : onOpened(midiDevice)
+    activate DS
+    DS -> DS : _connectionState.value = Connected
+    deactivate DS
+    
+    deactivate DS
+else Устройств нет
+    DS -> DS : _connectionState.value = NoDevice
+    deactivate DS
+end
+
+deactivate DS
+@enduml
+```
+
+#### Сценарий №2: Подключение нового устройства во время работы приложения
+
+Эта диаграмма иллюстрирует реакцию системы на подключение нового MIDI-устройства "на лету".
+
+```plantuml
+@startuml
+title Сценарий: Подключение нового устройства
 
 participant "Android System" as System
 participant "MidiDataSource" as DS
-participant "MidiDeviceMapper" as Mapper
+participant "Android MidiManager" as MidiManager
 participant "MidiConnectionViewModel" as VM
-participant "ShowConnectionNotificationUseCase" as NotifyUC
 
-activate DS
 System -> DS : onDeviceAdded(deviceInfo)
+activate DS
 
-DS -> Mapper : toDomain(deviceInfo)
-activate Mapper
-Mapper --> DS : domainMidiDevice
-deactivate Mapper
-
-DS -> DS : _connectionState.value = Connected(domainMidiDevice)
-
-activate VM
-DS -> VM : new ConnectionState.Connected
-VM -> VM : onEach { ... }
-
-VM -> NotifyUC : invoke(state)
-deactivate VM
-
-activate NotifyUC
-NotifyUC -> System: Показывает уведомление (Toast/Snackbar)
-deactivate NotifyUC
+alt Нет активного подключения
+    DS -> DS : openFirstAvailableDevice()
+    activate DS
+    
+    DS -> MidiManager : openDevice(deviceInfo, onOpened)
+    ...Некоторое время спустя...
+    
+    MidiManager -> DS : onOpened(midiDevice)
+    activate DS
+    DS -> DS : _connectionState.value = Connected
+    
+    DS -> VM : new ConnectionState.Connected
+    activate VM
+    VM -> System : Показывает уведомление
+    deactivate VM
+    
+    deactivate DS
+    deactivate DS
+else Есть активное подключение
+    DS -> DS : (ничего не делает)
+end
 
 deactivate DS
+@enduml
+```
 
+#### Сценарий №3: Отключение устройства
+
+Эта диаграмма показывает, что происходит при физическом отключении текущего активного устройства.
+
+```plantuml
+@startuml
+title Сценарий: Отключение устройства
+
+participant "Android System" as System
+participant "MidiDataSource" as DS
+participant "MidiConnectionViewModel" as VM
+
+System -> DS : onDeviceRemoved(deviceInfo)
+activate DS
+
+alt Отключено активное устройство
+    DS -> DS : closeDevice()
+    activate DS
+    
+    DS -> DS : openedDevice.close()
+    DS -> DS : _connectionState.value = Disconnected
+    deactivate DS
+
+    DS -> VM : new ConnectionState.Disconnected
+    activate VM
+    VM -> System : Показывает уведомление
+    deactivate VM
+else Отключено другое устройство
+    DS -> DS : (ничего не делает)
+end
+
+deactivate DS
 @enduml
 ```
 
