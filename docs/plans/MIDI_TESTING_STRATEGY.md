@@ -65,6 +65,15 @@ class MyViewModelTest {
 **Инструменты**:
 *   `Robolectric`, `MockK` / `Mockito`.
 
+### Полезные ссылки на официальную документацию
+
+- **Robolectric:**
+    - [Официальный сайт](http://robolectric.org/)
+    - [Гайд по Shadow-объектам](http://robolectric.org/extending/)
+- **Mockito и mockito-kotlin:**
+    - [Официальный сайт Mockito](https://site.mockito.org/)
+    - [Документация mockito-kotlin (синтаксис для Kotlin)](https://github.com/mockito/mockito-kotlin)
+
 **Пример (тестирование `MidiDataSource` с Robolectric)**:
 
 ```kotlin
