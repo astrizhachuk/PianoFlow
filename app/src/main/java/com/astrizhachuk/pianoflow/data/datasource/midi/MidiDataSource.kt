@@ -12,7 +12,6 @@ import com.astrizhachuk.pianoflow.domain.model.ConnectionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
-import java.util.concurrent.Executor
 import javax.inject.Inject
 import android.media.midi.MidiDevice as MidiDeviceApi
 
@@ -80,9 +79,12 @@ class MidiDataSource @Inject constructor(
         if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI)) {
             Timber.e("init: MIDI feature NOT supported.")
             _connectionState.value = ConnectionState.Error("MIDI API не поддерживается на этом устройстве.")
+        } else if (midiManager == null) {
+            Timber.w("init: MidiManager is null, MIDI system service not available.")
+            _connectionState.value = ConnectionState.NoDevice
         } else {
             Timber.i("init: MIDI feature supported.")
-            midiManager?.registerDeviceCallbackCompat(deviceCallback, Handler(Looper.getMainLooper()))
+            midiManager.registerDeviceCallbackCompat(deviceCallback, Handler(Looper.getMainLooper()))
             openFirstAvailableDevice()
         }
     }
@@ -95,7 +97,7 @@ class MidiDataSource @Inject constructor(
     private fun openFirstAvailableDevice() {
         Timber.d("openFirstAvailableDevice: Looking for devices.")
         try {
-            val firstDevice = midiManager?.getFirstAvailableDevice()
+            val firstDevice = midiManager!!.getFirstAvailableDevice()
             if (firstDevice != null) {
                 Timber.i("openFirstAvailableDevice: Found device: %s. Attempting to open.", firstDevice.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
                 openDevice(firstDevice)
@@ -125,7 +127,7 @@ class MidiDataSource @Inject constructor(
         
         closeDevice()
 
-        midiManager?.openDevice(deviceInfo, {
+        midiManager!!.openDevice(deviceInfo, {
             if (it == null) {
                 val deviceName = deviceInfo.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "Unknown Device"
                 Timber.e("openDevice: Failed to open device: %s", deviceName)
@@ -193,7 +195,7 @@ private fun MidiManager.registerDeviceCallbackCompat(
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         registerDeviceCallback(
             MidiManager.TRANSPORT_MIDI_BYTE_STREAM,
-            Executor { handler.post(it) },
+            { handler.post(it) },
             callback
         )
     } else {
