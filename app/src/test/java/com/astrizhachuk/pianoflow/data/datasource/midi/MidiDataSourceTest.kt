@@ -65,6 +65,21 @@ class MidiDataSourceTest {
             whenever(this.devices).thenThrow(exception)
         }
     }
+
+    private fun verifyRegisterDeviceCallback(
+        midiManager: MidiManager,
+        callbackCaptor: ArgumentCaptor<MidiManager.DeviceCallback>
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            verify(midiManager).registerDeviceCallback(
+                eq(MidiManager.TRANSPORT_MIDI_BYTE_STREAM),
+                any(),
+                callbackCaptor.capture()
+            )
+        } else {
+            verify(midiManager).registerDeviceCallback(callbackCaptor.capture(), any())
+        }
+    }
     //endregion
 
     //region Initialization Tests
@@ -137,7 +152,7 @@ class MidiDataSourceTest {
         midiManager.setupMockDevices(emptyArray()) // Initially no devices
         val dataSource = MidiDataSource(context, midiDeviceMapper)
         val callbackCaptor = ArgumentCaptor.forClass(MidiManager.DeviceCallback::class.java)
-        verify(midiManager).registerDeviceCallback(callbackCaptor.capture(), any())
+        verifyRegisterDeviceCallback(midiManager, callbackCaptor)
         val callback = callbackCaptor.value
         assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value) // Pre-condition
 
@@ -161,7 +176,7 @@ class MidiDataSourceTest {
         midiManager.setupMockDevices(emptyArray()) // Initially no devices
         val dataSource = MidiDataSource(context, midiDeviceMapper)
         val callbackCaptor = ArgumentCaptor.forClass(MidiManager.DeviceCallback::class.java)
-        verify(midiManager).registerDeviceCallback(callbackCaptor.capture(), any())
+        verifyRegisterDeviceCallback(midiManager, callbackCaptor)
         val callback = callbackCaptor.value
         assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value)
 
@@ -192,7 +207,7 @@ class MidiDataSourceTest {
         val dataSource = MidiDataSource(context, midiDeviceMapper)
 
         // Capture callbacks and simulate first successful connection
-        verify(midiManager).registerDeviceCallback(deviceCallbackCaptor.capture(), any())
+        verifyRegisterDeviceCallback(midiManager, deviceCallbackCaptor)
         verify(midiManager).openDevice(eq(mockDeviceInfo), openCallbackCaptor.capture(), anyOrNull())
         openCallbackCaptor.value.onDeviceOpened(mockDevice)
         assertTrue("Pre-condition failed: Device did not connect", dataSource.connectionState.value is ConnectionState.Connected)
@@ -222,7 +237,7 @@ class MidiDataSourceTest {
         val deviceCallbackCaptor = ArgumentCaptor.forClass(MidiManager.DeviceCallback::class.java)
         val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
         val dataSource = MidiDataSource(context, midiDeviceMapper)
-        verify(midiManager).registerDeviceCallback(deviceCallbackCaptor.capture(), any())
+        verifyRegisterDeviceCallback(midiManager, deviceCallbackCaptor)
         verify(midiManager).openDevice(eq(mockDeviceInfo), openCallbackCaptor.capture(), anyOrNull())
         openCallbackCaptor.value.onDeviceOpened(mockDevice)
         assertTrue("Pre-condition failed: Device did not connect", dataSource.connectionState.value is ConnectionState.Connected)
@@ -254,7 +269,7 @@ class MidiDataSourceTest {
         val dataSource = MidiDataSource(context, midiDeviceMapper)
 
         // Capture the callback and simulate a connection
-        verify(midiManager).registerDeviceCallback(deviceCallbackCaptor.capture(), any())
+        verifyRegisterDeviceCallback(midiManager, deviceCallbackCaptor)
         verify(midiManager).openDevice(eq(mockDeviceInfo), openCallbackCaptor.capture(), anyOrNull())
         openCallbackCaptor.value.onDeviceOpened(mockDeviceWithNullInfo)
         assertTrue("Pre-condition failed: Device did not connect", dataSource.connectionState.value is ConnectionState.Connected)
@@ -287,7 +302,7 @@ class MidiDataSourceTest {
         val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
 
         val dataSource = MidiDataSource(context, midiDeviceMapper)
-        verify(midiManager).registerDeviceCallback(deviceCallbackCaptor.capture(), any())
+        verifyRegisterDeviceCallback(midiManager, deviceCallbackCaptor)
         verify(midiManager).openDevice(any(), openCallbackCaptor.capture(), anyOrNull())
         openCallbackCaptor.value.onDeviceOpened(mockDevice) // Connect device 1
         assertTrue(dataSource.connectionState.value is ConnectionState.Connected) // Pre-condition
@@ -312,7 +327,7 @@ class MidiDataSourceTest {
         midiManager.setupMockDevices(emptyArray())
         val callbackCaptor = ArgumentCaptor.forClass(MidiManager.DeviceCallback::class.java)
         val dataSource = MidiDataSource(context, midiDeviceMapper)
-        verify(midiManager).registerDeviceCallback(callbackCaptor.capture(), any())
+        verifyRegisterDeviceCallback(midiManager, callbackCaptor)
         val callback = callbackCaptor.value
         assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value) // Pre-condition
         val removedDeviceInfo = createMockDeviceInfo("Removed MIDI")
