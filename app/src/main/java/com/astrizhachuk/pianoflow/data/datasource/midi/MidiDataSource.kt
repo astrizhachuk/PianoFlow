@@ -95,12 +95,7 @@ class MidiDataSource @Inject constructor(
     private fun openFirstAvailableDevice() {
         Timber.d("openFirstAvailableDevice: Looking for devices.")
         try {
-            val firstDevice = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                midiManager?.getDevicesForTransport(MidiManager.TRANSPORT_MIDI_BYTE_STREAM)?.firstOrNull()
-            } else {
-                @Suppress("DEPRECATION")
-                midiManager?.devices?.firstOrNull()
-            }
+            val firstDevice = midiManager?.getFirstAvailableDevice()
             if (firstDevice != null) {
                 Timber.i("openFirstAvailableDevice: Found device: %s. Attempting to open.", firstDevice.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
                 openDevice(firstDevice)
@@ -180,5 +175,21 @@ class MidiDataSource @Inject constructor(
         Timber.i("close: Unregistering callback and closing device.")
         midiManager?.unregisterDeviceCallback(deviceCallback)
         closeDevice()
+    }
+}
+
+/**
+ * Возвращает первое доступное MIDI-устройство, используя подходящий API в зависимости от версии Android.
+ *
+ * Для Android 13 (API 33) и выше используется [MidiManager.getDevicesForTransport]
+ * для получения устройств, подключенных через [MidiManager.TRANSPORT_MIDI_BYTE_STREAM].
+ * Для более старых версий используется устаревший метод [MidiManager.getDevices].
+ */
+private fun MidiManager.getFirstAvailableDevice(): MidiDeviceInfo? {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        getDevicesForTransport(MidiManager.TRANSPORT_MIDI_BYTE_STREAM).firstOrNull()
+    } else {
+        @Suppress("DEPRECATION")
+        devices.firstOrNull()
     }
 }
