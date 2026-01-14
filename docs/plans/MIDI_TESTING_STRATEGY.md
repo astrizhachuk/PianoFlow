@@ -60,41 +60,43 @@ class MyViewModelTest {
 
 **Что тестируем**:
 *   **Repository и DataSource**: Взаимодействие репозитория с `MidiDataSource`.
-*   **Взаимодействие с моками Android API**: Проверка вызовов `MidiManager`.
+*   **Взаимодействие с моками, либо с "теневой" реализацией классов Android API**: Проверка вызовов `MidiManager`.
 
 **Инструменты**:
 *   `Robolectric`, `MockK` / `Mockito`.
 
 **Пример (тестирование `MidiDataSource` с Robolectric)**:
+
 ```kotlin
 // Расположение: app/src/test/java/com/astrizhachuk/pianoflow/data/datasource/midi/MidiDataSourceTest.kt
 
 @RunWith(RobolectricTestRunner::class)
 class MidiDataSourceTest {
 
+    private lateinit var context: Context
     private lateinit var midiManager: MidiManager
-    private lateinit var dataSource: MidiDataSource
+    private lateinit var shadowMidiManager: ShadowMidiManager
 
     @Before
     fun setup() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        midiManager = mockk(relaxed = true)
-        shadowOf(context).setSystemService(Context.MIDI_SERVICE, midiManager)
-        
-        dataSource = MidiDataSource(midiManager)
+        context = RuntimeEnvironment.getApplication()
+        midiManager = context.getSystemService(Context.MIDI_SERVICE) as MidiManager
+        shadowMidiManager = shadowOf(midiManager)
     }
 
     @Test
-    fun `scanDevices returns available devices`() = runTest {
+    fun `when a device is available on init then it is opened`() = runTest {
         // Given
-        val mockDeviceInfo = mockk<MidiDeviceInfo>()
-        every { midiManager.devices } returns arrayOf(mockDeviceInfo)
+        val mockDeviceInfo = createMockDeviceInfo("Test MIDI") // Вспомогательная функция для создания мока
+        shadowMidiManager.addDevice(mockDeviceInfo)
         
         // When
-        val devices = dataSource.scanDevices()
+        val dataSource = MidiDataSource(context, mock()) // mock() для маппера
+        shadowOf(Looper.getMainLooper()).idle() // Даем время на выполнение колбэков
         
         // Then
-        assertEquals(1, devices.size)
+        val openedDevice = shadowMidiManager.openedDevices.first()
+        assertEquals(mockDeviceInfo, openedDevice.info)
     }
 }
 ```
@@ -275,6 +277,9 @@ dependencies {
     
     // Эмуляция Android-окружения для запуска тестов на JVM
     testImplementation(libs.robolectric)
+
+    // Дополнительные "тени" (Shadows) для Robolectric, включая ShadowMidiManager
+    testImplementation(libs.robolectric.shadows)
 
     // --- Инструментальные тесты (на устройстве/эмуляторе, src/androidTest) ---
 
