@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -437,6 +438,22 @@ class MidiDataSourceTest {
         // Assert
         verify(midiManager).unregisterDeviceCallback(deviceCallbackCaptor.value)
         assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value)
+    }
+
+    @Test
+    fun `when midiManager is null then close does not crash`() {
+        // Arrange
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
+        shadowOf(context as Application).setSystemService(Context.MIDI_SERVICE, null)
+        val dataSource = MidiDataSource(context, midiDeviceMapper)
+
+        // Act & Assert
+        try {
+            dataSource.close()
+            // Success: no exception was thrown
+        } catch (e: Exception) {
+            fail("Calling close() with a null midiManager should not throw an exception, but it threw ${e::class.simpleName}")
+        }
     }
 
     //endregion

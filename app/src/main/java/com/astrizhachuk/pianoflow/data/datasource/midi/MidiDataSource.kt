@@ -156,6 +156,12 @@ class MidiDataSource @Inject constructor(
         }
     }
 
+    /**
+     * Проверяет, является ли предоставленное устройство [device] текущим открытым устройством.
+     *
+     * @param device Устройство для проверки.
+     * @return `true`, если ID предоставленного устройства совпадает с ID текущего открытого устройства, иначе `false`.
+     */
     private fun isCurrentDevice(device: MidiDeviceInfo): Boolean {
         return openedDevice?.info?.id == device.id
     }
