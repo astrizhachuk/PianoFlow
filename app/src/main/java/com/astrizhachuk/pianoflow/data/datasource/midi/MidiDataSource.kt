@@ -66,7 +66,7 @@ class MidiDataSource @Inject constructor(
          * Если отключенное устройство является текущим открытым устройством, закрывает его.
          */
         override fun onDeviceRemoved(device: MidiDeviceInfo) {
-            Timber.i("onDeviceRemoved: Device disconnected: %s", device.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
+            Timber.w("onDeviceRemoved: Device disconnected: %s", device.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
             if (isCurrentDevice(device)) {
                 Timber.d("onDeviceRemoved: Disconnected device is current, closing.")
                 closeDevice()
@@ -77,7 +77,7 @@ class MidiDataSource @Inject constructor(
     init {
         Timber.i("init: Initializing.")
         if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI)) {
-            Timber.e("init: MIDI feature NOT supported.")
+            Timber.w("init: MIDI feature NOT supported.")
             _connectionState.value = ConnectionState.Error("MIDI API не поддерживается на этом устройстве.")
         } else if (midiManager == null) {
             Timber.w("init: MidiManager is null, MIDI system service not available.")
@@ -130,7 +130,7 @@ class MidiDataSource @Inject constructor(
         midiManager!!.openDevice(deviceInfo, {
             if (it == null) {
                 val deviceName = deviceInfo.properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "Unknown Device"
-                Timber.e("openDevice: Failed to open device: %s", deviceName)
+                Timber.w("openDevice: Failed to open device: %s", deviceName)
                 _connectionState.value = ConnectionState.Error("Не удалось подключиться к устройству: $deviceName")
                 return@openDevice
             }
