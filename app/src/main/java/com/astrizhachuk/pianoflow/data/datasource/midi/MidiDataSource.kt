@@ -54,14 +54,10 @@ class MidiDataSource @Inject constructor(
     private val deviceCallback = object : MidiManager.DeviceCallback() {
         /**
          * Вызывается системой при подключении нового MIDI-устройства.
-         * Если в данный момент нет активного подключения, пытается открыть новое устройство.
          */
         override fun onDeviceAdded(device: MidiDeviceInfo) {
             Timber.i("onDeviceAdded: Device detected: %s", device.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
-            if (_connectionState.value !is ConnectionState.Connected) {
-                Timber.d("onDeviceAdded: State not 'Connected', attempting to open.")
-                openFirstAvailableDevice()
-            }
+            openFirstAvailableDevice()
         }
 
         /**
@@ -70,7 +66,7 @@ class MidiDataSource @Inject constructor(
          */
         override fun onDeviceRemoved(device: MidiDeviceInfo) {
             Timber.i("onDeviceRemoved: Device disconnected: %s", device.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
-            if (openedDevice?.info?.id == device.id) {
+            if (isCurrentDevice(device)) {
                 Timber.d("onDeviceRemoved: Disconnected device is current, closing.")
                 closeDevice()
             }
@@ -83,21 +79,17 @@ class MidiDataSource @Inject constructor(
             Timber.e("init: MIDI feature NOT supported.")
             _connectionState.value = ConnectionState.Error("MIDI API не поддерживается на этом устройстве.")
         } else {
-            try {
-                Timber.i("init: MIDI feature supported.")
-                val handler = Handler(Looper.getMainLooper())
-                midiManager?.registerDeviceCallback(deviceCallback, handler)
-                openFirstAvailableDevice()
-            } catch (e: SecurityException) {
-                Timber.e(e, "init: SecurityException during initialization.")
-                _connectionState.value = ConnectionState.Error("Отсутствуют необходимые разрешения для работы с MIDI.")
-            }
+            Timber.i("init: MIDI feature supported.")
+            val handler = Handler(Looper.getMainLooper())
+            midiManager?.registerDeviceCallback(deviceCallback, handler)
+            openFirstAvailableDevice()
         }
     }
 
     /**
      * Ищет первое доступное MIDI-устройство в системе и инициирует его открытие.
      * Если устройства не найдены, устанавливает состояние в [ConnectionState.NoDevice].
+     * Безопасно обрабатывает SecurityException, если у приложения нет разрешений.
      */
     private fun openFirstAvailableDevice() {
         Timber.d("openFirstAvailableDevice: Looking for devices.")
@@ -125,7 +117,7 @@ class MidiDataSource @Inject constructor(
      */
     private fun openDevice(deviceInfo: MidiDeviceInfo) {
         Timber.i("openDevice: Opening device: %s", deviceInfo.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
-        if (openedDevice?.info?.id == deviceInfo.id) {
+        if (isCurrentDevice(deviceInfo)) {
             Timber.d("openDevice: Device already open, skipping.")
             return
         }
@@ -156,6 +148,10 @@ class MidiDataSource @Inject constructor(
             openedDevice = null
             _connectionState.value = ConnectionState.Disconnected
         }
+    }
+
+    private fun isCurrentDevice(device: MidiDeviceInfo): Boolean {
+        return openedDevice?.info?.id == device.id
     }
 
     /**
