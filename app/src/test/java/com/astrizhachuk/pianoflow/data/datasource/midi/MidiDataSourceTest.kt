@@ -9,6 +9,7 @@ import android.media.midi.MidiDevice
 import android.media.midi.MidiDeviceInfo
 import android.media.midi.MidiManager
 import android.os.Build
+import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.domain.mapper.midi.MidiDeviceMapper
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
 import com.astrizhachuk.pianoflow.domain.model.MidiDevice as MidiDeviceDomain
@@ -34,7 +35,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE, sdk = [23, 33])
+@Config(sdk = [23, 33])
 class MidiDataSourceTest {
 
     private lateinit var context: Context
@@ -95,7 +96,7 @@ class MidiDataSourceTest {
         // Assert
         val state = dataSource.connectionState.first()
         assertTrue(state is ConnectionState.Error)
-        assertEquals("MIDI API не поддерживается на этом устройстве.", (state as ConnectionState.Error).message)
+        assertEquals(context.getString(R.string.midi_error_api_unsupported), (state as ConnectionState.Error).message)
     }
 
     @Test
@@ -110,7 +111,7 @@ class MidiDataSourceTest {
         // Assert
         val state = dataSource.connectionState.first()
         assertTrue(state is ConnectionState.Error)
-        assertEquals("Отсутствуют необходимые разрешения для работы с MIDI.", (state as ConnectionState.Error).message)
+        assertEquals(context.getString(R.string.midi_error_no_permissions), (state as ConnectionState.Error).message)
     }
 
     @Test
@@ -182,7 +183,7 @@ class MidiDataSourceTest {
         // Assert
         val state = dataSource.connectionState.value
         assertTrue(state is ConnectionState.Error)
-        assertEquals("Отсутствуют необходимые разрешения для работы с MIDI.", (state as ConnectionState.Error).message)
+        assertEquals(context.getString(R.string.midi_error_no_permissions), (state as ConnectionState.Error).message)
     }
 
     @Test
@@ -363,7 +364,8 @@ class MidiDataSourceTest {
     fun `when device open fails then state is Error`() = runTest {
         // Arrange
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-        val mockDeviceInfo = createMockDeviceInfo("Failing MIDI Device")
+        val deviceName = "Failing MIDI Device"
+        val mockDeviceInfo = createMockDeviceInfo(deviceName)
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
         val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
         val dataSource = MidiDataSource(context, midiDeviceMapper)
@@ -375,7 +377,7 @@ class MidiDataSourceTest {
         // Assert
         val state = dataSource.connectionState.value
         assertTrue(state is ConnectionState.Error)
-        assertEquals("Не удалось подключиться к устройству: Failing MIDI Device", (state as ConnectionState.Error).message)
+        assertEquals(context.getString(R.string.midi_error_connection_failed, deviceName), (state as ConnectionState.Error).message)
     }
 
     @Test
@@ -388,6 +390,7 @@ class MidiDataSourceTest {
         val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
         val dataSource = MidiDataSource(context, midiDeviceMapper)
         verify(midiManager).openDevice(eq(mockDeviceInfo), openCallbackCaptor.capture(), anyOrNull())
+        val unknownDeviceName = context.getString(R.string.midi_unknown_device)
 
         // Act
         openCallbackCaptor.value.onDeviceOpened(null) // Simulate failure
@@ -395,7 +398,7 @@ class MidiDataSourceTest {
         // Assert
         val state = dataSource.connectionState.value
         assertTrue(state is ConnectionState.Error)
-        assertEquals("Не удалось подключиться к устройству: Unknown Device", (state as ConnectionState.Error).message)
+        assertEquals(context.getString(R.string.midi_error_connection_failed, unknownDeviceName), (state as ConnectionState.Error).message)
     }
 
     @Test

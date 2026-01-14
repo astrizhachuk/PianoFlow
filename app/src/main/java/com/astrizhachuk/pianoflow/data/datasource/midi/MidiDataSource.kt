@@ -7,6 +7,7 @@ import android.media.midi.MidiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.domain.mapper.midi.MidiDeviceMapper
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +31,7 @@ import android.media.midi.MidiDevice as MidiDeviceApi
  * @param midiDeviceMapper Преобразователь для преобразования системной модели [MidiDeviceInfo] в доменную модель.
  */
 class MidiDataSource @Inject constructor(
-    context: Context,
+    private val context: Context,
     private val midiDeviceMapper: MidiDeviceMapper
 ) {
     private val midiManager = context.getSystemService(MidiManager::class.java)
@@ -58,7 +59,7 @@ class MidiDataSource @Inject constructor(
          * Запускает процесс поиска и открытия первого доступного устройства.
          */
         override fun onDeviceAdded(device: MidiDeviceInfo) {
-            Timber.i("onDeviceAdded: Device detected: %s", device.deviceName)
+            Timber.i("onDeviceAdded: Device detected: %s", device.deviceName(context))
             openFirstAvailableDevice()
         }
 
@@ -67,7 +68,7 @@ class MidiDataSource @Inject constructor(
          * Если отключенное устройство является текущим открытым устройством, закрывает его.
          */
         override fun onDeviceRemoved(device: MidiDeviceInfo) {
-            Timber.w("onDeviceRemoved: Device disconnected: %s", device.deviceName)
+            Timber.w("onDeviceRemoved: Device disconnected: %s", device.deviceName(context))
             if (isCurrentDevice(device)) {
                 Timber.d("onDeviceRemoved: Disconnected device is current, closing.")
                 closeDevice()
@@ -80,7 +81,7 @@ class MidiDataSource @Inject constructor(
         when {
             !context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI) -> {
                 Timber.w("init: MIDI feature NOT supported.")
-                _connectionState.value = ConnectionState.Error("MIDI API не поддерживается на этом устройстве.")
+                _connectionState.value = ConnectionState.Error(context.getString(R.string.midi_error_api_unsupported))
             }
             midiManager == null -> {
                 Timber.w("init: MidiManager is null, MIDI system service not available.")
@@ -103,7 +104,7 @@ class MidiDataSource @Inject constructor(
         Timber.d("openFirstAvailableDevice: Looking for devices.")
         try {
             midiManager!!.getFirstAvailableDevice()?.let { device ->
-                Timber.i("openFirstAvailableDevice: Found device: %s. Attempting to open.", device.deviceName)
+                Timber.i("openFirstAvailableDevice: Found device: %s. Attempting to open.", device.deviceName(context))
                 openDevice(device)
             } ?: run {
                 Timber.i("openFirstAvailableDevice: No MIDI devices found.")
@@ -111,7 +112,7 @@ class MidiDataSource @Inject constructor(
             }
         } catch (e: SecurityException) {
             Timber.e(e, "openFirstAvailableDevice: SecurityException while getting devices.")
-            _connectionState.value = ConnectionState.Error("Отсутствуют необходимые разрешения для работы с MIDI.")
+            _connectionState.value = ConnectionState.Error(context.getString(R.string.midi_error_no_permissions))
         }
     }
 
@@ -123,7 +124,7 @@ class MidiDataSource @Inject constructor(
      * @param deviceInfo Информация о MIDI-устройстве, которое необходимо открыть.
      */
     private fun openDevice(deviceInfo: MidiDeviceInfo) {
-        Timber.i("openDevice: Opening device: %s", deviceInfo.deviceName)
+        Timber.i("openDevice: Opening device: %s", deviceInfo.deviceName(context))
         if (isCurrentDevice(deviceInfo)) {
             Timber.d("openDevice: Device already open, skipping.")
             return
@@ -133,9 +134,11 @@ class MidiDataSource @Inject constructor(
 
         midiManager!!.openDevice(deviceInfo, {
             if (it == null) {
-                val deviceName = deviceInfo.deviceName
+                val deviceName = deviceInfo.deviceName(context)
                 Timber.w("openDevice: Failed to open device: %s", deviceName)
-                _connectionState.value = ConnectionState.Error("Не удалось подключиться к устройству: $deviceName")
+                _connectionState.value = ConnectionState.Error(
+                    context.getString(R.string.midi_error_connection_failed, deviceName)
+                )
                 return@openDevice
             }
             Timber.i("openDevice: Device opened successfully.")
@@ -232,7 +235,9 @@ private fun MidiManager.getFirstAvailableDevice(): MidiDeviceInfo? {
 /**
  * Вспомогательное свойство-расширение для безопасного получения имени [MidiDeviceInfo].
  *
- * Возвращает имя устройства из его свойств или "Unknown Device", если имя отсутствует.
+ * Возвращает имя устройства из его свойств или `context.getString(R.string.midi_unknown_device)`, если имя отсутствует.
  */
-private val MidiDeviceInfo.deviceName: String
-    get() = properties.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "Unknown Device"
+private fun MidiDeviceInfo.deviceName(context: Context): String {
+    return properties.getString(MidiDeviceInfo.PROPERTY_NAME)
+        ?: context.getString(R.string.midi_unknown_device)
+}
