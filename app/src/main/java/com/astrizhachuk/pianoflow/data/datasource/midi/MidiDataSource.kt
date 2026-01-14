@@ -55,6 +55,7 @@ class MidiDataSource @Inject constructor(
     private val deviceCallback = object : MidiManager.DeviceCallback() {
         /**
          * Вызывается системой при подключении нового MIDI-устройства.
+         * Запускает процесс поиска и открытия первого доступного устройства.
          */
         override fun onDeviceAdded(device: MidiDeviceInfo) {
             Timber.i("onDeviceAdded: Device detected: %s", device.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
@@ -182,11 +183,16 @@ class MidiDataSource @Inject constructor(
 
 /**
  * Регистрирует обратный вызов для отслеживания MIDI-устройств,
- * используя подходящий API в зависимости от версии Android.
+ * используя подходящий API в зависимости от версии Android и обеспечивая выполнение в одном потоке.
  *
  * Для Android 13 (API 33) и выше используется [MidiManager.registerDeviceCallback]
- * с указанием транспорта [MidiManager.TRANSPORT_MIDI_BYTE_STREAM].
- * Для более старых версий используется устаревший метод [MidiManager.registerDeviceCallback].
+ * с указанием транспорта [MidiManager.TRANSPORT_MIDI_BYTE_STREAM]. Предоставленный [handler]
+ * адаптируется в `Executor` для выполнения колбэка в нужном потоке.
+ * Для более старых версий используется устаревший метод [MidiManager.registerDeviceCallback],
+ * которому [handler] передается напрямую.
+ *
+ * @param callback Обратный вызов для событий устройств.
+ * @param handler Handler, в потоке которого будут выполняться обратные вызовы.
  */
 private fun MidiManager.registerDeviceCallbackCompat(
     callback: MidiManager.DeviceCallback,
