@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.midi.MidiDeviceInfo
 import android.media.midi.MidiManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import com.astrizhachuk.pianoflow.domain.mapper.midi.MidiDeviceMapper
@@ -94,7 +95,12 @@ class MidiDataSource @Inject constructor(
     private fun openFirstAvailableDevice() {
         Timber.d("openFirstAvailableDevice: Looking for devices.")
         try {
-            val firstDevice = midiManager?.devices?.firstOrNull()
+            val firstDevice = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                midiManager?.getDevicesForTransport(MidiManager.TRANSPORT_MIDI_BYTE_STREAM)?.firstOrNull()
+            } else {
+                @Suppress("DEPRECATION")
+                midiManager?.devices?.firstOrNull()
+            }
             if (firstDevice != null) {
                 Timber.i("openFirstAvailableDevice: Found device: %s. Attempting to open.", firstDevice.properties.getString(MidiDeviceInfo.PROPERTY_NAME))
                 openDevice(firstDevice)
