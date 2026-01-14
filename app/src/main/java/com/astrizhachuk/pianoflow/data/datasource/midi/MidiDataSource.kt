@@ -145,9 +145,9 @@ class MidiDataSource @Inject constructor(
      * и обновляет состояние подключения на [ConnectionState.Disconnected].
      */
     private fun closeDevice() {
-        if (openedDevice != null) {
+        openedDevice?.let {
             Timber.i("closeDevice: Closing device.")
-            openedDevice?.close()
+            it.close()
             openedDevice = null
             _connectionState.value = ConnectionState.Disconnected
         }
