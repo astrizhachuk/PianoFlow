@@ -278,9 +278,6 @@ dependencies {
     // Эмуляция Android-окружения для запуска тестов на JVM
     testImplementation(libs.robolectric)
 
-    // Дополнительные "тени" (Shadows) для Robolectric, включая ShadowMidiManager
-    testImplementation(libs.robolectric.shadows)
-
     // --- Инструментальные тесты (на устройстве/эмуляторе, src/androidTest) ---
 
     // Расширения JUnit для Android-тестов
