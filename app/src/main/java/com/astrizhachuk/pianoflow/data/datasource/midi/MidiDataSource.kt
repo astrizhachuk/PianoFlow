@@ -12,6 +12,7 @@ import com.astrizhachuk.pianoflow.domain.model.ConnectionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
+import java.util.concurrent.Executor
 import javax.inject.Inject
 import android.media.midi.MidiDevice as MidiDeviceApi
 
@@ -81,8 +82,7 @@ class MidiDataSource @Inject constructor(
             _connectionState.value = ConnectionState.Error("MIDI API не поддерживается на этом устройстве.")
         } else {
             Timber.i("init: MIDI feature supported.")
-            val handler = Handler(Looper.getMainLooper())
-            midiManager?.registerDeviceCallback(deviceCallback, handler)
+            midiManager?.registerDeviceCallbackCompat(deviceCallback, Handler(Looper.getMainLooper()))
             openFirstAvailableDevice()
         }
     }
@@ -175,6 +175,30 @@ class MidiDataSource @Inject constructor(
         Timber.i("close: Unregistering callback and closing device.")
         midiManager?.unregisterDeviceCallback(deviceCallback)
         closeDevice()
+    }
+}
+
+/**
+ * Регистрирует обратный вызов для отслеживания MIDI-устройств,
+ * используя подходящий API в зависимости от версии Android.
+ *
+ * Для Android 13 (API 33) и выше используется [MidiManager.registerDeviceCallback]
+ * с указанием транспорта [MidiManager.TRANSPORT_MIDI_BYTE_STREAM].
+ * Для более старых версий используется устаревший метод [MidiManager.registerDeviceCallback].
+ */
+private fun MidiManager.registerDeviceCallbackCompat(
+    callback: MidiManager.DeviceCallback,
+    handler: Handler
+) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        registerDeviceCallback(
+            MidiManager.TRANSPORT_MIDI_BYTE_STREAM,
+            Executor { handler.post(it) },
+            callback
+        )
+    } else {
+        @Suppress("DEPRECATION")
+        registerDeviceCallback(callback, handler)
     }
 }
 
