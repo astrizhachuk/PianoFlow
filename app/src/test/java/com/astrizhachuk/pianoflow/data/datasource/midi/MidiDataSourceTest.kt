@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.astrizhachuk.pianoflow.data.datasource.midi
 
 import android.app.Application
@@ -8,6 +10,7 @@ import android.media.midi.MidiDeviceInfo
 import android.media.midi.MidiManager
 import com.astrizhachuk.pianoflow.domain.mapper.midi.MidiDeviceMapper
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
+import com.astrizhachuk.pianoflow.domain.model.MidiDevice as MidiDeviceDomain
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -28,7 +31,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import com.astrizhachuk.pianoflow.domain.model.MidiDevice as MidiDeviceDomain
 
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, sdk = [23])
@@ -43,6 +45,8 @@ class MidiDataSourceTest {
         context = RuntimeEnvironment.getApplication()
         shadowOf(context as Application).setSystemService(Context.MIDI_SERVICE, midiManager)
     }
+
+    //region Initialization Tests
 
     @Test
     fun `when MIDI feature is not supported on init then state is Error`() = runTest {
@@ -74,73 +78,6 @@ class MidiDataSourceTest {
     }
 
     @Test
-    fun `when SecurityException on device added then state is Error`() = runTest {
-        // Arrange
-        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-        whenever(midiManager.devices).thenReturn(emptyArray())
-        val dataSource = MidiDataSource(context, midiDeviceMapper)
-        val callbackCaptor = ArgumentCaptor.forClass(MidiManager.DeviceCallback::class.java)
-        verify(midiManager).registerDeviceCallback(callbackCaptor.capture(), any())
-        val callback = callbackCaptor.value
-        assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value) // Pre-condition
-
-        // Now, setup the SecurityException
-        whenever(midiManager.devices).thenThrow(SecurityException("Device list not available"))
-        val newDeviceInfo = createMockDeviceInfo("New Problematic MIDI")
-
-        // Act
-        callback.onDeviceAdded(newDeviceInfo)
-
-        // Assert
-        val state = dataSource.connectionState.value
-        assertTrue(state is ConnectionState.Error)
-        assertEquals("Отсутствуют необходимые разрешения для работы с MIDI.", (state as ConnectionState.Error).message)
-    }
-
-    @Test
-    fun `when device open fails then state is Error`() = runTest {
-        // Arrange
-        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-        val mockDeviceInfo = createMockDeviceInfo("Failing MIDI Device")
-        whenever(midiManager.devices).thenReturn(arrayOf(mockDeviceInfo))
-        val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
-        val dataSource = MidiDataSource(context, midiDeviceMapper)
-        verify(midiManager).openDevice(eq(mockDeviceInfo), openCallbackCaptor.capture(), anyOrNull())
-
-        // Act
-        openCallbackCaptor.value.onDeviceOpened(null) // Simulate failure by passing null
-
-        // Assert
-        val state = dataSource.connectionState.value
-        assertTrue(state is ConnectionState.Error)
-        assertEquals("Не удалось подключиться к устройству: Failing MIDI Device", (state as ConnectionState.Error).message)
-    }
-
-    @Test
-    fun `when device open fails for device with no name then state is Error with unknown`() = runTest {
-        // Arrange
-        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-        // Create device with null name
-        val properties = mock<android.os.Bundle>()
-        whenever(properties.getString(MidiDeviceInfo.PROPERTY_NAME)).thenReturn(null)
-        val mockDeviceInfo = mock<MidiDeviceInfo>()
-        whenever(mockDeviceInfo.properties).thenReturn(properties)
-
-        whenever(midiManager.devices).thenReturn(arrayOf(mockDeviceInfo))
-        val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
-        val dataSource = MidiDataSource(context, midiDeviceMapper)
-        verify(midiManager).openDevice(eq(mockDeviceInfo), openCallbackCaptor.capture(), anyOrNull())
-
-        // Act
-        openCallbackCaptor.value.onDeviceOpened(null) // Simulate failure
-
-        // Assert
-        val state = dataSource.connectionState.value
-        assertTrue(state is ConnectionState.Error)
-        assertEquals("Не удалось подключиться к устройству: Unknown Device", (state as ConnectionState.Error).message)
-    }
-
-    @Test
     fun `when no devices are available on init then state is NoDevice`() = runTest {
         // Arrange
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
@@ -168,6 +105,34 @@ class MidiDataSourceTest {
         verify(midiManager).openDevice(eq(mockDeviceInfo), any(), anyOrNull())
     }
 
+    //endregion
+
+    //region DeviceCallback Tests
+
+    @Test
+    fun `when SecurityException on device added then state is Error`() = runTest {
+        // Arrange
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
+        whenever(midiManager.devices).thenReturn(emptyArray())
+        val dataSource = MidiDataSource(context, midiDeviceMapper)
+        val callbackCaptor = ArgumentCaptor.forClass(MidiManager.DeviceCallback::class.java)
+        verify(midiManager).registerDeviceCallback(callbackCaptor.capture(), any())
+        val callback = callbackCaptor.value
+        assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value) // Pre-condition
+
+        // Now, setup the SecurityException
+        whenever(midiManager.devices).thenThrow(SecurityException("Device list not available"))
+        val newDeviceInfo = createMockDeviceInfo("New Problematic MIDI")
+
+        // Act
+        callback.onDeviceAdded(newDeviceInfo)
+
+        // Assert
+        val state = dataSource.connectionState.value
+        assertTrue(state is ConnectionState.Error)
+        assertEquals("Отсутствуют необходимые разрешения для работы с MIDI.", (state as ConnectionState.Error).message)
+    }
+
     @Test
     fun `when a new device is added then it is opened`() = runTest {
         // Arrange
@@ -186,25 +151,6 @@ class MidiDataSourceTest {
 
         // Assert
         verify(midiManager).openDevice(eq(newDeviceInfo), any(), anyOrNull())
-    }
-
-    @Test
-    fun `when device opens successfully then state is Connected`() = runTest {
-        // Arrange
-        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-        val mockDeviceInfo = createMockDeviceInfo("Successful Connection MIDI")
-        whenever(midiManager.devices).thenReturn(arrayOf(mockDeviceInfo))
-        whenever(midiDeviceMapper.toDomain(any())).thenReturn(mock<MidiDeviceDomain>())
-        val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
-        val dataSource = MidiDataSource(context, midiDeviceMapper)
-        verify(midiManager).openDevice(eq(mockDeviceInfo), openCallbackCaptor.capture(), anyOrNull())
-
-        // Act
-        openCallbackCaptor.value.onDeviceOpened(mock())
-
-        // Assert
-        val state = dataSource.connectionState.value
-        assertTrue(state is ConnectionState.Connected)
     }
 
     @Test
@@ -356,6 +302,74 @@ class MidiDataSourceTest {
         assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value)
     }
 
+    //endregion
+
+    //region OpenDeviceCallback Tests
+    @Test
+    fun `when device open fails then state is Error`() = runTest {
+        // Arrange
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
+        val mockDeviceInfo = createMockDeviceInfo("Failing MIDI Device")
+        whenever(midiManager.devices).thenReturn(arrayOf(mockDeviceInfo))
+        val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
+        val dataSource = MidiDataSource(context, midiDeviceMapper)
+        verify(midiManager).openDevice(eq(mockDeviceInfo), openCallbackCaptor.capture(), anyOrNull())
+
+        // Act
+        openCallbackCaptor.value.onDeviceOpened(null) // Simulate failure by passing null
+
+        // Assert
+        val state = dataSource.connectionState.value
+        assertTrue(state is ConnectionState.Error)
+        assertEquals("Не удалось подключиться к устройству: Failing MIDI Device", (state as ConnectionState.Error).message)
+    }
+
+    @Test
+    fun `when device open fails for device with no name then state is Error with unknown`() = runTest {
+        // Arrange
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
+        // Create device with null name
+        val properties = mock<android.os.Bundle>()
+        whenever(properties.getString(MidiDeviceInfo.PROPERTY_NAME)).thenReturn(null)
+        val mockDeviceInfo = mock<MidiDeviceInfo>()
+        whenever(mockDeviceInfo.properties).thenReturn(properties)
+
+        whenever(midiManager.devices).thenReturn(arrayOf(mockDeviceInfo))
+        val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
+        val dataSource = MidiDataSource(context, midiDeviceMapper)
+        verify(midiManager).openDevice(eq(mockDeviceInfo), openCallbackCaptor.capture(), anyOrNull())
+
+        // Act
+        openCallbackCaptor.value.onDeviceOpened(null) // Simulate failure
+
+        // Assert
+        val state = dataSource.connectionState.value
+        assertTrue(state is ConnectionState.Error)
+        assertEquals("Не удалось подключиться к устройству: Unknown Device", (state as ConnectionState.Error).message)
+    }
+
+    @Test
+    fun `when device opens successfully then state is Connected`() = runTest {
+        // Arrange
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
+        val mockDeviceInfo = createMockDeviceInfo("Successful Connection MIDI")
+        whenever(midiManager.devices).thenReturn(arrayOf(mockDeviceInfo))
+        whenever(midiDeviceMapper.toDomain(any())).thenReturn(mock<MidiDeviceDomain>())
+        val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
+        val dataSource = MidiDataSource(context, midiDeviceMapper)
+        verify(midiManager).openDevice(eq(mockDeviceInfo), openCallbackCaptor.capture(), anyOrNull())
+
+        // Act
+        openCallbackCaptor.value.onDeviceOpened(mock())
+
+        // Assert
+        val state = dataSource.connectionState.value
+        assertTrue(state is ConnectionState.Connected)
+    }
+
+    //endregion
+
+    //region Close Tests
     @Test
     fun `when close is called then resources are released`() = runTest {
         // Arrange
@@ -396,6 +410,8 @@ class MidiDataSourceTest {
         verify(midiManager).unregisterDeviceCallback(any())
         assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value)
     }
+
+    //endregion
 
     private fun createMockDeviceInfo(name: String, id: Int = 1): MidiDeviceInfo {
         val properties = mock<android.os.Bundle>()
