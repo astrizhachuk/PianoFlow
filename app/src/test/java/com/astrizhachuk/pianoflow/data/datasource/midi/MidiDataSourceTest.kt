@@ -141,6 +141,22 @@ class MidiDataSourceTest {
         verify(midiManager).openDevice(eq(mockDeviceInfo), any(), anyOrNull())
     }
 
+    @Test
+    fun `when MidiManager is null then it does not crash`() = runTest {
+        // Arrange
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
+        // Important: Set the mock midiManager to null to simulate it being unavailable
+        shadowOf(context as Application).setSystemService(Context.MIDI_SERVICE, null)
+
+        // Act
+        val dataSource = MidiDataSource(context, midiDeviceMapper)
+
+        // Assert
+        val state = dataSource.connectionState.value
+        // Expect that it gracefully sets to NoDevice as it can't find any
+        assertEquals(ConnectionState.NoDevice, state)
+    }
+
     //endregion
 
     //region DeviceCallback Tests
@@ -429,6 +445,22 @@ class MidiDataSourceTest {
         verify(midiManager).unregisterDeviceCallback(any())
         verify(mockDevice).close()
         assertEquals(ConnectionState.Disconnected, dataSource.connectionState.value)
+    }
+
+    @Test
+    fun `when close is called and MidiManager is null then it does not crash`() = runTest {
+        // Arrange
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
+        shadowOf(context as Application).setSystemService(Context.MIDI_SERVICE, null)
+        val dataSource = MidiDataSource(context, midiDeviceMapper)
+        assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value)
+
+        // Act
+        dataSource.close()
+
+        // Assert
+        // The main assertion is that no exception is thrown.
+        assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value)
     }
     //endregion
 
