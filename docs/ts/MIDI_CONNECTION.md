@@ -92,7 +92,7 @@ sealed interface ConnectionState {
 }
 
 // com.astrizhachuk.pianoflow.domain.model.MidiDevice.kt
-data class MidiDevice(val id: Int, val name: String, val vendor: String)
+data class MidiDevice(val id: Int, val name: String, val product: String, val manufacturer: String)
 
 // com.astrizhachuk.pianoflow.domain.repository.MidiRepository.kt
 interface MidiRepository {
