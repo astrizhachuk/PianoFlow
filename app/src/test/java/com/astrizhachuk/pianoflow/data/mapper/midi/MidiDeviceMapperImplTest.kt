@@ -2,12 +2,12 @@ package com.astrizhachuk.pianoflow.data.mapper.midi
 
 import android.media.midi.MidiDeviceInfo
 import android.os.Bundle
+import io.mockk.every
+import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.whenever
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -25,8 +25,8 @@ class MidiDeviceMapperImplTest {
             putString(MidiDeviceInfo.PROPERTY_MANUFACTURER, "PianoCorp")
             putString(MidiDeviceInfo.PROPERTY_PRODUCT, "The Grand")
         }
-        val deviceInfo = mock<MidiDeviceInfo>()
-        whenever(deviceInfo.properties).thenReturn(properties)
+        val deviceInfo = mockk<MidiDeviceInfo>(relaxed = true)
+        every { deviceInfo.properties } returns properties
 
         // Act
         val domainDevice = mapper.toDomain(deviceInfo)
@@ -43,8 +43,8 @@ class MidiDeviceMapperImplTest {
         val properties = Bundle().apply {
             putString(MidiDeviceInfo.PROPERTY_MANUFACTURER, "PianoCorp")
         }
-        val deviceInfo = mock<MidiDeviceInfo>()
-        whenever(deviceInfo.properties).thenReturn(properties)
+        val deviceInfo = mockk<MidiDeviceInfo>(relaxed = true)
+        every { deviceInfo.properties } returns properties
 
         // Act
         val domainDevice = mapper.toDomain(deviceInfo)
@@ -61,8 +61,8 @@ class MidiDeviceMapperImplTest {
         val properties = Bundle().apply {
             putString(MidiDeviceInfo.PROPERTY_NAME, "Digital Piano")
         }
-        val deviceInfo = mock<MidiDeviceInfo>()
-        whenever(deviceInfo.properties).thenReturn(properties)
+        val deviceInfo = mockk<MidiDeviceInfo>(relaxed = true)
+        every { deviceInfo.properties } returns properties
 
         // Act
         val domainDevice = mapper.toDomain(deviceInfo)
@@ -79,8 +79,8 @@ class MidiDeviceMapperImplTest {
         val properties = Bundle().apply {
             putString(MidiDeviceInfo.PROPERTY_PRODUCT, "The Grand")
         }
-        val deviceInfo = mock<MidiDeviceInfo>()
-        whenever(deviceInfo.properties).thenReturn(properties)
+        val deviceInfo = mockk<MidiDeviceInfo>(relaxed = true)
+        every { deviceInfo.properties } returns properties
 
         // Act
         val domainDevice = mapper.toDomain(deviceInfo)
@@ -94,8 +94,8 @@ class MidiDeviceMapperImplTest {
     @Test
     fun `toDomain should use empty strings when properties bundle is empty`() {
         // Arrange
-        val deviceInfo = mock<MidiDeviceInfo>()
-        whenever(deviceInfo.properties).thenReturn(Bundle())
+        val deviceInfo = mockk<MidiDeviceInfo>(relaxed = true)
+        every { deviceInfo.properties } returns Bundle()
 
         // Act
         val domainDevice = mapper.toDomain(deviceInfo)
@@ -114,8 +114,8 @@ class MidiDeviceMapperImplTest {
             putString(MidiDeviceInfo.PROPERTY_MANUFACTURER, null)
             putString(MidiDeviceInfo.PROPERTY_PRODUCT, null)
         }
-        val deviceInfo = mock<MidiDeviceInfo>()
-        whenever(deviceInfo.properties).thenReturn(properties)
+        val deviceInfo = mockk<MidiDeviceInfo>(relaxed = true)
+        every { deviceInfo.properties } returns properties
 
         // Act
         val domainDevice = mapper.toDomain(deviceInfo)
@@ -129,8 +129,8 @@ class MidiDeviceMapperImplTest {
     @Test
     fun `toDomain should throw NPE on null properties bundle`() {
         // Arrange
-        val deviceInfo = mock<MidiDeviceInfo>()
-        whenever(deviceInfo.properties).thenReturn(null)
+        val deviceInfo = mockk<MidiDeviceInfo>(relaxed = true)
+        every { deviceInfo.properties } returns null
 
         // Act & Assert
         try {
