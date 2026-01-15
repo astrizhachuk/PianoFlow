@@ -14,11 +14,14 @@ import com.astrizhachuk.pianoflow.domain.mapper.midi.MidiDeviceMapper
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
 import com.astrizhachuk.pianoflow.domain.model.MidiDevice as MidiDeviceDomain
 import io.mockk.*
+import io.mockk.impl.annotations.RelaxedMockK
+import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -30,15 +33,23 @@ import org.robolectric.annotation.Config
 @Config(sdk = [23, 33])
 class MidiDataSourceTest {
 
+    @get:Rule
+    val mockkRule = MockKRule(this)
+
     private lateinit var context: Context
-    private val midiManager: MidiManager = mockk(relaxed = true)
-    private val midiDeviceMapper: MidiDeviceMapper = mockk(relaxed = true)
+
+    @RelaxedMockK
+    private lateinit var midiManager: MidiManager
+
+    @RelaxedMockK
+    private lateinit var midiDeviceMapper: MidiDeviceMapper
 
 
     @Before
     fun setup() {
         context = RuntimeEnvironment.getApplication()
         shadowOf(context as Application).setSystemService(Context.MIDI_SERVICE, midiManager)
+        every { midiDeviceMapper.toDomain(any()) } returns mockk()
     }
 
     //region Helper Methods for Mocking
@@ -207,7 +218,6 @@ class MidiDataSourceTest {
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
         val mockDeviceInfo = createMockDeviceInfo("Already Open MIDI", "manufacturer", "product")
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
-        every { midiDeviceMapper.toDomain(any()) } returns mockk<MidiDeviceDomain>()
         val mockDevice = mockk<MidiDevice>(relaxed = true)
         every { mockDevice.info } returns mockDeviceInfo
 
@@ -241,7 +251,6 @@ class MidiDataSourceTest {
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
         val mockDeviceInfo = createMockDeviceInfo("Connected MIDI", "manufacturer", "product")
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
-        every { midiDeviceMapper.toDomain(any()) } returns mockk<MidiDeviceDomain>()
         val mockDevice = mockk<MidiDevice>(relaxed = true)
         every { mockDevice.info } returns mockDeviceInfo
         val deviceCallbackSlot = slot<MidiManager.DeviceCallback>()
@@ -267,7 +276,6 @@ class MidiDataSourceTest {
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
         val mockDeviceInfo = createMockDeviceInfo("MIDI with null info", "manufacturer", "product")
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
-        every { midiDeviceMapper.toDomain(any()) } returns mockk()
 
         // Create a mock device that will have a null `info` property
         val mockDeviceWithNullInfo = mockk<MidiDevice>(relaxed = true)
@@ -307,7 +315,6 @@ class MidiDataSourceTest {
         val mockDevice = mockk<MidiDevice>(relaxed = true)
         every { mockDevice.info } returns connectedDeviceInfo
         midiManager.setupMockDevices(arrayOf(connectedDeviceInfo))
-        every { midiDeviceMapper.toDomain(any()) } returns mockk<MidiDeviceDomain>() // FIX
         val deviceCallbackSlot = slot<MidiManager.DeviceCallback>()
         val openCallbackSlot = slot<MidiManager.OnDeviceOpenedListener>()
 
@@ -427,7 +434,6 @@ class MidiDataSourceTest {
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
         val mockDevice = mockk<MidiDevice>(relaxed = true)
         every { mockDevice.info } returns mockDeviceInfo
-        every { midiDeviceMapper.toDomain(any()) } returns mockk<MidiDeviceDomain>()
 
         val deviceCallbackSlot = slot<MidiManager.DeviceCallback>()
         val openCallbackSlot = slot<MidiManager.OnDeviceOpenedListener>()
