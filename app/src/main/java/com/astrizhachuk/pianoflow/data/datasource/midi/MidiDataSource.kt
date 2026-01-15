@@ -96,6 +96,22 @@ class MidiDataSource @Inject constructor(
     }
 
     /**
+     * Полностью освобождает все ресурсы, используемые [MidiDataSource].
+     * Отменяет регистрацию обратного вызова и закрывает открытое устройство.
+     *
+     * В текущей архитектуре, где [MidiDataSource] является классом-одиночкой (@Singleton),
+     * этот метод не вызывается в обычном потоке работы приложения. Однако он предоставляет
+     * необходимый механизм для явного управления ресурсами в случаях, когда
+     * жизненным циклом этого компонента требуется управлять вручную.
+     */
+    @Suppress("unused")
+    fun close() {
+        Timber.i("close: Unregistering callback and closing device.")
+        midiManager?.unregisterDeviceCallback(deviceCallback)
+        closeDevice()
+    }
+
+    /**
      * Ищет первое доступное MIDI-устройство в системе и инициирует его открытие.
      * Если устройства не найдены, устанавливает состояние в [ConnectionState.NoDevice].
      * Безопасно обрабатывает SecurityException, если у приложения нет разрешений.
@@ -168,22 +184,6 @@ class MidiDataSource @Inject constructor(
      */
     private fun isCurrentDevice(device: MidiDeviceInfo): Boolean {
         return openedDevice?.info?.id == device.id
-    }
-
-    /**
-     * Полностью освобождает все ресурсы, используемые [MidiDataSource].
-     * Отменяет регистрацию обратного вызова и закрывает открытое устройство.
-     *
-     * В текущей архитектуре, где [MidiDataSource] является классом-одиночкой (@Singleton),
-     * этот метод не вызывается в обычном потоке работы приложения. Однако он предоставляет
-     * необходимый механизм для явного управления ресурсами в случаях, когда
-     * жизненным циклом этого компонента требуется управлять вручную.
-     */
-    @Suppress("unused")
-    fun close() {
-        Timber.i("close: Unregistering callback and closing device.")
-        midiManager?.unregisterDeviceCallback(deviceCallback)
-        closeDevice()
     }
 }
 
