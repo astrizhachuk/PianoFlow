@@ -237,7 +237,7 @@ class MidiDataSourceTest {
         // Assert
         // Verify openDevice was called only once initially.
         // The second onDeviceAdded should result in a quick exit from openDevice, so no second call.
-        verify(midiManager, times(1)).openDevice(any(), any(), anyOrNull())
+        verify(midiManager, times(1)).openDevice(eq(mockDeviceInfo), any(), anyOrNull())
         // Crucially, verify that the original device was never closed, proving we exited early.
         verify(mockDevice, never()).close()
     }
@@ -320,7 +320,7 @@ class MidiDataSourceTest {
 
         val dataSource = MidiDataSource(context, midiDeviceMapper)
         verifyRegisterDeviceCallback(midiManager, deviceCallbackCaptor)
-        verify(midiManager).openDevice(any(), openCallbackCaptor.capture(), anyOrNull())
+        verify(midiManager).openDevice(eq(connectedDeviceInfo), openCallbackCaptor.capture(), anyOrNull())
         openCallbackCaptor.value.onDeviceOpened(mockDevice) // Connect device 1
         assertTrue(dataSource.connectionState.value is ConnectionState.Connected) // Pre-condition
 
@@ -436,16 +436,18 @@ class MidiDataSourceTest {
         whenever(mockDevice.info).thenReturn(mockDeviceInfo)
         whenever(midiDeviceMapper.toDomain(any())).thenReturn(mock<MidiDeviceDomain>())
 
+        val deviceCallbackCaptor = ArgumentCaptor.forClass(MidiManager.DeviceCallback::class.java)
         val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
         val dataSource = MidiDataSource(context, midiDeviceMapper)
-        verify(midiManager).openDevice(any(), openCallbackCaptor.capture(), anyOrNull())
+        verifyRegisterDeviceCallback(midiManager, deviceCallbackCaptor)
+        verify(midiManager).openDevice(eq(mockDeviceInfo), openCallbackCaptor.capture(), anyOrNull())
         openCallbackCaptor.value.onDeviceOpened(mockDevice) // Make sure a device is open
 
         // Act
         dataSource.close()
 
         // Assert
-        verify(midiManager).unregisterDeviceCallback(any())
+        verify(midiManager).unregisterDeviceCallback(eq(deviceCallbackCaptor.value))
         verify(mockDevice).close()
         assertEquals(ConnectionState.Disconnected, dataSource.connectionState.value)
     }
