@@ -19,8 +19,9 @@ class MidiDeviceMapperImpl @Inject constructor() : MidiDeviceMapper {
      * Преобразует объект [MidiDeviceInfo] из Android MIDI API в доменную модель [MidiDevice].
      *
      * Извлекает ключевые свойства из `Bundle`, содержащегося в [MidiDeviceInfo]:
-     * - Имя устройства из [MidiDeviceInfo.PROPERTY_NAME].
+     * - Имя устройства из [MidiDeviceInfo.PROPERTY_NAME]. Для USB-устройств: имя производителя + имя продукта.
      * - Имя производителя из [MidiDeviceInfo.PROPERTY_MANUFACTURER].
+     * - Имя продукта из [MidiDeviceInfo.PROPERTY_PRODUCT].
      *
      * Если какое-либо из этих свойств отсутствует или равно `null`, метод подставляет
      * пустую строку `""` в качестве значения по умолчанию, обеспечивая стабильность
@@ -32,12 +33,14 @@ class MidiDeviceMapperImpl @Inject constructor() : MidiDeviceMapper {
     override fun toDomain(deviceInfo: MidiDeviceInfo): MidiDevice {
         val properties = deviceInfo.properties
         val name = properties.getString(MidiDeviceInfo.PROPERTY_NAME)
-        val vendor = properties.getString(MidiDeviceInfo.PROPERTY_MANUFACTURER)
+        val manufacturer = properties.getString(MidiDeviceInfo.PROPERTY_MANUFACTURER)
+        val product = properties.getString(MidiDeviceInfo.PROPERTY_PRODUCT)
 
         return MidiDevice(
             id = deviceInfo.id,
             name = name ?: "",
-            vendor = vendor ?: ""
+            manufacturer = manufacturer ?: "",
+            product = product ?: ""
         )
     }
 }

@@ -132,7 +132,7 @@ class MidiDataSourceTest {
     fun `when a device is available on init then it is opened`() = runTest {
         // Arrange
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-        val mockDeviceInfo = createMockDeviceInfo("Initial Available MIDI")
+        val mockDeviceInfo = createMockDeviceInfo("Initial Available MIDI", "manufacturer", "product")
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
 
         // Act
@@ -175,7 +175,7 @@ class MidiDataSourceTest {
 
         // Now, setup the SecurityException for the next device scan
         midiManager.setupMockDevicesToThrow(SecurityException("Device list not available"))
-        val newDeviceInfo = createMockDeviceInfo("New Problematic MIDI")
+        val newDeviceInfo = createMockDeviceInfo("New Problematic MIDI", "manufacturer", "product")
 
         // Act
         callback.onDeviceAdded(newDeviceInfo)
@@ -198,7 +198,7 @@ class MidiDataSourceTest {
         assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value)
 
         // Now a new device is available
-        val newDeviceInfo = createMockDeviceInfo("New MIDI")
+        val newDeviceInfo = createMockDeviceInfo("New MIDI", "manufacturer", "product")
         midiManager.setupMockDevices(arrayOf(newDeviceInfo))
 
         // Act
@@ -212,7 +212,7 @@ class MidiDataSourceTest {
     fun `when opening an already opened device then it does not re-open`() = runTest {
         // Arrange
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-        val mockDeviceInfo = createMockDeviceInfo("Already Open MIDI")
+        val mockDeviceInfo = createMockDeviceInfo("Already Open MIDI", "manufacturer", "product")
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
         whenever(midiDeviceMapper.toDomain(any())).thenReturn(mock<MidiDeviceDomain>())
         val mockDevice = mock<MidiDevice>()
@@ -246,7 +246,7 @@ class MidiDataSourceTest {
     fun `when a connected device is removed then state is Disconnected`() = runTest {
         // Arrange
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-        val mockDeviceInfo = createMockDeviceInfo("Connected MIDI")
+        val mockDeviceInfo = createMockDeviceInfo("Connected MIDI", "manufacturer", "product")
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
         whenever(midiDeviceMapper.toDomain(any())).thenReturn(mock<MidiDeviceDomain>())
         val mockDevice = mock<MidiDevice>()
@@ -272,7 +272,7 @@ class MidiDataSourceTest {
     fun `when removed device has null info then it does not crash`() = runTest {
         // Arrange
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-        val mockDeviceInfo = createMockDeviceInfo("MIDI with null info")
+        val mockDeviceInfo = createMockDeviceInfo("MIDI with null info", "manufacturer", "product")
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
         whenever(midiDeviceMapper.toDomain(any())).thenReturn(mock())
 
@@ -292,7 +292,7 @@ class MidiDataSourceTest {
         assertTrue("Pre-condition failed: Device did not connect", dataSource.connectionState.value is ConnectionState.Connected)
 
         // The device that is being "removed" by the system
-        val removedDeviceInfo = createMockDeviceInfo("Some other device")
+        val removedDeviceInfo = createMockDeviceInfo("Some other device", "manufacturer", "product")
         val callback = deviceCallbackCaptor.value
 
         // Act
@@ -310,7 +310,7 @@ class MidiDataSourceTest {
         // Arrange
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
         // Setup a connected device
-        val connectedDeviceInfo = createMockDeviceInfo("Connected MIDI", id = 1)
+        val connectedDeviceInfo = createMockDeviceInfo("Connected MIDI", "manufacturer", "product", id = 1)
         val mockDevice = mock<MidiDevice>()
         whenever(mockDevice.info).thenReturn(connectedDeviceInfo)
         midiManager.setupMockDevices(arrayOf(connectedDeviceInfo))
@@ -326,7 +326,7 @@ class MidiDataSourceTest {
 
         val deviceCallback = deviceCallbackCaptor.value
         // Create info for a different device
-        val otherDeviceInfo = createMockDeviceInfo("Other MIDI", id = 2)
+        val otherDeviceInfo = createMockDeviceInfo("Other MIDI", "manufacturer", "product", id = 2)
 
         // Act
         deviceCallback.onDeviceRemoved(otherDeviceInfo) // Remove device 2
@@ -347,7 +347,7 @@ class MidiDataSourceTest {
         verifyRegisterDeviceCallback(midiManager, callbackCaptor)
         val callback = callbackCaptor.value
         assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value) // Pre-condition
-        val removedDeviceInfo = createMockDeviceInfo("Removed MIDI")
+        val removedDeviceInfo = createMockDeviceInfo("Removed MIDI", "manufacturer", "product")
 
         // Act
         callback.onDeviceRemoved(removedDeviceInfo)
@@ -365,7 +365,7 @@ class MidiDataSourceTest {
         // Arrange
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
         val deviceName = "Failing MIDI Device"
-        val mockDeviceInfo = createMockDeviceInfo(deviceName)
+        val mockDeviceInfo = createMockDeviceInfo(deviceName, "manufacturer", "product")
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
         val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
         val dataSource = MidiDataSource(context, midiDeviceMapper)
@@ -385,7 +385,7 @@ class MidiDataSourceTest {
         // Arrange
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
         // Create device with null name
-        val mockDeviceInfo = createMockDeviceInfo(null)
+        val mockDeviceInfo = createMockDeviceInfo(null, "manufacturer", "product")
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
         val openCallbackCaptor = ArgumentCaptor.forClass(MidiManager.OnDeviceOpenedListener::class.java)
         val dataSource = MidiDataSource(context, midiDeviceMapper)
@@ -405,7 +405,7 @@ class MidiDataSourceTest {
     fun `when device opens successfully then state is Connected`() = runTest {
         // Arrange
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-        val mockDeviceInfo = createMockDeviceInfo("Successful MIDI")
+        val mockDeviceInfo = createMockDeviceInfo("Successful MIDI", "manufacturer", "product")
         val mockDomainDevice = mock<MidiDeviceDomain>()
         whenever(midiDeviceMapper.toDomain(mockDeviceInfo)).thenReturn(mockDomainDevice)
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
@@ -430,7 +430,7 @@ class MidiDataSourceTest {
     fun `when close is called then unregisters callback and closes device`() = runTest {
         // Arrange
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-        val mockDeviceInfo = createMockDeviceInfo("Device to close")
+        val mockDeviceInfo = createMockDeviceInfo("Device to close", "manufacturer", "product")
         midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
         val mockDevice = mock<MidiDevice>()
         whenever(mockDevice.info).thenReturn(mockDeviceInfo)
@@ -470,9 +470,11 @@ class MidiDataSourceTest {
     //endregion
 
     //region Mock Creation Helpers
-    private fun createMockDeviceInfo(name: String?, id: Int = 123): MidiDeviceInfo {
+    private fun createMockDeviceInfo(name: String?, manufacturer: String?, product: String?, id: Int = 123): MidiDeviceInfo {
         val properties = mock<android.os.Bundle>()
         whenever(properties.getString(MidiDeviceInfo.PROPERTY_NAME)).thenReturn(name)
+        whenever(properties.getString(MidiDeviceInfo.PROPERTY_MANUFACTURER)).thenReturn(manufacturer)
+        whenever(properties.getString(MidiDeviceInfo.PROPERTY_PRODUCT)).thenReturn(product)
 
         val mockDeviceInfo = mock<MidiDeviceInfo>()
         whenever(mockDeviceInfo.properties).thenReturn(properties)

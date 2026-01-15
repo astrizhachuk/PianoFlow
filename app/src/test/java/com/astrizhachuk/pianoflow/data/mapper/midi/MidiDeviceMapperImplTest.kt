@@ -1,4 +1,3 @@
-
 package com.astrizhachuk.pianoflow.data.mapper.midi
 
 import android.media.midi.MidiDeviceInfo
@@ -24,6 +23,7 @@ class MidiDeviceMapperImplTest {
         val properties = Bundle().apply {
             putString(MidiDeviceInfo.PROPERTY_NAME, "Digital Piano")
             putString(MidiDeviceInfo.PROPERTY_MANUFACTURER, "PianoCorp")
+            putString(MidiDeviceInfo.PROPERTY_PRODUCT, "The Grand")
         }
         val deviceInfo = mock<MidiDeviceInfo>()
         whenever(deviceInfo.properties).thenReturn(properties)
@@ -33,11 +33,12 @@ class MidiDeviceMapperImplTest {
 
         // Assert
         assertEquals("Digital Piano", domainDevice.name)
-        assertEquals("PianoCorp", domainDevice.vendor)
+        assertEquals("PianoCorp", domainDevice.manufacturer)
+        assertEquals("The Grand", domainDevice.product)
     }
 
     @Test
-    fun `toDomain should handle missing product name`() {
+    fun `toDomain should use empty string when name and product are missing`() {
         // Arrange
         val properties = Bundle().apply {
             putString(MidiDeviceInfo.PROPERTY_MANUFACTURER, "PianoCorp")
@@ -50,11 +51,12 @@ class MidiDeviceMapperImplTest {
 
         // Assert
         assertEquals("", domainDevice.name)
-        assertEquals("PianoCorp", domainDevice.vendor)
+        assertEquals("PianoCorp", domainDevice.manufacturer)
+        assertEquals("", domainDevice.product)
     }
 
     @Test
-    fun `toDomain should handle missing manufacturer name`() {
+    fun `toDomain should use empty string when manufacturer and product are missing`() {
         // Arrange
         val properties = Bundle().apply {
             putString(MidiDeviceInfo.PROPERTY_NAME, "Digital Piano")
@@ -67,11 +69,30 @@ class MidiDeviceMapperImplTest {
 
         // Assert
         assertEquals("Digital Piano", domainDevice.name)
-        assertEquals("", domainDevice.vendor)
+        assertEquals("", domainDevice.manufacturer)
+        assertEquals("", domainDevice.product)
     }
 
     @Test
-    fun `toDomain should handle empty properties bundle`() {
+    fun `toDomain should use empty string when name and manufacturer are missing`() {
+        // Arrange
+        val properties = Bundle().apply {
+            putString(MidiDeviceInfo.PROPERTY_PRODUCT, "The Grand")
+        }
+        val deviceInfo = mock<MidiDeviceInfo>()
+        whenever(deviceInfo.properties).thenReturn(properties)
+
+        // Act
+        val domainDevice = mapper.toDomain(deviceInfo)
+
+        // Assert
+        assertEquals("", domainDevice.name)
+        assertEquals("", domainDevice.manufacturer)
+        assertEquals("The Grand", domainDevice.product)
+    }
+
+    @Test
+    fun `toDomain should use empty strings when properties bundle is empty`() {
         // Arrange
         val deviceInfo = mock<MidiDeviceInfo>()
         whenever(deviceInfo.properties).thenReturn(Bundle())
@@ -81,7 +102,28 @@ class MidiDeviceMapperImplTest {
 
         // Assert
         assertEquals("", domainDevice.name)
-        assertEquals("", domainDevice.vendor)
+        assertEquals("", domainDevice.manufacturer)
+        assertEquals("", domainDevice.product)
+    }
+
+    @Test
+    fun `toDomain should use empty strings for null property values`() {
+        // Arrange
+        val properties = Bundle().apply {
+            putString(MidiDeviceInfo.PROPERTY_NAME, null)
+            putString(MidiDeviceInfo.PROPERTY_MANUFACTURER, null)
+            putString(MidiDeviceInfo.PROPERTY_PRODUCT, null)
+        }
+        val deviceInfo = mock<MidiDeviceInfo>()
+        whenever(deviceInfo.properties).thenReturn(properties)
+
+        // Act
+        val domainDevice = mapper.toDomain(deviceInfo)
+
+        // Assert
+        assertEquals("", domainDevice.name)
+        assertEquals("", domainDevice.manufacturer)
+        assertEquals("", domainDevice.product)
     }
 
     @Test
