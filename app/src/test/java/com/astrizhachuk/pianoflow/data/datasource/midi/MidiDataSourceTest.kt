@@ -44,7 +44,6 @@ class MidiDataSourceTest {
     @RelaxedMockK
     private lateinit var midiDeviceMapper: MidiDeviceMapper
 
-
     @Before
     fun setup() {
         context = RuntimeEnvironment.getApplication()
@@ -53,6 +52,18 @@ class MidiDataSourceTest {
     }
 
     //region Helper Methods for Mocking
+    private fun createMockDeviceInfo(name: String?, manufacturer: String?, product: String?, id: Int = 123): MidiDeviceInfo {
+        val properties = mockk<android.os.Bundle>()
+        every { properties.getString(MidiDeviceInfo.PROPERTY_NAME) } returns name
+        every { properties.getString(MidiDeviceInfo.PROPERTY_MANUFACTURER) } returns manufacturer
+        every { properties.getString(MidiDeviceInfo.PROPERTY_PRODUCT) } returns product
+
+        val mockDeviceInfo = mockk<MidiDeviceInfo>()
+        every { mockDeviceInfo.properties } returns properties
+        every { mockDeviceInfo.id } returns id
+        return mockDeviceInfo
+    }
+
     private fun MidiManager.setupMockDevices(devices: Array<MidiDeviceInfo>) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             every { getDevicesForTransport(MidiManager.TRANSPORT_MIDI_BYTE_STREAM) } returns devices.toSet()
@@ -465,20 +476,6 @@ class MidiDataSourceTest {
         // Assert
         // The main assertion is that no exception is thrown.
         assertEquals(ConnectionState.NoDevice, dataSource.connectionState.value)
-    }
-    //endregion
-
-    //region Mock Creation Helpers
-    private fun createMockDeviceInfo(name: String?, manufacturer: String?, product: String?, id: Int = 123): MidiDeviceInfo {
-        val properties = mockk<android.os.Bundle>()
-        every { properties.getString(MidiDeviceInfo.PROPERTY_NAME) } returns name
-        every { properties.getString(MidiDeviceInfo.PROPERTY_MANUFACTURER) } returns manufacturer
-        every { properties.getString(MidiDeviceInfo.PROPERTY_PRODUCT) } returns product
-
-        val mockDeviceInfo = mockk<MidiDeviceInfo>()
-        every { mockDeviceInfo.properties } returns properties
-        every { mockDeviceInfo.id } returns id
-        return mockDeviceInfo
     }
     //endregion
 }
