@@ -27,7 +27,7 @@
 *   **Mappers**: Логику преобразования данных.
 
 **Инструменты**:
-*   `JUnit 5` / `JUnit 4`, `MockK` / `Mockito`, `kotlinx-coroutines-test`, `Turbine`.
+*   `JUnit 5` / `JUnit 4`, `MockK`, `kotlinx-coroutines-test`, `Turbine`.
 
 **Пример (тестирование ViewModel)**:
 ```kotlin
@@ -275,8 +275,7 @@ dependencies {
     testImplementation(libs.junit)
 
     // Создание моков (mock-объектов) для изоляции зависимостей
-    testImplementation(libs.mockito.core)
-    testImplementation(libs.mockito.kotlin) // Kotlin-специфичные расширения для Mockito
+    testImplementation(libs.mockk)
 
     // Тестирование корутин и асинхронного кода
     testImplementation(libs.coroutines.test)
