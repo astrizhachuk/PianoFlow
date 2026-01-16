@@ -15,6 +15,17 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
+/**
+ * ViewModel, отвечающая за управление и наблюдение за состоянием подключений MIDI-устройств.
+ *
+ * Эта ViewModel предоставляет текущий [ConnectionState] в виде [StateFlow] и реагирует
+ * на изменения подключения, отображая уведомления для пользователя (например, toast-сообщения или snackbar),
+ * чтобы информировать его о статусе подключения (подключено, отключено и т.д.).
+ *
+ * @param trackMidiConnectionUseCase Use case для отслеживания состояния подключения MIDI.
+ * @param showConnectionNotificationUseCase Use case для создания понятных пользователю сообщений на основе состояния подключения.
+ * @param userNotifier Утилита для отображения сообщений пользователю.
+ */
 @HiltViewModel
 class MidiConnectionViewModel @Inject constructor(
     trackMidiConnectionUseCase: TrackMidiConnectionUseCase,
@@ -33,12 +44,20 @@ class MidiConnectionViewModel @Inject constructor(
         observeConnectionState()
     }
 
+    /**
+     * Наблюдает за потоком [connectionState] и показывает уведомление пользователю при изменении состояния.
+     *
+     * Эта функция пропускает начальное значение потока, чтобы избежать показа уведомления
+     * сразу после создания ViewModel. При каждом последующем изменении состояния она определяет
+     * подходящее сообщение для пользователя через [showConnectionNotificationUseCase] и отображает его
+     * с помощью [userNotifier].
+     */
     private fun observeConnectionState() {
         connectionState
             .drop(1) // Ignore the initial value to prevent showing a notification on startup
             .onEach { state ->
                 val userMessage = showConnectionNotificationUseCase(state)
-                userMessage?.let { userNotifier.sendMessage(it) }
+                userNotifier.sendMessage(userMessage)
             }.launchIn(viewModelScope)
     }
 }
