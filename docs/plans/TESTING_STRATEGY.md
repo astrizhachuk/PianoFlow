@@ -294,6 +294,9 @@ dependencies {
     // Фреймворк для UI-тестирования
     androidTestImplementation(libs.androidx.espresso.core)
 
+    // Tracing
+    implementation(libs.androidx.tracing.ktx)
+
     // Поддержка Hilt в инструментальных тестах для внедрения зависимостей
     androidTestImplementation(libs.hilt.android.testing)
     kspAndroidTest(libs.hilt.compiler)

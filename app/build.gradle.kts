@@ -72,6 +72,9 @@ dependencies {
 
     // Logging
     implementation(libs.timber)
+
+    // Tracing
+    implementation(libs.androidx.tracing.ktx)
     
     // Testing
     testImplementation(libs.junit)
