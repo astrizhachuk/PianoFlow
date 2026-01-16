@@ -2,10 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools" >
 
-<!--    <uses-permission android:name="android.permission.MIDI" />-->
-<!--    <uses-feature android:name="android.software.midi" android:required="true"/>-->
+    <uses-feature android:name="android.software.midi" android:required="true"/>
 
     <application
+        android:name=".PianoFlowApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -15,7 +15,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PianoFlow" >
         <activity
-            android:name=".MainActivity"
+            android:name=".presentation.ui.main.MainActivity"
             android:exported="true" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

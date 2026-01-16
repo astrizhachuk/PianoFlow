@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">PianoFlow</string>
+    <string name="midi_error_api_unsupported">MIDI API не поддерживается на этом устройстве.</string>
+    <string name="midi_error_no_permissions">Отсутствуют необходимые разрешения для работы с MIDI.</string>
+    <string name="midi_error_connection_failed">Не удалось подключиться к устройству: %s</string>
+    <string name="midi_unknown_device">Неизвестное устройство</string>
+    <string name="midi_device_disconnected">MIDI-устройство отключено</string>
+    <string name="midi_device_connected">MIDI-устройство подключено: %1$s</string>
+</resources>
