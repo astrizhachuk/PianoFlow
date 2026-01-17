@@ -22,9 +22,7 @@
 left to right direction
 actor Пользователь as User
 rectangle "Система PianoFlow" {
-  usecase UC2 as "UC-002
-Прием и отображение
-MIDI-сообщений"
+  usecase UC2 as "UC-002\nПрием и отображение\nMIDI-сообщений"
 }
 
 User -> UC2 : играет на клавиатуре
@@ -88,7 +86,7 @@ UC-002
 
 ---
 
-## Диаграмма последовательности основного сценария
+## Диаграмма последовательности
 
 ```plantuml
 @startuml
@@ -99,12 +97,23 @@ box "Приложение PianoFlow"
   participant "UI / Presentation\n(ViewModel/View)" as UI
 end box
 
-User -> Keyboard : Нажимает клавишу(и)
-Keyboard -> MidiProcessor : Отправляет MIDI-сообщение (Note On)
-MidiProcessor -> UI : Передает данные о ноте(ах)
-UI -> UI : Очищает нотный стан
-UI -> UI : Отображает новые ноты
-UI -> User : Показывает ноты на экране
+User -> Keyboard : Выполняет действие на клавиатуре
+
+alt MIDI-сообщение == "Note On" (нажатие клавиши или аккорд)
+
+    Keyboard -> MidiProcessor : Отправляет MIDI-сообщение(я) (Note On)
+    MidiProcessor -> UI : Передает данные о ноте(ах)
+    UI -> UI : Очищает нотный стан
+    UI -> UI : Отображает новые ноты
+    UI -> User : Показывает ноты на экране
+
+else Другое MIDI-сообщение (Note Off, Pitch Bend и т.д.)
+
+    Keyboard -> MidiProcessor : Отправляет MIDI-сообщение (не Note On)
+    MidiProcessor -> MidiProcessor : Игнорирует сообщение
+    note right of MidiProcessor: Отображение на экране не меняется
+
+end
 
 @enduml
 ```
