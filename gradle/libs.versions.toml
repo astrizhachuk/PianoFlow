@@ -1,9 +1,9 @@
 [versions]
 # Gradle Plugins
-androidGradlePlugin = "8.13.2"
-kotlin = "2.0.0"
-ksp = "2.0.0-1.0.21"
-hilt = "2.51.1"
+androidGradlePlugin = "9.0.0"
+kotlin = "2.2.10"
+ksp = "2.3.2"
+hilt = "2.58"
 
 # AndroidX
 coreKtx = "1.13.1"
