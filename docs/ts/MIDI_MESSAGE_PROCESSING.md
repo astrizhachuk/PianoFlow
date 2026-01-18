@@ -4,33 +4,35 @@
 
 ### 1.1. Цель доработки
 
-Реализовать функционал для приема, обработки и визуализации MIDI-сообщений (нот), поступающих от подключенной MIDI-клавиатуры. Основная задача — отображать сыгранные пользователем ноты и аккорды на виртуальном нотном стане в реальном времени.
+Реализовать функционал для приема, обработки и визуализации MIDI-сообщений (нот), поступающих от подключенной MIDI-клавиатуры. Основная задача — отображать сыгранные пользователем ноты и аккорды на экране в реальном времени.
 
 ### 1.2. Базовые документы
 
 - [Архитектурные принципы](../plans/ARCHITECTURE_PRINCIPLES.md)
 - [Сценарии: Прием и отображение MIDI-сообщений](../uc/MIDI_MESSAGE_PROCESSING.md)
+- [Техническое задание: Реализация отслеживания состояния подключения MIDI-клавиатуры](./MIDI_CONNECTION.md)
 
 ## 2. Архитектурное решение
 
 ### 2.1. Компоненты
 
-Система обработки MIDI-сообщений будет интегрирована в существующую архитектуру, расширяя функционал `Data` и `Domain` слоев и добавляя новые компоненты в `Presentation` слой.
+Система обработки MIDI-сообщений интегрирована в существующую архитектуру, расширяя функционал `Data` и `Domain` слоев и добавляя новые компоненты в `Presentation` слой.
 
 **Data Layer**
-- **`MidiDataSource`:** Будет расширен для обработки входящих MIDI-сообщений. После успешного открытия устройства (`MidiManager.openDevice`), он будет подключать кастомный `MidiReceiver` к входному порту устройства (`MidiInputPort`) для приема данных.
-- **`MidiMessageReceiver`:** Новая внутренняя реализация `android.media.midi.MidiReceiver`, ответственная за прием сырых MIDI-данных (`byte[]`).
-- **`MidiMessageParser`:** Новый компонент, который получает сырые данные от `MidiMessageReceiver`, парсит их и преобразует в доменную модель `Note`. Он будет игнорировать все сообщения, кроме `Note On`.
-- **`MidiRepositoryImpl`:** Будет расширен для предоставления потока сыгранных нот.
+- **`MidiDataSource`:** Расширен для обработки входящих MIDI-сообщений. После успешного открытия устройства (`MidiManager.openDevice`), он подключает `MidiReceiver` к **выходному порту** устройства (`MidiOutputPort`) для приема данных.
+- **`MidiMessageReceiver`:** Внутренняя реализация `android.media.midi.MidiReceiver`, ответственная за прием сырых MIDI-данных (`byte[]`).
+- **`MidiMessageParser`:** Компонент, который получает сырые данные от `MidiMessageReceiver`, парсит их и преобразует в доменную модель `Note`. Игнорирует все сообщения, кроме `Note On`.
+- **`MidiRepositoryImpl`:** Реализация репозитория, которая предоставляет поток входящих нот.
 
 **Domain Layer**
-- **`Note`:** Новая доменная модель, представляющая одну ноту (высота тона).
-- **`MidiRepository`:** Интерфейс будет дополнен методом для наблюдения за входящими нотами.
-- **`ObserveMidiMessagesUseCase`:** `Use Case`, который предоставляет `Flow<List<Note>>` для `Presentation Layer`. Он инкапсулирует логику группировки быстрых последовательных нажатий в один аккорд.
+- **`Note`:** Доменная модель, представляющая одну ноту (высота тона).
+- **`MidiRepository`:** Интерфейс дополнен методом для наблюдения за входящими нотами (`Flow<Note>`).
+- **`ObserveMidiMessagesUseCase`:** `Use Case`, который получает поток одиночных нот и преобразует его в `Flow<List<Note>>`, группируя быстрые последовательные нажатия в один аккорд.
 
 **Presentation Layer**
-- **`PianoStaffViewModel`:** Новая `ViewModel` для экрана с нотным станом. Она будет получать `Flow` нот из `ObserveMidiMessagesUseCase` и преобразовывать его в состояние для UI.
-- **`PianoStaffScreen`:** Новый `Composable`-экран, который отображает нотный стан и визуализирует ноты на основе состояния, полученного от `ViewModel`.
+- **`PianoStaffViewModel`:** Новая `ViewModel` для экрана с нотным станом. Она получает `Flow` нот из `ObserveMidiMessagesUseCase` и преобразует его в состояние для UI.
+- **`PianoStaffScreen`:** `Composable`-экран, который отображает сыгранные ноты. На данном этапе — в виде простого текста.
+- **`MainActivity`**: Основная `Activity` приложения, которая была переведена на Jetpack Compose с помощью `setContent` для отображения `PianoStaffScreen` и использует `MaterialTheme`.
 
 ```plantuml
 @startuml
@@ -39,15 +41,16 @@
 title C4 - Level 3: Компоненты системы обработки MIDI-сообщений
 
 System_Ext(midi_device, "MIDI Keyboard", "Физическое устройство")
-System_Ext(android_sdk, "Android SDK", "MidiReceiver, MidiInputPort")
+System_Ext(android_sdk, "Android SDK", "MidiReceiver, MidiOutputPort")
 
 Container_Boundary(presentation, "Presentation Layer") {
+    Component(activity, "MainActivity", "Activity", "Отображает Composable UI")
     Component(vm, "PianoStaffViewModel", "ViewModel", "Управляет состоянием нотного стана.")
-    Component(screen, "PianoStaffScreen", "Composable", "Отображает ноты на нотном стане.")
+    Component(screen, "PianoStaffScreen", "Composable", "Отображает ноты.")
 }
 
 Container_Boundary(domain, "Domain Layer") {
-    Component(observe_uc, "ObserveMidiMessagesUseCase", "Use Case", "Предоставляет Flow<List<Note>>.")
+    Component(observe_uc, "ObserveMidiMessagesUseCase", "Use Case", "Группирует ноты в аккорды.")
     Component(repo, "MidiRepository", "Interface", "Контракт для получения MIDI-данных.")
     Component(note, "Note", "Data Class", "Доменная модель ноты.")
 }
@@ -60,6 +63,7 @@ Container_Boundary(data, "Data Layer") {
 }
 
 ' Связи
+Rel(activity, screen, "Отображает")
 Rel(screen, vm, "Наблюдает за")
 Rel(vm, observe_uc, "Вызывает")
 Rel(observe_uc, repo, "Зависит от")
@@ -93,7 +97,7 @@ data class Note(
 // com.astrizhachuk.pianoflow.domain.repository.MidiRepository.kt
 interface MidiRepository {
     fun observeConnectionState(): Flow<ConnectionState>
-    fun observeNotes(): Flow<List<Note>> // Новый метод
+    fun observeNotes(): Flow<Note> // Возвращает поток одиночных нот
 }
 ```
 
@@ -123,24 +127,26 @@ class PianoStaffViewModel @Inject constructor(
 
 ### 2.3. Расширение зависимостей
 
-Новые компоненты будут внедряться с помощью Hilt. `MidiMessageParser` будет добавлен в граф зависимостей и внедрен в `MidiDataSource`.
+`MidiMessageParser` был добавлен в граф зависимостей Hilt и внедрен в `MidiDataSource`.
 
 ```kotlin
 // com.astrizhachuk.pianoflow.data.di.DataModule.kt
+// ...
+companion object {
+    @Provides
+    @Singleton
+    fun provideMidiDataSource(
+        @ApplicationContext context: Context,
+        midiDeviceMapper: MidiDeviceMapper,
+        midiMessageParser: MidiMessageParser // Добавлена зависимость
+    ): MidiDataSource {
+        return MidiDataSource(context, midiDeviceMapper, midiMessageParser)
+    }
 
-@Module
-@InstallIn(SingletonComponent::class)
-abstract class DataModule {
-    // ... существующие @Binds для MidiRepository и MidiDeviceMapper ...
-
-    companion object {
-        // ... существующий provideMidiDataSource ...
-
-        @Provides
-        @Singleton
-        fun provideMidiMessageParser(): MidiMessageParser {
-            return MidiMessageParser()
-        }
+    @Provides
+    @Singleton
+    fun provideMidiMessageParser(): MidiMessageParser {
+        return MidiMessageParser()
     }
 }
 ```
@@ -150,29 +156,29 @@ abstract class DataModule {
 ### 3.1. Принцип работы
 
 1.  **Подключение `Receiver`'а**:
-    *   После того как `MidiDataSource` успешно открывает соединение с MIDI-устройством (`onDeviceOpened` callback от `MidiManager`), он получает объект `android.media.midi.MidiDevice`.
-    *   `MidiDataSource` находит первый доступный входной порт (`MidiInputPort`) устройства.
-    *   Создается экземпляр `MidiMessageReceiver`, и он подключается к порту с помощью `inputPort.onConnect(midiMessageReceiver)`.
+    *   После того как `MidiDataSource` успешно открывает соединение с MIDI-устройством, он находит первый доступный **выходной порт** (`MidiOutputPort`) устройства.
+    *   `MidiDataSource` вызывает `outputPort.connect(midiMessageReceiver)`, чтобы начать получать MIDI-данные.
 
 2.  **Прием и парсинг сообщений**:
     *   Когда пользователь нажимает клавишу, MIDI-клавиатура отправляет сообщение. `MidiMessageReceiver.onSend()` вызывается с сырыми данными (`byte[]`).
     *   `MidiMessageReceiver` немедленно передает эти данные в `MidiMessageParser`.
-    *   `MidiMessageParser` анализирует первый байт (статус). Если это `Note On` (например, `0x90` для канала 0), он извлекает второй байт (номер ноты/pitch). Сообщения `Note Off` и другие типы игнорируются, как указано в требованиях.
-    *   Парсер создает объект `Note` и передает его обратно в `MidiDataSource`.
+    *   `MidiMessageParser` анализирует байты. Если это `Note On`, он извлекает номер ноты и создает объект `Note`, который передает обратно в `MidiDataSource`.
+    *   `MidiDataSource` отправляет полученную `Note` в `SharedFlow`.
 
 3.  **Группировка и передача нот**:
-    *   `MidiDataSource` управляет внутренним потоком событий `Note`.
-    *   Чтобы сгруппировать одновременно нажатые ноты (аккорды) и реализовать очистку стана перед отображением новых нот, в `ObserveMidiMessagesUseCase` поток от репозитория будет обработан с небольшой задержкой (например, с помощью `debounce` или `sample`). Это позволит собрать все ноты, пришедшие почти одновременно, в один список `List<Note>`.
-    *   Каждая новая эмиссия `List<Note>` из `UseCase` представляет собой полный набор нот, которые должны быть отображены на экране в данный момент.
+    *   `MidiRepositoryImpl` проксирует `Flow<Note>` из `MidiDataSource`.
+    *   `ObserveMidiMessagesUseCase` подписывается на этот поток. Он использует операторы `Kotlin Flow` (например, `channelFlow` с `delay`) для группировки нот, пришедших в течение короткого промежутка времени (`50 мс`), в один список `List<Note>` (аккорд).
 
 4.  **Отображение на UI**:
-    *   `PianoStaffViewModel` подписывается на `Flow<List<Note>>` от `ObserveMidiMessagesUseCase`.
-    *   При получении нового списка нот `ViewModel` обновляет свой `StateFlow<PianoStaffUiState>`.
-    *   `PianoStaffScreen`, подписанный на `uiState`, получает новый список нот и перерисовывается, отображая актуальное состояние нотного стана.
+    *   `PianoStaffViewModel` подписывается на `Flow<List<Note>>` от `ObserveMidiMessagesUseCase` и обновляет свой `StateFlow<PianoStaffUiState>`.
+    *   `MainActivity` через `setContent` устанавливает `MaterialTheme` и отображает `PianoStaffScreen`.
+    *   `PianoStaffScreen` подписывается на `uiState` и перерисовывается, отображая актуальный список нот в виде текста.
+    
+    Примечание: Реализация уведомлений о подключении использует View-систему и будет переведена на Jetpack Compose в будущем.
 
 ### 3.2. Диаграмма последовательности
 
-Эта диаграмма иллюстрирует поток данных от нажатия клавиши до отображения ноты на экране.
+Эта диаграмма иллюстрирует актуальный поток данных от нажатия клавиши до отображения ноты на экране.
 
 ```plantuml
 @startuml
@@ -202,12 +208,12 @@ Receiver -> DS : Сообщает о новой ноте
 deactivate Receiver
 activate DS
 
-DS -> UC : Эмитит новую ноту в Flow
+DS -> UC : Отправляет новую ноту в Flow<Note>
 deactivate DS
 activate UC
 
 note right of UC: Группирует ноты в список (аккорд)
-UC -> VM : Эмитит Flow<List<Note>>
+UC -> VM : Отправляет Flow<List<Note>>
 deactivate UC
 activate VM
 
@@ -216,10 +222,22 @@ VM -> Screen : Передает новое состояние
 deactivate VM
 activate Screen
 
-Screen -> Screen : Очищает нотный стан
-Screen -> Screen : Рисует новые ноты
-Screen -> User : Показывает ноты
+Screen -> Screen : Отображает текстовое представление нот
+Screen -> User : Показывает "Сыграны ноты: ..."
 deactivate Screen
 
 @enduml
 ```
+## 4. Критерии приемки
+
+- При нажатии одной клавиши на MIDI-клавиатуре соответствующая нота немедленно отображается на экране (в виде MIDI-номера).
+- При одновременном нажатии нескольких клавиш (аккорд) все соответствующие ноты отображаются на экране (в виде MIDI-номеров).
+- Каждое новое событие нажатия (`Note On`) приводит к полной очистке экрана перед отображением новых нот.
+- Система реагирует только на сообщения о нажатии клавиш (`Note On`); сообщения об отпускании (`Note Off`) и другие типы MIDI-сообщений игнорируются.
+- Визуализация нот на экране происходит без видимых задержек после нажатия клавиши.
+- Функционал стабильно работает при быстром и многократном нажатии клавиш, приложение не падает и не зависает.
+
+## См. также
+
+- [См. документ о Kotlin Flow](../tech/KOTLIN_FLOW.md)
+- [См. документ о MIDI API в Android](../tech/MIDI_API.md)
