@@ -151,6 +151,32 @@ companion object {
 }
 ```
 
+```plantuml
+@startuml
+title Внедрение зависимости MidiMessageParser через Hilt
+
+class MidiMessageParser <<@Singleton>>
+class MidiDataSource <<@Singleton>>
+
+abstract class DataModule <<Hilt Module>> {
+  +provideMidiMessageParser(): MidiMessageParser
+  +provideMidiDataSource(...,
+  midiMessageParser: MidiMessageParser): MidiDataSource
+}
+
+note right of DataModule::provideMidiMessageParser
+  Этот метод сообщает Hilt,
+  как создавать MidiMessageParser.
+end note
+
+' Зависимости
+DataModule::provideMidiMessageParser ..> MidiMessageParser : <<@Provides>>
+DataModule::provideMidiDataSource ..> MidiDataSource : <<@Provides>>
+MidiDataSource --> MidiMessageParser : <<inject>>
+
+@enduml
+```
+
 ### 3. Жизненный цикл и взаимодействие
 
 ### 3.1. Принцип работы
@@ -176,9 +202,52 @@ companion object {
     
     Примечание: Реализация уведомлений о подключении использует View-систему и будет переведена на Jetpack Compose в будущем.
 
-### 3.2. Диаграмма последовательности
+### 3.2. Внутренняя работа MidiMessageReceiver
 
-Эта диаграмма иллюстрирует актуальный поток данных от нажатия клавиши до отображения ноты на экране.
+Эта диаграмма иллюстрирует внутреннюю логику `midiMessageReceiver` в момент получения MIDI-сообщения. Она показывает, как данные передаются парсеру и как результат отправляется в поток для дальнейшей обработки.
+
+```plantuml
+@startuml
+title Диаграмма последовательности: Внутренняя работа midiMessageReceiver
+
+participant "Android MIDI System" as MidiSystem
+box "MidiDataSource" #White
+    participant "midiMessageReceiver" as Receiver
+    participant "midiMessageParser" as Parser
+    participant "_notes: MutableSharedFlow" as NotesFlow
+end box
+participant "Timber" as Logger
+
+MidiSystem -> Receiver : onSend(msg, offset, count, ...)
+activate Receiver
+
+Receiver -> Receiver : relevantData = msg.copyOfRange(...)
+note right: Извлечение байтов текущего сообщения
+
+Receiver -> Parser : parse(relevantData)
+activate Parser
+Parser --> Receiver : note
+deactivate Parser
+
+Receiver -> NotesFlow : tryEmit(note)
+activate NotesFlow
+
+alt Успешная отправка
+    NotesFlow --> Receiver : true
+else Буфер переполнен
+    NotesFlow --> Receiver : false
+    Receiver -> Logger : w("Failed to emit note...")
+end
+
+deactivate NotesFlow
+deactivate Receiver
+
+@enduml
+```
+
+### 3.3. Общая диаграмма последовательности
+
+Эта диаграмма иллюстрирует общий поток данных от нажатия клавиши до отображения ноты на экране. Детали приема и парсинга сообщения вынесены в отдельную схему для упрощения.
 
 ```plantuml
 @startuml
@@ -187,8 +256,6 @@ title Диаграмма последовательности: Обработк�
 actor Пользователь as User
 participant "MIDI-клавиатура" as Keyboard
 box "Приложение PianoFlow"
-  participant "MidiMessageReceiver" as Receiver
-  participant "MidiMessageParser" as Parser
   participant "MidiDataSource" as DS
   participant "ObserveMidiMessagesUseCase" as UC
   participant "PianoStaffViewModel" as VM
@@ -196,17 +263,14 @@ box "Приложение PianoFlow"
 end box
 
 User -> Keyboard : Нажимает клавишу(и)
-Keyboard -> Receiver : onSend(byte[] data, ...)
-activate Receiver
-
-Receiver -> Parser : parse(data)
-activate Parser
-Parser --> Receiver : Note(pitch)
-deactivate Parser
-
-Receiver -> DS : Сообщает о новой ноте
-deactivate Receiver
+Keyboard -> DS : Отправляет MIDI-сообщение
 activate DS
+
+note right of DS
+  Прием и парсинг сообщения.
+  Подробности см. в диаграмме
+  "Внутренняя работа midiMessageReceiver".
+end note
 
 DS -> UC : Отправляет новую ноту в Flow<Note>
 deactivate DS
