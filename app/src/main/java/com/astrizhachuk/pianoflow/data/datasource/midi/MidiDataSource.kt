@@ -4,13 +4,18 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.midi.MidiDeviceInfo
 import android.media.midi.MidiManager
+import android.media.midi.MidiOutputPort
+import android.media.midi.MidiReceiver
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.domain.mapper.midi.MidiDeviceMapper
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
+import com.astrizhachuk.pianoflow.domain.model.Note
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
 import javax.inject.Inject
@@ -38,8 +43,11 @@ class MidiDataSource @Inject constructor(
 ) {
     private val midiManager = context.getSystemService(MidiManager::class.java)
     private var openedDevice: MidiDeviceApi? = null
+    private var outputPort: MidiOutputPort? = null
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.NoDevice)
+    private val _notes = MutableSharedFlow<Note>(extraBufferCapacity = 64)
+
     /**
      * Публичный поток (Flow), представляющий текущее состояние подключения MIDI-устройства.
      *
@@ -74,6 +82,17 @@ class MidiDataSource @Inject constructor(
             if (isCurrentDevice(device)) {
                 Timber.d("onDeviceRemoved: Disconnected device is current, closing.")
                 closeDevice()
+            }
+        }
+    }
+
+    private val midiMessageReceiver = object : MidiReceiver() {
+        override fun onSend(msg: ByteArray, offset: Int, count: Int, timestamp: Long) {
+            val relevantData = msg.copyOfRange(offset, offset + count)
+            midiMessageParser.parse(relevantData)?.let { note ->
+                if (!_notes.tryEmit(note)) {
+                    Timber.w("Failed to emit note, buffer is full.")
+                }
             }
         }
     }
@@ -162,7 +181,36 @@ class MidiDataSource @Inject constructor(
             Timber.i("openDevice: Device opened successfully.")
             openedDevice = it
             _connectionState.value = ConnectionState.Connected(midiDeviceMapper.toDomain(deviceInfo))
+
+            setupOutputPort(it)
+
         }, null)
+    }
+
+    /**
+     * Находит и настраивает выходной порт для получения MIDI-данных с устройства.
+     *
+     * В контексте Android MIDI API, "выходной" порт устройства — это порт, из которого
+     * приложение может *читать* данные (т.е. устройство "выводит" данные в приложение).
+     * Этот метод находит первый доступный порт типа [MidiDeviceInfo.PortInfo.TYPE_OUTPUT],
+     * открывает его и подключает к нему [midiMessageReceiver] для прослушивания входящих MIDI-сообщений.
+     *
+     * @param device Открытое MIDI-устройство ([MidiDeviceApi]), для которого нужно настроить порт.
+     */
+    private fun setupOutputPort(device: MidiDeviceApi) {
+        val portInfo = device.info.ports.firstOrNull { it.type == MidiDeviceInfo.PortInfo.TYPE_OUTPUT }
+        if (portInfo == null) {
+            Timber.e("setupOutputPort: Device has no output ports to receive data from.")
+            return
+        }
+
+        outputPort = device.openOutputPort(portInfo.portNumber)
+        if (outputPort == null) {
+            Timber.e("setupOutputPort: Failed to open output port %d.", portInfo.portNumber)
+        } else {
+            Timber.i("setupOutputPort: Output port %d opened. Connecting receiver.", portInfo.portNumber)
+            outputPort?.connect(midiMessageReceiver)
+        }
     }
 
     /**
@@ -172,6 +220,8 @@ class MidiDataSource @Inject constructor(
     private fun closeDevice() {
         openedDevice?.let {
             Timber.i("closeDevice: Closing device.")
+            outputPort?.close()
+            outputPort = null
             it.close()
             openedDevice = null
             _connectionState.value = ConnectionState.Disconnected
