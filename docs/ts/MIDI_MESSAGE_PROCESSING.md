@@ -240,4 +240,4 @@ deactivate Screen
 ## См. также
 
 - [См. документ о Kotlin Flow](../tech/KOTLIN_FLOW.md)
-- [См. документ о MIDI API в Android](../tech/MIDI_API.md)
+- [См. документ о MIDI API в Android](../tech/MIDI.md)
