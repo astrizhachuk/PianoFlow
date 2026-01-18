@@ -185,33 +185,47 @@ MidiDataSource --> MidiMessageParser : <<inject>>
     *   После того как `MidiDataSource` успешно открывает соединение с MIDI-устройством, он находит первый доступный **выходной порт** (`MidiOutputPort`) устройства.
     *   `MidiDataSource` вызывает `outputPort.connect(midiMessageReceiver)`, чтобы начать получать MIDI-данные.
 
+```plantuml
+@startuml
+title Диаграмма последовательности: Подключение MidiMessageReceiver
+
+participant "Android MIDI System" as MidiSystem
+box "Приложение PianoFlow" #LightGray
+    participant "MidiDataSource" as DS
+end box
+
+note over MidiSystem, DS
+  Процесс инициируется после успешного
+  асинхронного открытия устройства (см. [[./MIDI_CONNECTION.md ТЗ по MIDI Connection]])
+end note
+
+MidiSystem -> DS: onDeviceOpened(device)
+activate DS
+
+DS -> MidiSystem: device.openOutputPort(portNumber)
+note right: Находит и открывает выходной порт MIDI-устройства
+
+MidiSystem --> DS: outputPort
+
+DS -> MidiSystem: outputPort.connect(midiMessageReceiver)
+note right: Подключает `Receiver` к порту для прослушивания
+
+deactivate DS
+@enduml
+```
+
 2.  **Прием и парсинг сообщений**:
     *   Когда пользователь нажимает клавишу, MIDI-клавиатура отправляет сообщение. `MidiMessageReceiver.onSend()` вызывается с сырыми данными (`byte[]`).
     *   `MidiMessageReceiver` немедленно передает эти данные в `MidiMessageParser`.
     *   `MidiMessageParser` анализирует байты. Если это `Note On`, он извлекает номер ноты и создает объект `Note`, который передает обратно в `MidiDataSource`.
     *   `MidiDataSource` отправляет полученную `Note` в `SharedFlow`.
 
-3.  **Группировка и передача нот**:
-    *   `MidiRepositoryImpl` проксирует `Flow<Note>` из `MidiDataSource`.
-    *   `ObserveMidiMessagesUseCase` подписывается на этот поток. Он использует операторы `Kotlin Flow` (например, `channelFlow` с `delay`) для группировки нот, пришедших в течение короткого промежутка времени (`50 мс`), в один список `List<Note>` (аккорд).
-
-4.  **Отображение на UI**:
-    *   `PianoStaffViewModel` подписывается на `Flow<List<Note>>` от `ObserveMidiMessagesUseCase` и обновляет свой `StateFlow<PianoStaffUiState>`.
-    *   `MainActivity` через `setContent` устанавливает `MaterialTheme` и отображает `PianoStaffScreen`.
-    *   `PianoStaffScreen` подписывается на `uiState` и перерисовывается, отображая актуальный список нот в виде текста.
-    
-    Примечание: Реализация уведомлений о подключении использует View-систему и будет переведена на Jetpack Compose в будущем.
-
-### 3.2. Внутренняя работа MidiMessageReceiver
-
-Эта диаграмма иллюстрирует внутреннюю логику `midiMessageReceiver` в момент получения MIDI-сообщения. Она показывает, как данные передаются парсеру и как результат отправляется в поток для дальнейшей обработки.
-
 ```plantuml
 @startuml
 title Диаграмма последовательности: Внутренняя работа midiMessageReceiver
 
 participant "Android MIDI System" as MidiSystem
-box "MidiDataSource" #White
+box "MidiDataSource" #LightGray
     participant "midiMessageReceiver" as Receiver
     participant "midiMessageParser" as Parser
     participant "_notes: MutableSharedFlow" as NotesFlow
@@ -245,9 +259,20 @@ deactivate Receiver
 @enduml
 ```
 
-### 3.3. Общая диаграмма последовательности
+3.  **Группировка и передача нот**:
+    *   `MidiRepositoryImpl` проксирует `Flow<Note>` из `MidiDataSource`.
+    *   `ObserveMidiMessagesUseCase` подписывается на этот поток. Он использует операторы `Kotlin Flow` (например, `channelFlow` с `delay`) для группировки нот, пришедших в течение короткого промежутка времени (`50 мс`), в один список `List<Note>` (аккорд).
 
-Эта диаграмма иллюстрирует общий поток данных от нажатия клавиши до отображения ноты на экране. Детали приема и парсинга сообщения вынесены в отдельную схему для упрощения.
+4.  **Отображение на UI**:
+    *   `PianoStaffViewModel` подписывается на `Flow<List<Note>>` от `ObserveMidiMessagesUseCase` и обновляет свой `StateFlow<PianoStaffUiState>`.
+    *   `MainActivity` через `setContent` устанавливает `MaterialTheme` и отображает `PianoStaffScreen`.
+    *   `PianoStaffScreen` подписывается на `uiState` и перерисовывается, отображая актуальный список нот в виде текста.
+    
+    Примечание: Реализация уведомлений о подключении использует View-систему и будет переведена на Jetpack Compose в будущем.
+
+### 3.2. Общая диаграмма последовательности
+
+Эта диаграмма иллюстрирует общий поток данных от нажатия клавиши до отображения ноты на экране.
 
 ```plantuml
 @startuml
