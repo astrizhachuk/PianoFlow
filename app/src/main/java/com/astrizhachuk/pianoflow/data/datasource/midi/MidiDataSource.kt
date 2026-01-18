@@ -29,10 +29,12 @@ import android.media.midi.MidiDevice as MidiDeviceApi
  *
  * @param context Контекст приложения, необходимый для доступа к системным сервисам, таким как [MidiManager].
  * @param midiDeviceMapper Преобразователь для преобразования системной модели [MidiDeviceInfo] в доменную модель.
+ * @param midiMessageParser Парсер для извлечения данных из MIDI-сообщений.
  */
 class MidiDataSource @Inject constructor(
     private val context: Context,
-    private val midiDeviceMapper: MidiDeviceMapper
+    private val midiDeviceMapper: MidiDeviceMapper,
+    private val midiMessageParser: MidiMessageParser
 ) {
     private val midiManager = context.getSystemService(MidiManager::class.java)
     private var openedDevice: MidiDeviceApi? = null
