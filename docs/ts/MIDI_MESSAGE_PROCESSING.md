@@ -66,7 +66,7 @@ Container_Boundary(data, "Data Layer") {
 Rel(activity, screen, "Отображает")
 Rel(screen, vm, "Наблюдает за")
 Rel(vm, observe_uc, "Вызывает")
-Rel(observe_uc, repo, "Зависит от")
+Rel(observe_uc, repo, "Вызывает observeNotes()")
 
 Rel(repo_impl, repo, "@Binds")
 Rel(repo_impl, ds, "Зависит от")
@@ -177,7 +177,7 @@ MidiDataSource --> MidiMessageParser : <<inject>>
 @enduml
 ```
 
-### 3. Жизненный цикл и взаимодействие
+## 3. Жизненный цикл и взаимодействие
 
 ### 3.1. Принцип работы
 
@@ -260,7 +260,7 @@ deactivate Receiver
 ```
 
 3.  **Группировка и передача нот**:
-    *   `MidiRepositoryImpl` проксирует `Flow<Note>` из `MidiDataSource`.
+    *   `MidiRepositoryImpl` через `observeNotes()` проксирует `Flow<Note>` из `MidiDataSource`.
     *   `ObserveMidiMessagesUseCase` подписывается на этот поток. Он использует операторы `Kotlin Flow` (например, `channelFlow` с `delay`) для группировки нот, пришедших в течение короткого промежутка времени (`50 мс`), в один список `List<Note>` (аккорд).
 
 4.  **Отображение на UI**:
