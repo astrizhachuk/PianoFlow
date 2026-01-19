@@ -10,13 +10,17 @@ import android.os.Bundle
 import app.cash.turbine.test
 import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.data.datasource.midi.MidiDataSource
+import com.astrizhachuk.pianoflow.data.datasource.midi.MidiMessageParser
 import com.astrizhachuk.pianoflow.data.mapper.midi.MidiDeviceMapperImpl
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
+import com.astrizhachuk.pianoflow.domain.model.Note
 import io.mockk.*
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -38,13 +42,34 @@ class MidiRepositoryImplTest {
 
     // --- Unit Test ---
 
+    private lateinit var repository: MidiRepositoryImpl
+    private lateinit var context: Context
+    private lateinit var mapper: MidiDeviceMapperImpl
+
+    @RelaxedMockK
+    private lateinit var midiDataSource: MidiDataSource
+    @RelaxedMockK
+    private lateinit var midiManager: MidiManager
+    @RelaxedMockK
+    private lateinit var midiMessageParser: MidiMessageParser
+
+    @Before
+    fun setup() {
+        // --- Integration Test Setup ---
+        context = RuntimeEnvironment.getApplication()
+        shadowOf(context.applicationContext as Application).setSystemService(Context.MIDI_SERVICE, midiManager)
+        mapper = MidiDeviceMapperImpl()
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
+
+        // --- Unit Test Setup ---
+        repository = MidiRepositoryImpl(midiDataSource)
+    }
+
     @Test
     fun `observeConnectionState should proxy call to data source`() = runTest {
         // Arrange
-        val midiDataSource: MidiDataSource = mockk()
         val expectedState = ConnectionState.NoDevice
         every { midiDataSource.connectionState } returns MutableStateFlow(expectedState)
-        val repository = MidiRepositoryImpl(midiDataSource)
 
         // Act
         val actualState = repository.observeConnectionState().first()
@@ -55,24 +80,8 @@ class MidiRepositoryImplTest {
 
     // --- Integration Tests ---
 
-    private lateinit var context: Context
-    private lateinit var mapper: MidiDeviceMapperImpl
-
-    @RelaxedMockK
-    private lateinit var midiManager: MidiManager
-
-    @Before
-    fun setup() {
-        context = RuntimeEnvironment.getApplication()
-        shadowOf(context.applicationContext as Application).setSystemService(Context.MIDI_SERVICE, midiManager)
-        mapper = MidiDeviceMapperImpl()
-
-        // Precondition: Enable MIDI feature for most tests
-        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-    }
-
     private fun createRepository(): MidiRepositoryImpl {
-        val dataSource = MidiDataSource(context, mapper)
+        val dataSource = MidiDataSource(context, mapper, midiMessageParser)
         return MidiRepositoryImpl(dataSource)
     }
 
