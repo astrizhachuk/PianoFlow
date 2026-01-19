@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
+import app.cash.turbine.test
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -783,15 +784,15 @@ class MidiDataSourceTest {
         val receiverSlot = slot<MidiReceiver>()
 
         openCallbackSlot.captured.onDeviceOpened(mockDevice)
-
-        // Act - verify the receiver was connected
         verify { mockOutputPort.connect(capture(receiverSlot)) }
 
-        // Act - send a MIDI message to the receiver
-        receiverSlot.captured.onSend(midiMessage, 0, midiMessage.size, 0L)
-
-        // Assert - parser should be called with correct data
-        verify(exactly = 1) { midiMessageParser.parse(midiMessage) }
+        // Act & Assert - send a MIDI message and verify note is emitted
+        dataSource.notes.test {
+            receiverSlot.captured.onSend(midiMessage, 0, midiMessage.size, 0L)
+            assertEquals(testNote, awaitItem())
+            verify(exactly = 1) { midiMessageParser.parse(midiMessage) }
+            cancel()
+        }
     }
 
     @Test
@@ -862,16 +863,18 @@ class MidiDataSourceTest {
         openCallbackSlot.captured.onDeviceOpened(mockDevice)
         verify { mockOutputPort.connect(capture(receiverSlot)) }
 
-        // Act & Assert - no exception should be thrown
-        receiverSlot.captured.onSend(midiMessage, 0, midiMessage.size, 0L)
-
-        // Verify parser was called but no note was processed
-        verify(exactly = 1) { midiMessageParser.parse(midiMessage) }
+        // Act & Assert - parser was called but no note was emitted
+        dataSource.notes.test {
+            receiverSlot.captured.onSend(midiMessage, 0, midiMessage.size, 0L)
+            verify(exactly = 1) { midiMessageParser.parse(midiMessage) }
+            expectNoEvents() // Verify no items were emitted
+            cancel()
+        }
     }
 
     @Test
     fun `when notes buffer is full then note emission fails`() = runTest {
-        // Arrange
+        // Arrange - specifically test the Timber.w logging when tryEmit returns false
         shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
         val mockDeviceInfo = createMockDeviceInfo("MIDI device", "manufacturer", "product")
         val mockPortInfo = createMockPortInfo(MidiDeviceInfo.PortInfo.TYPE_OUTPUT, 1)
@@ -897,12 +900,11 @@ class MidiDataSourceTest {
         openCallbackSlot.captured.onDeviceOpened(mockDevice)
         verify { mockOutputPort.connect(capture(receiverSlot)) }
 
-        // Получаем приватное поле _notes через рефлексию и мокируем tryEmit
+        // Mock the internal _notes flow to simulate buffer full (tryEmit returns false after 64 items)
         val notesField = dataSource::class.java.getDeclaredField("_notes")
         notesField.isAccessible = true
         val mockSharedFlow = mockk<MutableSharedFlow<Note>>(relaxed = true)
         
-        // Успешно эмитим первые 64 сообщения, потом возвращаем false
         var callCount = 0
         every { mockSharedFlow.tryEmit(any()) } answers {
             callCount++
@@ -911,12 +913,12 @@ class MidiDataSourceTest {
         
         notesField.set(dataSource, mockSharedFlow)
 
-        // Act - отправляем 65 сообщений
+        // Act - send 65 messages (64 succeed, 65th fails and triggers Timber.w)
         repeat(65) {
             receiverSlot.captured.onSend(midiMessage, 0, midiMessage.size, 0L)
         }
 
-        // Assert
+        // Assert - all 65 parse attempts occurred, and tryEmit was called 65 times
         verify(exactly = 65) { midiMessageParser.parse(any()) }
         verify(exactly = 65) { mockSharedFlow.tryEmit(any()) }
     }
