@@ -60,6 +60,11 @@ class MidiDataSource @Inject constructor(
     val connectionState = _connectionState.asStateFlow()
 
     /**
+     * Публичный поток принятых MIDI нот.
+     */
+    val notes = _notes.asSharedFlow()
+
+    /**
      * Обратный вызов для системного [MidiManager], который отслеживает физическое
      * подключение и отключение MIDI-устройств к Android-устройству.
      */
@@ -204,12 +209,12 @@ class MidiDataSource @Inject constructor(
             return
         }
 
-        outputPort = device.openOutputPort(portInfo.portNumber)
-        if (outputPort == null) {
-            Timber.e("setupOutputPort: Failed to open output port %d.", portInfo.portNumber)
-        } else {
+        device.openOutputPort(portInfo.portNumber)?.let { port ->
+            outputPort = port
             Timber.i("setupOutputPort: Output port %d opened. Connecting receiver.", portInfo.portNumber)
-            outputPort?.connect(midiMessageReceiver)
+            port.connect(midiMessageReceiver)
+        } ?: run {
+            Timber.e("setupOutputPort: Failed to open output port %d.", portInfo.portNumber)
         }
     }
 
