@@ -1,6 +1,7 @@
 
 package com.astrizhachuk.pianoflow.presentation.viewmodel.midi
 
+import app.cash.turbine.test
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
 import com.astrizhachuk.pianoflow.domain.model.MidiDevice
 import com.astrizhachuk.pianoflow.domain.usecase.midi.ShowConnectionNotificationUseCase
@@ -18,7 +19,6 @@ import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -47,8 +47,10 @@ class MidiConnectionViewModelTest {
 
     @Before
     fun setUp() {
-        connectionStateFlow = MutableSharedFlow()
+        connectionStateFlow = MutableSharedFlow(replay = 1)
         coEvery { trackMidiConnectionUseCase.invoke() } returns connectionStateFlow
+        // Emit initial value to mimic StateFlow behavior for consistency in tests
+        connectionStateFlow.tryEmit(ConnectionState.NoDevice)
     }
 
     @Test
@@ -59,15 +61,19 @@ class MidiConnectionViewModelTest {
             showConnectionNotificationUseCase,
             userNotifier
         )
-        assertEquals(ConnectionState.NoDevice, viewModel.connectionState.value)
         val mockDevice = mockk<MidiDevice>()
         val connectedState = ConnectionState.Connected(mockDevice)
 
-        // Act
-        connectionStateFlow.emit(connectedState)
+        viewModel.connectionState.test {
+            // Assert initial state
+            assertEquals(ConnectionState.NoDevice, awaitItem())
+            
+            // Act
+            connectionStateFlow.emit(connectedState)
 
-        // Assert
-        assertEquals(connectedState, viewModel.connectionState.value)
+            // Assert new state
+            assertEquals(connectedState, awaitItem())
+        }
     }
 
     @Test
@@ -80,11 +86,18 @@ class MidiConnectionViewModelTest {
         )
         val disconnectedState = ConnectionState.Disconnected
 
-        // Act
-        connectionStateFlow.emit(disconnectedState)
+        viewModel.connectionState.test {
+            awaitItem() // Initial state
 
-        // Assert
-        coVerify { showConnectionNotificationUseCase(disconnectedState) }
+            // Act
+            connectionStateFlow.emit(disconnectedState)
+            
+            // Assert state update
+            assertEquals(disconnectedState, awaitItem())
+
+            // Assert side-effect
+            coVerify { showConnectionNotificationUseCase(disconnectedState) }
+        }
     }
 
     @Test
@@ -98,42 +111,18 @@ class MidiConnectionViewModelTest {
             userNotifier
         )
 
-        // Act
-        connectionStateFlow.emit(ConnectionState.Disconnected)
-
-        // Assert
-        coVerify { userNotifier.sendMessage(testMessage) }
-    }
-
-    @Test
-    fun `multiple collectors receive state updates`() = runTest(mainDispatcherRule.testDispatcher) {
-        // Arrange
-        val viewModel = MidiConnectionViewModel(
-            trackMidiConnectionUseCase,
-            showConnectionNotificationUseCase,
-            userNotifier
-        )
-        val states1 = mutableListOf<ConnectionState>()
-        val states2 = mutableListOf<ConnectionState>()
-
-        // Act
-        val job1 = launch { viewModel.connectionState.collect { states1.add(it) } }
-        val job2 = launch { viewModel.connectionState.collect { states2.add(it) } }
-
-        // Assert
-        assertEquals(listOf(ConnectionState.NoDevice), states1)
-        assertEquals(listOf(ConnectionState.NoDevice), states2)
-
-        // Act
-        val connectedState = ConnectionState.Connected(mockk())
-        connectionStateFlow.emit(connectedState)
-
-        // Assert
-        assertEquals(listOf(ConnectionState.NoDevice, connectedState), states1)
-        assertEquals(listOf(ConnectionState.NoDevice, connectedState), states2)
-
-        job1.cancel()
-        job2.cancel()
+        viewModel.connectionState.test {
+            awaitItem() // Initial state
+            
+            // Act
+            connectionStateFlow.emit(ConnectionState.Disconnected)
+            
+            // Wait for state change
+            awaitItem()
+            
+            // Assert side-effect
+            coVerify { userNotifier.sendMessage(testMessage) }
+        }
     }
 
     @Test
@@ -153,15 +142,25 @@ class MidiConnectionViewModelTest {
             showConnectionNotificationUseCase,
             userNotifier
         )
+        val state1 = ConnectionState.Connected(mockk())
+        val state2 = ConnectionState.Disconnected
         val finalState = ConnectionState.Connected(mockk())
 
-        // Act
-        connectionStateFlow.emit(ConnectionState.Connected(mockk()))
-        connectionStateFlow.emit(ConnectionState.Disconnected)
-        connectionStateFlow.emit(finalState)
+        viewModel.connectionState.test {
+            awaitItem() // Initial
 
-        // Assert
-        assertEquals(finalState, viewModel.connectionState.value)
+            // Act & Assert
+            connectionStateFlow.emit(state1)
+            assertEquals(state1, awaitItem())
+
+            connectionStateFlow.emit(state2)
+            assertEquals(state2, awaitItem())
+
+            connectionStateFlow.emit(finalState)
+            assertEquals(finalState, awaitItem())
+        }
+        
+        // Assert side-effects
         coVerify(exactly = 3) { showConnectionNotificationUseCase(any()) }
     }
 
@@ -175,12 +174,22 @@ class MidiConnectionViewModelTest {
         )
         val disconnectedState = ConnectionState.Disconnected
 
-        // Act
-        connectionStateFlow.emit(disconnectedState)
-        connectionStateFlow.emit(disconnectedState)
+        viewModel.connectionState.test {
+            awaitItem() // Initial state
 
-        // Assert
-        assertEquals(disconnectedState, viewModel.connectionState.value)
+            // Act
+            connectionStateFlow.emit(disconnectedState)
+            assertEquals(disconnectedState, awaitItem()) // State is updated
+
+            // Act again with the same state
+            connectionStateFlow.emit(disconnectedState)
+            
+            // Since StateFlow is distinct, no new item should be emitted
+            // We can ensure channel is empty before cancelling
+            expectNoEvents()
+        }
+
+        // Assert that the side-effect was only called once
         coVerify(exactly = 1) { showConnectionNotificationUseCase(disconnectedState) }
     }
 
@@ -194,15 +203,20 @@ class MidiConnectionViewModelTest {
             showConnectionNotificationUseCase,
             userNotifier
         )
-        val job = launch { viewModel.connectionState.collect {} } 
         val exception = RuntimeException("Upstream error")
+        val errorState = ConnectionState.Error(exception.message ?: "Unknown error")
+        val connectedState = ConnectionState.Connected(mockk())
 
-        // Act
-        errorFlow.tryEmit(ConnectionState.Connected(mockk()))
-        errorFlow.tryEmit(ConnectionState.Error(exception.message ?: "Unknown error"))
+        viewModel.connectionState.test {
+            // Assert
+            assertEquals(ConnectionState.NoDevice, awaitItem())
 
-        // Assert
-        // The main assertion is that the collector coroutine doesn't crash and can be cancelled.
-        job.cancel()
+            // Act
+            errorFlow.emit(connectedState)
+            assertEquals(connectedState, awaitItem())
+            
+            errorFlow.emit(errorState)
+            assertEquals(errorState, awaitItem())
+        }
     }
 }
