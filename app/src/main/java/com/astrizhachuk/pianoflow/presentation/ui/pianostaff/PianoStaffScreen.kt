@@ -2,6 +2,7 @@ package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -9,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.astrizhachuk.pianoflow.domain.model.Note
@@ -38,16 +40,18 @@ private fun PianoStaffContent(
     uiState: PianoStaffUiState
 ) {
     Box(
-        modifier = Modifier.Companion.fillMaxSize(),
-        contentAlignment = Alignment.Companion.Center
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
     ) {
         if (uiState.notes.isEmpty()) {
             Text(text = "Начните играть на MIDI-клавиатуре...")
         } else {
-            // Простое отображение MIDI-номеров нот для прототипа.
-            // В будущем здесь будет полноценный компонент нотного стана.
-            val notesText = uiState.notes.joinToString(separator = ", ") { it.pitch.toString() }
-            Text(text = "Сыграны ноты: $notesText")
+            PianoStaff(
+                notes = uiState.notes,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            )
         }
     }
 }
