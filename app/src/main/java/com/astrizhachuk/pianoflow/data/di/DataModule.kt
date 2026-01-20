@@ -2,6 +2,7 @@ package com.astrizhachuk.pianoflow.data.di
 
 import android.content.Context
 import com.astrizhachuk.pianoflow.data.datasource.midi.MidiDataSource
+import com.astrizhachuk.pianoflow.data.datasource.midi.MidiMessageParser
 import com.astrizhachuk.pianoflow.data.mapper.midi.MidiDeviceMapperImpl
 import com.astrizhachuk.pianoflow.data.repository.MidiRepositoryImpl
 import com.astrizhachuk.pianoflow.domain.mapper.midi.MidiDeviceMapper
@@ -46,9 +47,19 @@ abstract class DataModule {
         @Singleton
         fun provideMidiDataSource(
             @ApplicationContext context: Context,
-            midiDeviceMapper: MidiDeviceMapper
+            midiDeviceMapper: MidiDeviceMapper,
+            midiMessageParser: MidiMessageParser
         ): MidiDataSource {
-            return MidiDataSource(context, midiDeviceMapper)
+            return MidiDataSource(context, midiDeviceMapper, midiMessageParser)
+        }
+
+        /**
+         * Предоставляет [MidiMessageParser] как синглтон.
+         */
+        @Provides
+        @Singleton
+        fun provideMidiMessageParser(): MidiMessageParser {
+            return MidiMessageParser()
         }
     }
 }
