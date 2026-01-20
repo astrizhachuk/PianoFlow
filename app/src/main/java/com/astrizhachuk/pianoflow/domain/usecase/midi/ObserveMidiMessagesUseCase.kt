@@ -30,10 +30,9 @@ class ObserveMidiMessagesUseCase @Inject constructor(
         var flushJob: Job? = null
 
         midiRepository.observeNotes().collect { note ->
-            // Если предыдущая задача по отправке была завершена (или ее не было),
-            // значит, это начало нового музыкального события (новой ноты или аккорда).
-            // В этом случае мы очищаем буфер перед добавлением новой ноты.
-            if (flushJob == null || flushJob?.isCompleted == true) {
+            // Если предыдущая задача отсутствует (null) или уже завершена,
+            // это означает начало нового музыкального события.
+            if (flushJob?.isCompleted ?: true) {
                 notesBuffer.clear()
             }
 
