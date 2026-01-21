@@ -27,47 +27,15 @@ fun PianoStaffScreen(
     viewModel: PianoStaffViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    PianoStaffContent(uiState = uiState)
-}
-
-/**
- * Основной контент для экрана с нотным станом.
- *
- * @param uiState Текущее состояние UI.
- */
-@Composable
-private fun PianoStaffContent(
-    uiState: PianoStaffUiState
-) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        if (uiState.notes.isEmpty()) {
-            Text(text = "Начните играть на MIDI-клавиатуре...")
-        } else {
-            PianoStaff(
-                notes = uiState.notes,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun PianoStaffScreenPreview_Empty() {
-    MaterialTheme {
-        PianoStaffContent(uiState = PianoStaffUiState(notes = emptyList()))
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun PianoStaffScreenPreview_WithNotes() {
-    MaterialTheme {
-        PianoStaffContent(uiState = PianoStaffUiState(notes = listOf(Note(60), Note(64), Note(67))))
+        PianoStaff(
+            notes = uiState.notes,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        )
     }
 }

@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.astrizhachuk.pianoflow.domain.model.Note
 
-@SuppressLint("SetJavaScriptEnabled")
+//@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun PianoStaff(
     notes: List<Note>,
