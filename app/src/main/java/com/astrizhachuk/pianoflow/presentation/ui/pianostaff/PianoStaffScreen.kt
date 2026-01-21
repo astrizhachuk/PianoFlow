@@ -3,36 +3,37 @@ package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.astrizhachuk.pianoflow.domain.model.Note
-import com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState
 import com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffViewModel
 
 /**
- * Экран, отображающий нотный стан и сыгранные ноты.
+ * Компонента-экран, которая отображает нотный стан (скрипичный и басовый ключи) с музыкальными нотами.
  *
- * @param viewModel ViewModel, предоставляющая состояние экрана.
+ * Этот экран отслеживает состояние UI из [PianoStaffViewModel], чтобы получить ноты для отображения.
+ * Он центрирует компоненту [PianoStaff], которая отвечает за отрисовку самого нотного стана и нот.
+ *
+ * @param viewModel Экземпляр [PianoStaffViewModel], обычно предоставляемый через Hilt, который
+ * поставляет состояние UI, включая JSON-представления нот для скрипичного и басового ключей.
  */
 @Composable
 fun PianoStaffScreen(
     viewModel: PianoStaffViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         PianoStaff(
-            notes = uiState.notes,
+            trebleNotesJson = uiState.trebleNotesJson,
+            bassNotesJson = uiState.bassNotesJson,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp)
