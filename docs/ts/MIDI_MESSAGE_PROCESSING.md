@@ -45,8 +45,9 @@ System_Ext(android_sdk, "Android SDK", "MidiReceiver, MidiOutputPort")
 
 Container_Boundary(presentation, "Presentation Layer") {
     Component(activity, "MainActivity", "Activity", "Отображает Composable UI")
-    Component(vm, "PianoStaffViewModel", "ViewModel", "Управляет состоянием нотного стана.")
-    Component(screen, "PianoStaffScreen", "Composable", "Отображает ноты на нотном стане.")
+    Component(vm, "PianoStaffViewModel", "ViewModel", "Управляет состоянием UI, получая ноты и формируя PianoStaffUiState.")
+    Component(screen, "PianoStaffScreen", "Composable", "Экран, который отображает нотный стан, получая состояние от ViewModel.")
+    Component(staff, "PianoStaff", "Composable", "Компонент для непосредственной отрисовки нотного стана.")
 }
 
 Container_Boundary(domain, "Domain Layer") {
@@ -64,7 +65,8 @@ Container_Boundary(data, "Data Layer") {
 
 ' Связи
 Rel(activity, screen, "Отображает")
-Rel(screen, vm, "Наблюдает за")
+Rel(screen, staff, "Использует")
+Rel(screen, vm, "Наблюдает за", "PianoStaffUiState")
 Rel(vm, observe_uc, "Вызывает")
 Rel(observe_uc, repo, "Вызывает observeNotes()")
 
@@ -104,24 +106,38 @@ interface MidiRepository {
 **Presentation Layer:**
 
 ```kotlin
-// com.astrizhachuk.pianoflow.presentation.pianostaff.PianoStaffUiState.kt
+// com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState.kt
 data class PianoStaffUiState(
-    val notes: List<Note> = emptyList()
+    val trebleNotesJson: String = "[]",
+    val bassNotesJson: String = "[]"
 )
 
-// com.astrizhachuk.pianoflow.presentation.pianostaff.PianoStaffViewModel.kt
+// com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffViewModel.kt
 @HiltViewModel
 class PianoStaffViewModel @Inject constructor(
     observeMidiMessagesUseCase: ObserveMidiMessagesUseCase
 ) : ViewModel() {
 
-    val uiState: StateFlow<PianoStaffUiState> = observeMidiMessagesUseCase()
-        .map { notes -> PianoStaffUiState(notes = notes) }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = PianoStaffUiState()
-        )
+    private val _uiState = MutableStateFlow(PianoStaffUiState())
+    val uiState: StateFlow<PianoStaffUiState> = _uiState.asStateFlow()
+}
+```
+
+**PianoStaffScreen** — это `Composable`-функция, которая получает `PianoStaffViewModel` через Hilt, подписывается на изменения `uiState` и передает данные в `PianoStaff` для отрисовки.
+
+```kotlin
+// com.astrizhachuk.pianoflow.presentation.ui.pianostaff.PianoStaffScreen.kt
+@Composable
+fun PianoStaffScreen(
+    viewModel: PianoStaffViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    PianoStaff(
+        trebleNotesJson = uiState.trebleNotesJson,
+        bassNotesJson = uiState.bassNotesJson,
+        modifier = Modifier.fillMaxSize()
+    )
 }
 ```
 
