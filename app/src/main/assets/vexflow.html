@@ -43,7 +43,7 @@
             drawVoice(context, bassStave, bassNotesJson, 'bass');
 
         } catch (e) {
-            console.error("VexFlow rendering error: " + e.stack);
+            console.error("VexFlow rendering error: ", e);
         }
     }
 
@@ -51,25 +51,20 @@
         if (notesJson && notesJson !== '[]') {
             const notes = JSON.parse(notesJson).map(noteData => {
                 noteData.clef = clef;
-                const staveNote = new Vex.Flow.StaveNote(noteData);
-
-                // --- ИСПРАВЛЕНИЕ: Явно добавляем знаки альтерации (диезы/бемоли) ---
-                // Проходим по каждой ноте в аккорде и добавляем знак, если он есть.
-                noteData.keys.forEach((key, index) => {
-                    if (key.includes("#")) {
-                        staveNote.addAccidental(index, new Vex.Flow.Accidental("#"));
-                    } else if (key.includes("b")) {
-                        staveNote.addAccidental(index, new Vex.Flow.Accidental("b"));
-                    }
-                });
-                return staveNote;
+                // The noteData.keys already contains strings like "c#/4"
+                return new Vex.Flow.StaveNote(noteData);
             });
 
             if (notes.length > 0) {
                 const voice = new Vex.Flow.Voice({num_beats: 4, beat_value: 4});
                 voice.setStrict(false);
                 voice.addTickables(notes);
-                new Vex.Flow.Formatter().joinVoices([voice]).format([voice], stave.getWidth() - 50);
+
+                // Explicitly tell VexFlow to apply accidentals to the voice.
+                // This is a static method on the Accidental class.
+                Vex.Flow.Accidental.applyAccidentals([voice]);
+
+                const formatter = new Vex.Flow.Formatter().joinVoices([voice]).format([voice], stave.getWidth() - 50);
                 voice.draw(context, stave);
             }
         }
