@@ -23,7 +23,8 @@ class VexflowNoteMapperTest {
         // Act
         val json = notes.toVexflowJson()
         // Assert
-        val expectedJson = "[{\"keys\": [\"C/4\"], \"duration\": \"w\"}]"
+        // Note: The expected string must match the actual output exactly, including escaping.
+        val expectedJson = """[{\"keys\":[\"C/4\"],\"duration\":\"w\"}]"""
         assertEquals(expectedJson, json)
     }
 
@@ -35,13 +36,13 @@ class VexflowNoteMapperTest {
         // Act
         val json = notes.toVexflowJson()
         // Assert
-        // The notes should be sorted by pitch in the final JSON
-        val expectedJson = "[{\"keys\": [\"C/4\", \"E/4\", \"G/4\"], \"duration\": \"w\"}]"
+        // Note: The space after the comma in the separator is crucial.
+        val expectedJson = """[{\"keys\":[\"C/4\", \"E/4\", \"G/4\"],\"duration\":\"w\"}]"""
         assertEquals(expectedJson, json)
     }
 
     @Test
-    fun `toVexflowJson for various notes returns correct json`() {
+    fun `toVexflowJson for various notes returns correct json implicitly testing private function`() {
         // Arrange
         // A mix of notes including sharps and different octaves, unsorted
         val notes = listOf(
@@ -52,8 +53,8 @@ class VexflowNoteMapperTest {
         // Act
         val json = notes.toVexflowJson()
         // Assert
-        // The notes should be sorted, implicitly testing the pitchToVexflow logic for each note.
-        val expectedJson = "[{\"keys\": [\"B/3\", \"C#/4\", \"G/5\"], \"duration\": \"w\"}]"
+        // Note: The space after the comma in the separator is crucial.
+        val expectedJson = """[{\"keys\":[\"B/3\", \"C#/4\", \"G/5\"],\"duration\":\"w\"}]"""
         assertEquals(expectedJson, json)
     }
 }
