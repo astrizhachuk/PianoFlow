@@ -286,10 +286,6 @@ deactivate Receiver
     *   `PianoStaffViewModel` обновляет свой `StateFlow<PianoStaffUiState>`, который содержит две JSON-строки: `trebleNotesJson` и `bassNotesJson`.
     *   `PianoStaffScreen`, подписанный на `uiState`, получает эти JSON-строки и передает их в `Composable`-компонент `PianoStaff` для финальной отрисовки.
 
-### 3.2. Общая диаграмма последовательности
-
-Эта диаграмма иллюстрирует общий поток данных от нажатия клавиши до отображения ноты на экране.
-
 ```plantuml
 @startuml
 title Диаграмма последовательности: Обработка Note On
@@ -338,6 +334,78 @@ deactivate Screen
 
 @enduml
 ```
+
+### 3.2. Механизм отображения нот
+
+Отрисовка нотного стана выполняется с помощью `WebView` и JavaScript-библиотеки [VexFlow](https://www.vexflow.com/). Этот подход позволяет отделить логику отрисовки от нативного кода, используя мощные возможности веб-технологий для визуализации музыкальной нотации.
+
+**Ключевые компоненты:**
+
+- **`PianoStaff` Composable:** Оборачивает `AndroidView`, в котором создается и настраивается `WebView`.
+- **`vexflow.html`:** HTML-файл, расположенный в `app/src/main/assets/`. Он содержит базовую разметку, стили и основной JavaScript-код для работы с VexFlow.
+- **`vexflow.js`:** Сама библиотека VexFlow (версия [4.2.2](https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js)), также расположенная в `assets`.
+
+**Процесс работы:**
+
+1.  **Инициализация `WebView`:** При создании `PianoStaff` `Composable`, `AndroidView` инициализирует `WebView` и загружает локальный HTML-файл `file:///android_asset/vexflow.html`.
+2.  **Передача данных:** При каждом обновлении состояния `uiState` в `PianoStaffScreen` вызывается `update`-блок `AndroidView`.
+3.  **Вызов JavaScript:** Внутри `update` происходит вызов JavaScript-функции `drawNotes` в `WebView` с помощью метода `evaluateJavascript`.
+4.  **Отрисовка в `WebView`:** В качестве аргументов в `drawNotes` передаются две JSON-строки: `trebleNotesJson` и `bassNotesJson`. JavaScript-код в `vexflow.html` парсит эти строки и использует VexFlow API для отрисовки нот на SVG-холсте внутри `WebView`.
+
+**Диаграмма взаимодействия**
+
+```plantuml
+@startuml
+title Диаграмма взаимодействия: Отображение нот через WebView
+
+box "Presentation Layer (Kotlin/Compose)" #LightBlue
+    participant "PianoStaffScreen" as Screen
+    participant "PianoStaff" as StaffComposable
+end box
+
+box "WebView (Java/Android)" #LightGreen
+    participant "AndroidView" as AndroidView
+    participant "WebView" as WebView
+end box
+
+box "VexFlow (HTML/JavaScript)" #LightYellow
+    participant "vexflow.html" as HtmlPage
+    participant "drawNotes()" as DrawJsFunc
+    participant "VexFlow.js" as VexFlowLib
+end box
+
+Screen -> StaffComposable : Передает JSON-строки
+activate StaffComposable
+
+StaffComposable -> AndroidView : (update)
+activate AndroidView
+
+AndroidView -> WebView : evaluateJavascript("drawNotes(...)")
+activate WebView
+
+WebView -> HtmlPage : Вызывает JS-функцию
+activate HtmlPage
+
+HtmlPage -> DrawJsFunc : drawNotes(trebleJson, bassJson)
+activate DrawJsFunc
+
+DrawJsFunc -> VexFlowLib : Использует API для отрисовки
+activate VexFlowLib
+VexFlowLib --> DrawJsFunc : SVG-элементы нот
+deactivate VexFlowLib
+
+DrawJsFunc --> HtmlPage : Вставляет SVG в DOM
+
+HtmlPage --> WebView : Отображает результат
+deactivate DrawJsFunc
+deactivate HtmlPage
+deactivate WebView
+deactivate AndroidView
+deactivate StaffComposable
+
+@enduml
+```
+
 ## 4. Критерии приемки
 
 - При нажатии одной клавиши на MIDI-клавиатуре соответствующая нота немедленно отображается на нотном стане.
