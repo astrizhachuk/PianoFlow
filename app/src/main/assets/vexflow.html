@@ -30,8 +30,8 @@
             const context = renderer.getContext();
 
             const staveWidth = div.clientWidth - 20;
-            const trebleStave = new Vex.Flow.Stave(10, 0, staveWidth).addClef("treble").addTimeSignature("4/4");
-            const bassStave = new Vex.Flow.Stave(10, 100, staveWidth).addClef("bass").addTimeSignature("4/4");
+            const trebleStave = new Vex.Flow.Stave(10, 60, staveWidth).addClef("treble").addTimeSignature("4/4");
+            const bassStave = new Vex.Flow.Stave(10, 140, staveWidth).addClef("bass").addTimeSignature("4/4");
 
             trebleStave.setContext(context).draw();
             bassStave.setContext(context).draw();

@@ -28,15 +28,14 @@ fun PianoStaffScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp, vertical = 32.dp),
         contentAlignment = Alignment.Center
     ) {
         PianoStaff(
             trebleNotesJson = uiState.trebleNotesJson,
-            bassNotesJson = uiState.bassNotesJson,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
+            bassNotesJson = uiState.bassNotesJson
         )
     }
 }
