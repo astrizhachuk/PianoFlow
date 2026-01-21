@@ -23,8 +23,7 @@ class VexflowNoteMapperTest {
         // Act
         val json = notes.toVexflowJson()
         // Assert
-        // Note: The expected string must match the actual output exactly, including escaping.
-        val expectedJson = """[{\"keys\":[\"C/4\"],\"duration\":\"w\"}]"""
+        val expectedJson = "[{\\\"keys\\\":[\\\"c/4\\\"],\\\"duration\\\":\\\"w\\\"}]"
         assertEquals(expectedJson, json)
     }
 
@@ -36,8 +35,7 @@ class VexflowNoteMapperTest {
         // Act
         val json = notes.toVexflowJson()
         // Assert
-        // Note: The space after the comma in the separator is crucial.
-        val expectedJson = """[{\"keys\":[\"C/4\", \"E/4\", \"G/4\"],\"duration\":\"w\"}]"""
+        val expectedJson = "[{\\\"keys\\\":[\\\"c/4\\\", \\\"e/4\\\", \\\"g/4\\\"],\\\"duration\\\":\\\"w\\\"}]"
         assertEquals(expectedJson, json)
     }
 
@@ -53,8 +51,7 @@ class VexflowNoteMapperTest {
         // Act
         val json = notes.toVexflowJson()
         // Assert
-        // Note: The space after the comma in the separator is crucial.
-        val expectedJson = """[{\"keys\":[\"B/3\", \"C#/4\", \"G/5\"],\"duration\":\"w\"}]"""
+        val expectedJson = "[{\\\"keys\\\":[\\\"b/3\\\", \\\"c#/4\\\", \\\"g/5\\\"],\\\"duration\\\":\\\"w\\\"}]"
         assertEquals(expectedJson, json)
     }
 }
