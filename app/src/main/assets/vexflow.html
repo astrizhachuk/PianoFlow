@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; }
+        #staff { width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+<div id="staff"></div>
+
+<script src="./vexflow.js"></script>
+
+<script>
+    function drawNotes(trebleNotesJson, bassNotesJson) {
+        const div = document.getElementById("staff");
+        if (!div || (div.clientWidth === 0 || div.clientHeight === 0)) {
+            requestAnimationFrame(() => drawNotes(trebleNotesJson, bassNotesJson));
+            return;
+        }
+
+        div.innerHTML = '';
+
+        if (typeof Vex === 'undefined' || typeof Vex.Flow === 'undefined') return;
+
+        try {
+            const renderer = new Vex.Flow.Renderer(div, Vex.Flow.Renderer.Backends.SVG);
+            renderer.resize(div.clientWidth, div.clientHeight);
+            const context = renderer.getContext();
+
+            const staveWidth = div.clientWidth - 20;
+            const trebleStave = new Vex.Flow.Stave(10, 0, staveWidth).addClef("treble").addTimeSignature("4/4");
+            const bassStave = new Vex.Flow.Stave(10, 100, staveWidth).addClef("bass").addTimeSignature("4/4");
+
+            trebleStave.setContext(context).draw();
+            bassStave.setContext(context).draw();
+
+            new Vex.Flow.StaveConnector(trebleStave, bassStave).setType(Vex.Flow.StaveConnector.type.BRACE).setContext(context).draw();
+            new Vex.Flow.StaveConnector(trebleStave, bassStave).setType(Vex.Flow.StaveConnector.type.SINGLE_LEFT).setContext(context).draw();
+
+            drawVoice(context, trebleStave, trebleNotesJson, 'treble');
+            drawVoice(context, bassStave, bassNotesJson, 'bass');
+
+        } catch (e) {
+            console.error("VexFlow rendering error: " + e.stack);
+        }
+    }
+
+    function drawVoice(context, stave, notesJson, clef) {
+        if (notesJson && notesJson !== '[]') {
+            const notes = JSON.parse(notesJson).map(noteData => {
+                noteData.clef = clef;
+                const staveNote = new Vex.Flow.StaveNote(noteData);
+
+                // --- ИСПРАВЛЕНИЕ: Явно добавляем знаки альтерации (диезы/бемоли) ---
+                // Проходим по каждой ноте в аккорде и добавляем знак, если он есть.
+                noteData.keys.forEach((key, index) => {
+                    if (key.includes("#")) {
+                        staveNote.addAccidental(index, new Vex.Flow.Accidental("#"));
+                    } else if (key.includes("b")) {
+                        staveNote.addAccidental(index, new Vex.Flow.Accidental("b"));
+                    }
+                });
+                return staveNote;
+            });
+
+            if (notes.length > 0) {
+                const voice = new Vex.Flow.Voice({num_beats: 4, beat_value: 4});
+                voice.setStrict(false);
+                voice.addTickables(notes);
+                new Vex.Flow.Formatter().joinVoices([voice]).format([voice], stave.getWidth() - 50);
+                voice.draw(context, stave);
+            }
+        }
+    }
+
+    // Первоначальная отрисовка
+    drawNotes('[]', '[]');
+</script>
+</body>
+</html>
