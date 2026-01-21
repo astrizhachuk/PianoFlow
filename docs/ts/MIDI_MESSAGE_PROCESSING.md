@@ -230,7 +230,7 @@ deactivate DS
 @enduml
 ```
 
-2.  **Прием и парсинг сообщений**:
+2.  **Прием и парсинг сообщений**: 
     *   Когда пользователь нажимает клавишу, MIDI-клавиатура отправляет сообщение. `MidiMessageReceiver.onSend()` вызывается с сырыми данными (`byte[]`).
     *   `MidiMessageReceiver` немедленно передает эти данные в `MidiMessageParser`.
     *   `MidiMessageParser` анализирует байты. Если это `Note On`, он извлекает номер ноты и создает объект `Note`, который передает обратно в `MidiDataSource`.
@@ -280,11 +280,11 @@ deactivate Receiver
     *   `ObserveMidiMessagesUseCase` подписывается на этот поток. Он использует операторы `Kotlin Flow` (например, `channelFlow` с `delay`) для группировки нот, пришедших в течение короткого промежутка времени (`50 мс`), в один список `List<Note>` (аккорд).
 
 4.  **Отображение на UI**:
-    *   `PianoStaffViewModel` подписывается на `Flow<List<Note>>` от `ObserveMidiMessagesUseCase` и обновляет свой `StateFlow<PianoStaffUiState>`.
-    *   `MainActivity` через `setContent` устанавливает `MaterialTheme` и отображает `PianoStaffScreen`.
-    *   `PianoStaffScreen` подписывается на `uiState` и перерисовывается, отображая актуальный список нот на нотном стане.
-    
-    Примечание: Реализация уведомлений о подключении использует View-систему и будет переведена на Jetpack Compose в будущем.
+    *   `PianoStaffViewModel` подписывается на `Flow<List<Note>>` от `ObserveMidiMessagesUseCase`.
+    *   Внутри `ViewModel` ноты разделяются на два списка: для басового (`pitch < 60`) и скрипичного ключей.
+    *   Каждый из списков преобразуется в JSON-строку с помощью `toVexflowJson()`.
+    *   `PianoStaffViewModel` обновляет свой `StateFlow<PianoStaffUiState>`, который содержит две JSON-строки: `trebleNotesJson` и `bassNotesJson`.
+    *   `PianoStaffScreen`, подписанный на `uiState`, получает эти JSON-строки и передает их в `Composable`-компонент `PianoStaff` для финальной отрисовки.
 
 ### 3.2. Общая диаграмма последовательности
 
@@ -301,6 +301,7 @@ box "Приложение PianoFlow"
   participant "ObserveMidiMessagesUseCase" as UC
   participant "PianoStaffViewModel" as VM
   participant "PianoStaffScreen" as Screen
+  participant "PianoStaff" as Staff
 end box
 
 User -> Keyboard : Нажимает клавишу(и)
@@ -322,13 +323,17 @@ UC -> VM : Отправляет Flow<List<Note>>
 deactivate UC
 activate VM
 
+VM -> VM : Разделяет ноты на басовые и скрипичные
+VM -> VM : Преобразует списки нот в JSON
 VM -> VM : Обновляет uiState
-VM -> Screen : Передает новое состояние
+VM -> Screen : Передает новое состояние (UiState с JSON)
 deactivate VM
 activate Screen
 
-Screen -> Screen : Отображает ноты на нотном стане
-Screen -> User : Показывает ноты на нотном стане
+Screen -> Staff : Передает JSON с нотами
+activate Staff
+Staff -> User : Отображает ноты на нотном стане
+deactivate Staff
 deactivate Screen
 
 @enduml
