@@ -16,7 +16,6 @@ tracing = "1.3.0-alpha02"
 
 # Compose
 composeBom = "2024.06.00"
-composeCompiler = "1.5.14"
 hiltNavigationCompose = "1.2.0"
 
 # Coroutines

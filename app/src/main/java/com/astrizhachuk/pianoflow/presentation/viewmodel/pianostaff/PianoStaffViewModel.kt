@@ -4,42 +4,45 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.astrizhachuk.pianoflow.domain.usecase.midi.ObserveMidiMessagesUseCase
 import com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState
+import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.toVexflowJson
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ViewModel для экрана с нотным станом.
+ * ViewModel для экрана нотного стана.
  *
- * Эта ViewModel отвечает за получение потока MIDI-нот из `ObserveMidiMessagesUseCase`
- * и его преобразование в состояние UI (`PianoStaffUiState`), которое может быть
- * использовано `Composable`-функцией для отрисовки.
+ * Эта ViewModel отвечает за получение MIDI-сообщений, их обработку в музыкальные ноты
+ * и предоставление состояния для UI, чтобы отображать ноты на нотном стане.
+ * Она разделяет ноты на скрипичный и басовый ключи и преобразует их в JSON-формат,
+ * подходящий для библиотеки рендеринга, такой как VexFlow.
+ *
+ * @param observeMidiMessagesUseCase Use case для получения входящих MIDI-сообщений.
  */
 @HiltViewModel
 class PianoStaffViewModel @Inject constructor(
     observeMidiMessagesUseCase: ObserveMidiMessagesUseCase
 ) : ViewModel() {
 
-    /**
-     * `StateFlow`, который выдает актуальное состояние UI для экрана нотного стана.
-     *
-     * - `observeMidiMessagesUseCase()`: Запускает use case, который возвращает `Flow<List<Note>>`,
-     *   где каждый список представляет собой аккорд или одиночную ноту.
-     * - `.map { notes -> PianoStaffUiState(notes = notes) }`: Преобразует каждый список нот
-     *   в объект состояния UI.
-     * - `.stateIn(...)`: Превращает "холодный" Flow в "горячий" `StateFlow`, который
-     *   хранит последнее значение и передает его новым подписчикам. Поток активен, пока
-     *   есть подписчики, и останавливается через 5 секунд после исчезновения последнего подписчика,
-     *   что экономит ресурсы.
-     */
-    val uiState: StateFlow<PianoStaffUiState> = observeMidiMessagesUseCase()
-        .map { notes -> PianoStaffUiState(notes = notes) }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Companion.WhileSubscribed(5000),
-            initialValue = PianoStaffUiState()
-        )
+    private val _uiState = MutableStateFlow(PianoStaffUiState())
+    val uiState: StateFlow<PianoStaffUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            observeMidiMessagesUseCase().collect { notes ->
+                val (bassNotes, trebleNotes) = notes.partition { it.pitch < 60 }
+
+                _uiState.update {
+                    it.copy(
+                        trebleNotesJson = trebleNotes.toVexflowJson(),
+                        bassNotesJson = bassNotes.toVexflowJson()
+                    )
+                }
+            }
+        }
+    }
 }

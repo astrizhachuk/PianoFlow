@@ -4,7 +4,7 @@
 
 ### 1.1. Цель доработки
 
-Реализовать функционал для приема, обработки и визуализации MIDI-сообщений (нот), поступающих от подключенной MIDI-клавиатуры. Основная задача — отображать сыгранные пользователем ноты и аккорды на экране в реальном времени.
+Реализовать функционал для приема, обработки и визуализации MIDI-сообщений (нот), поступающих от подключенной MIDI-клавиатуры. Основная задача — отображать сыгранные пользователем ноты и аккорды на нотном стане в реальном времени.
 
 ### 1.2. Базовые документы
 
@@ -31,7 +31,7 @@
 
 **Presentation Layer**
 - **`PianoStaffViewModel`:** Новая `ViewModel` для экрана с нотным станом. Она получает `Flow` нот из `ObserveMidiMessagesUseCase` и преобразует его в состояние для UI.
-- **`PianoStaffScreen`:** `Composable`-экран, который отображает сыгранные ноты. На данном этапе — в виде простого текста.
+- **`PianoStaffScreen`:** `Composable`-экран, который отображает сыгранные ноты на нотном стане.
 - **`MainActivity`**: Основная `Activity` приложения, которая была переведена на Jetpack Compose с помощью `setContent` для отображения `PianoStaffScreen` и использует `MaterialTheme`.
 
 ```plantuml
@@ -45,8 +45,9 @@ System_Ext(android_sdk, "Android SDK", "MidiReceiver, MidiOutputPort")
 
 Container_Boundary(presentation, "Presentation Layer") {
     Component(activity, "MainActivity", "Activity", "Отображает Composable UI")
-    Component(vm, "PianoStaffViewModel", "ViewModel", "Управляет состоянием нотного стана.")
-    Component(screen, "PianoStaffScreen", "Composable", "Отображает ноты.")
+    Component(vm, "PianoStaffViewModel", "ViewModel", "Управляет состоянием UI, получая ноты и формируя PianoStaffUiState.")
+    Component(screen, "PianoStaffScreen", "Composable", "Экран, который отображает нотный стан, получая состояние от ViewModel.")
+    Component(staff, "PianoStaff", "Composable", "Компонент для непосредственной отрисовки нотного стана.")
 }
 
 Container_Boundary(domain, "Domain Layer") {
@@ -64,7 +65,8 @@ Container_Boundary(data, "Data Layer") {
 
 ' Связи
 Rel(activity, screen, "Отображает")
-Rel(screen, vm, "Наблюдает за")
+Rel(screen, staff, "Использует")
+Rel(screen, vm, "Наблюдает за", "PianoStaffUiState")
 Rel(vm, observe_uc, "Вызывает")
 Rel(observe_uc, repo, "Вызывает observeNotes()")
 
@@ -104,24 +106,38 @@ interface MidiRepository {
 **Presentation Layer:**
 
 ```kotlin
-// com.astrizhachuk.pianoflow.presentation.pianostaff.PianoStaffUiState.kt
+// com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState.kt
 data class PianoStaffUiState(
-    val notes: List<Note> = emptyList()
+    val trebleNotesJson: String = "[]",
+    val bassNotesJson: String = "[]"
 )
 
-// com.astrizhachuk.pianoflow.presentation.pianostaff.PianoStaffViewModel.kt
+// com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffViewModel.kt
 @HiltViewModel
 class PianoStaffViewModel @Inject constructor(
     observeMidiMessagesUseCase: ObserveMidiMessagesUseCase
 ) : ViewModel() {
 
-    val uiState: StateFlow<PianoStaffUiState> = observeMidiMessagesUseCase()
-        .map { notes -> PianoStaffUiState(notes = notes) }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = PianoStaffUiState()
-        )
+    private val _uiState = MutableStateFlow(PianoStaffUiState())
+    val uiState: StateFlow<PianoStaffUiState> = _uiState.asStateFlow()
+}
+```
+
+**PianoStaffScreen** — это `Composable`-функция, которая получает `PianoStaffViewModel` через Hilt, подписывается на изменения `uiState` и передает данные в `PianoStaff` для отрисовки.
+
+```kotlin
+// com.astrizhachuk.pianoflow.presentation.ui.pianostaff.PianoStaffScreen.kt
+@Composable
+fun PianoStaffScreen(
+    viewModel: PianoStaffViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    PianoStaff(
+        trebleNotesJson = uiState.trebleNotesJson,
+        bassNotesJson = uiState.bassNotesJson,
+        modifier = Modifier.fillMaxSize()
+    )
 }
 ```
 
@@ -264,15 +280,11 @@ deactivate Receiver
     *   `ObserveMidiMessagesUseCase` подписывается на этот поток. Он использует операторы `Kotlin Flow` (например, `channelFlow` с `delay`) для группировки нот, пришедших в течение короткого промежутка времени (`50 мс`), в один список `List<Note>` (аккорд).
 
 4.  **Отображение на UI**:
-    *   `PianoStaffViewModel` подписывается на `Flow<List<Note>>` от `ObserveMidiMessagesUseCase` и обновляет свой `StateFlow<PianoStaffUiState>`.
-    *   `MainActivity` через `setContent` устанавливает `MaterialTheme` и отображает `PianoStaffScreen`.
-    *   `PianoStaffScreen` подписывается на `uiState` и перерисовывается, отображая актуальный список нот в виде текста.
-    
-    Примечание: Реализация уведомлений о подключении использует View-систему и будет переведена на Jetpack Compose в будущем.
-
-### 3.2. Общая диаграмма последовательности
-
-Эта диаграмма иллюстрирует общий поток данных от нажатия клавиши до отображения ноты на экране.
+    *   `PianoStaffViewModel` подписывается на `Flow<List<Note>>` от `ObserveMidiMessagesUseCase`.
+    *   Внутри `ViewModel` ноты разделяются на два списка: для басового (`pitch < 60`) и скрипичного ключей.
+    *   Каждый из списков преобразуется в JSON-строку с помощью `toVexflowJson()`.
+    *   `PianoStaffViewModel` обновляет свой `StateFlow<PianoStaffUiState>`, который содержит две JSON-строки: `trebleNotesJson` и `bassNotesJson`.
+    *   `PianoStaffScreen`, подписанный на `uiState`, получает эти JSON-строки и передает их в `Composable`-компонент `PianoStaff` для финальной отрисовки.
 
 ```plantuml
 @startuml
@@ -285,6 +297,7 @@ box "Приложение PianoFlow"
   participant "ObserveMidiMessagesUseCase" as UC
   participant "PianoStaffViewModel" as VM
   participant "PianoStaffScreen" as Screen
+  participant "PianoStaff" as Staff
 end box
 
 User -> Keyboard : Нажимает клавишу(и)
@@ -306,21 +319,97 @@ UC -> VM : Отправляет Flow<List<Note>>
 deactivate UC
 activate VM
 
+VM -> VM : Разделяет ноты на басовые и скрипичные
+VM -> VM : Преобразует списки нот в JSON
 VM -> VM : Обновляет uiState
-VM -> Screen : Передает новое состояние
+VM -> Screen : Передает новое состояние (UiState с JSON)
 deactivate VM
 activate Screen
 
-Screen -> Screen : Отображает текстовое представление нот
-Screen -> User : Показывает "Сыграны ноты: ..."
+Screen -> Staff : Передает JSON с нотами
+activate Staff
+Staff -> User : Отображает ноты на нотном стане
+deactivate Staff
 deactivate Screen
 
 @enduml
 ```
+
+### 3.2. Механизм отображения нот
+
+Отрисовка нотного стана выполняется с помощью `WebView` и JavaScript-библиотеки [VexFlow](https://www.vexflow.com/). Этот подход позволяет отделить логику отрисовки от нативного кода, используя мощные возможности веб-технологий для визуализации музыкальной нотации.
+
+**Ключевые компоненты:**
+
+- **`PianoStaff` Composable:** Оборачивает `AndroidView`, в котором создается и настраивается `WebView`.
+- **`vexflow.html`:** HTML-файл, расположенный в `app/src/main/assets/`. Он содержит базовую разметку, стили и основной JavaScript-код для работы с VexFlow.
+- **`vexflow.js`:** Сама библиотека VexFlow (версия [4.2.2](https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js)), также расположенная в `assets`.
+
+**Процесс работы:**
+
+1.  **Инициализация `WebView`:** При создании `PianoStaff` `Composable`, `AndroidView` инициализирует `WebView` и загружает локальный HTML-файл `file:///android_asset/vexflow.html`.
+2.  **Передача данных:** При каждом обновлении состояния `uiState` в `PianoStaffScreen` вызывается `update`-блок `AndroidView`.
+3.  **Вызов JavaScript:** Внутри `update` происходит вызов JavaScript-функции `drawNotes` в `WebView` с помощью метода `evaluateJavascript`.
+4.  **Отрисовка в `WebView`:** В качестве аргументов в `drawNotes` передаются две JSON-строки: `trebleNotesJson` и `bassNotesJson`. JavaScript-код в `vexflow.html` парсит эти строки и использует VexFlow API для отрисовки нот на SVG-холсте внутри `WebView`.
+
+**Диаграмма взаимодействия**
+
+```plantuml
+@startuml
+title Диаграмма взаимодействия: Отображение нот через WebView
+
+box "Presentation Layer (Kotlin/Compose)" #LightBlue
+    participant "PianoStaffScreen" as Screen
+    participant "PianoStaff" as StaffComposable
+end box
+
+box "WebView (Java/Android)" #LightGreen
+    participant "AndroidView" as AndroidView
+    participant "WebView" as WebView
+end box
+
+box "VexFlow (HTML/JavaScript)" #LightYellow
+    participant "vexflow.html" as HtmlPage
+    participant "drawNotes()" as DrawJsFunc
+    participant "VexFlow.js" as VexFlowLib
+end box
+
+Screen -> StaffComposable : Передает JSON-строки
+activate StaffComposable
+
+StaffComposable -> AndroidView : (update)
+activate AndroidView
+
+AndroidView -> WebView : evaluateJavascript("drawNotes(...)")
+activate WebView
+
+WebView -> HtmlPage : Вызывает JS-функцию
+activate HtmlPage
+
+HtmlPage -> DrawJsFunc : drawNotes(trebleJson, bassJson)
+activate DrawJsFunc
+
+DrawJsFunc -> VexFlowLib : Использует API для отрисовки
+activate VexFlowLib
+VexFlowLib --> DrawJsFunc : SVG-элементы нот
+deactivate VexFlowLib
+
+DrawJsFunc --> HtmlPage : Вставляет SVG в DOM
+
+HtmlPage --> WebView : Отображает результат
+deactivate DrawJsFunc
+deactivate HtmlPage
+deactivate WebView
+deactivate AndroidView
+deactivate StaffComposable
+
+@enduml
+```
+
 ## 4. Критерии приемки
 
-- При нажатии одной клавиши на MIDI-клавиатуре соответствующая нота немедленно отображается на экране (в виде MIDI-номера).
-- При одновременном нажатии нескольких клавиш (аккорд) все соответствующие ноты отображаются на экране (в виде MIDI-номеров).
+- При нажатии одной клавиши на MIDI-клавиатуре соответствующая нота немедленно отображается на нотном стане.
+- При одновременном нажатии нескольких клавиш (аккорд) все соответствующие ноты отображаются на нотном стане.
 - Каждое новое событие нажатия (`Note On`) приводит к полной очистке экрана перед отображением новых нот.
 - Система реагирует только на сообщения о нажатии клавиш (`Note On`); сообщения об отпускании (`Note Off`) и другие типы MIDI-сообщений игнорируются.
 - Визуализация нот на экране происходит без видимых задержек после нажатия клавиши.

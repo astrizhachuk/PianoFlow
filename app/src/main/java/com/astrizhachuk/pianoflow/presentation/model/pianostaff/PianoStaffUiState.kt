@@ -1,12 +1,16 @@
 package com.astrizhachuk.pianoflow.presentation.model.pianostaff
 
-import com.astrizhachuk.pianoflow.domain.model.Note
-
 /**
- * Представляет состояние UI для экрана с нотным станом.
+ * Представляет состояние пользовательского интерфейса для экрана с нотным станом.
  *
- * @param notes Список нот, которые должны быть отображены на нотном стане.
+ * Этот data-класс содержит музыкальные ноты для скрипичного и басового ключей,
+ * сериализованные в виде JSON-строк. Этот формат используется для эффективной передачи
+ * данных о нотах в UI-слой, как правило, для отрисовки в WebView или аналогичном компоненте.
+ *
+ * @param trebleNotesJson JSON-строка, представляющая массив нот для скрипичного ключа.
+ * @param bassNotesJson JSON-строка, представляющая массив нот для басового ключа.
  */
 data class PianoStaffUiState(
-    val notes: List<Note> = emptyList()
+    val trebleNotesJson: String = "[]",
+    val bassNotesJson: String = "[]"
 )
