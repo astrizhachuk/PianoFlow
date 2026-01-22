@@ -9,6 +9,7 @@ import android.media.midi.MidiReceiver
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import androidx.tracing.trace
 import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.domain.mapper.midi.MidiDeviceMapper
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
@@ -102,20 +103,22 @@ class MidiDataSource @Inject constructor(
     }
 
     init {
-        Timber.i("init: Initializing.")
-        when {
-            !context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI) -> {
-                Timber.w("init: MIDI feature NOT supported.")
-                _connectionState.value = ConnectionState.Error(context.getString(R.string.midi_error_api_unsupported))
-            }
-            midiManager == null -> {
-                Timber.w("init: MidiManager is null, MIDI system service not available.")
-                _connectionState.value = ConnectionState.NoDevice
-            }
-            else -> {
-                Timber.i("init: MIDI feature supported.")
-                midiManager.registerDeviceCallbackCompat(deviceCallback, Handler(Looper.getMainLooper()))
-                openFirstAvailableDevice()
+        trace("MidiDataSource.init") {
+            Timber.i("init: Initializing.")
+            when {
+                !context.packageManager.hasSystemFeature(PackageManager.FEATURE_MIDI) -> {
+                    Timber.w("init: MIDI feature NOT supported.")
+                    _connectionState.value = ConnectionState.Error(context.getString(R.string.midi_error_api_unsupported))
+                }
+                midiManager == null -> {
+                    Timber.w("init: MidiManager is null, MIDI system service not available.")
+                    _connectionState.value = ConnectionState.NoDevice
+                }
+                else -> {
+                    Timber.i("init: MIDI feature supported.")
+                    midiManager.registerDeviceCallbackCompat(deviceCallback, Handler(Looper.getMainLooper()))
+                    openFirstAvailableDevice()
+                }
             }
         }
     }

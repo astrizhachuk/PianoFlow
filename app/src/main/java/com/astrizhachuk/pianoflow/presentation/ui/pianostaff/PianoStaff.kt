@@ -6,6 +6,7 @@ import android.webkit.WebView
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.tracing.trace
 
 /**
  * Composable-функция, которая отображает фортепианный нотный стан с музыкальными нотами с помощью WebView.
@@ -29,18 +30,22 @@ fun PianoStaff(
 ) {
     AndroidView(
         factory = { context ->
-            WebView(context).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-                settings.javaScriptEnabled = true
-                webChromeClient = WebChromeClient()
-                loadUrl("file:///android_asset/vexflow.html")
+            trace("PianoStaff:WebView:factory") {
+                WebView(context).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    settings.javaScriptEnabled = true
+                    webChromeClient = WebChromeClient()
+                    loadUrl("file:///android_asset/vexflow.html")
+                }
             }
         },
         update = { webView ->
-            webView.evaluateJavascript("drawNotes('$trebleNotesJson', '$bassNotesJson')", null)
+            trace("PianoStaff:WebView:update") {
+                webView.evaluateJavascript("drawNotes('$trebleNotesJson', '$bassNotesJson')", null)
+            }
         },
         modifier = modifier
     )

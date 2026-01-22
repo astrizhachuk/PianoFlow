@@ -2,6 +2,7 @@ package com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.tracing.trace
 import com.astrizhachuk.pianoflow.domain.usecase.midi.ObserveMidiMessagesUseCase
 import com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState
 import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.toVexflowJson
@@ -33,21 +34,23 @@ class PianoStaffViewModel @Inject constructor(
     val uiState: StateFlow<PianoStaffUiState> = _uiState.asStateFlow()
 
     init {
-        Timber.i("init: ViewModel created.")
-        viewModelScope.launch {
-            observeMidiMessagesUseCase().collect { notes ->
-                Timber.d("collect: Received ${notes.size} notes.")
-                val (bassNotes, trebleNotes) = notes.partition { it.pitch < 60 }
-                Timber.d("collect: Partitioned notes - Bass: ${bassNotes.size}, Treble: ${trebleNotes.size}")
+        trace("PianoStaffViewModel.init") {
+            Timber.i("init: ViewModel created.")
+            viewModelScope.launch {
+                observeMidiMessagesUseCase().collect { notes ->
+                    Timber.d("collect: Received ${notes.size} notes.")
+                    val (bassNotes, trebleNotes) = notes.partition { it.pitch < 60 }
+                    Timber.d("collect: Partitioned notes - Bass: ${bassNotes.size}, Treble: ${trebleNotes.size}")
 
-                _uiState.update {
-                    val newTrebleJson = trebleNotes.toVexflowJson()
-                    val newBassJson = bassNotes.toVexflowJson()
-                    Timber.d("collect: Updating UI state - Treble JSON: $newTrebleJson, Bass JSON: $newBassJson")
-                    it.copy(
-                        trebleNotesJson = newTrebleJson,
-                        bassNotesJson = newBassJson
-                    )
+                    _uiState.update {
+                        val newTrebleJson = trebleNotes.toVexflowJson()
+                        val newBassJson = bassNotes.toVexflowJson()
+                        Timber.d("collect: Updating UI state - Treble JSON: $newTrebleJson, Bass JSON: $newBassJson")
+                        it.copy(
+                            trebleNotesJson = newTrebleJson,
+                            bassNotesJson = newBassJson
+                        )
+                    }
                 }
             }
         }
