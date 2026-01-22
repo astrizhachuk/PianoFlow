@@ -8,9 +8,8 @@ import timber.log.Timber
  * подходящее для отрисовки целой ноты или аккорда в VexFlow.
  *
  * Эта функция-расширение принимает список нот, сортирует их по высоте (pitch)
- * и форматирует в JSON-массив. Высота каждой ноты преобразуется в формат
- * VexFlow «нота/октава» (например, «c/4»). Полученный JSON представляет собой
- * один аккорд из целых нот («w»), содержащий все указанные ноты.
+ * и форматирует в JSON-массив. Невалидные ноты (с высотой звука вне диапазона 0-127)
+ * игнорируются.
  *
  * Важно: Эта функция создает строку с экранированными кавычками, чтобы ее можно
  * было безопасно передать в JavaScript-функцию, ожидающую строковый аргумент.
@@ -25,35 +24,38 @@ fun List<Note>.toVexflowJson(): String {
         return "[]"
     }
 
-    // Создаем строку вида: "\"c#/4\"", "\"e/4\""
-    val keys = this.sortedBy { it.pitch }.joinToString(separator = ", ") { note ->
-        val vexflowPitch = note.pitchToVexflow()
-        if (vexflowPitch.isNotEmpty()) {
-            "\\\"$vexflowPitch\\\""
-        } else {
-            null
+    val keys = this.sortedBy { it.pitch }
+        .mapNotNull { note -> note.pitchToVexflow() }
+        .joinToString(separator = ", ") { vexflowNote ->
+            "\\\"$vexflowNote\\\""
         }
-    }.filterNotNull()
 
     if (keys.isEmpty()) {
-        Timber.w("No valid notes to convert to VexFlow JSON.")
+        Timber.w("No valid notes found to convert to VexFlow JSON. Input was: $this")
         return "[]"
     }
 
     // Собираем итоговую JSON-строку, экранируя все внутренние кавычки.
-    // Двойной бэкслеш (\\) в Kotlin-строке превращается в один бэкслеш (\) в итоговой строке.
-    val result = "[{\\\"keys\\\":[${keys.joinToString()}],\\\"duration\\\":\\\"w\\\"}]"
+    val result = "[{\\\"keys\\\":[$keys],\\\"duration\\\":\\\"w\\\"}]"
     Timber.d("toVexflowJson() result: $result")
     return result
 }
 
-private fun Note.pitchToVexflow(): String {
+/**
+ * Преобразует высоту MIDI-ноты в строковый формат VexFlow ("нота/октава").
+ *
+ * Если значение pitch находится вне допустимого диапазона MIDI (0-127), функция
+ * возвращает `null`.
+ *
+ * @return Строка в формате VexFlow (например, "c#/4") для валидных нот или `null` для невалидных.
+ */
+private fun Note.pitchToVexflow(): String? {
     if (pitch !in 0..127) {
-        Timber.e("Invalid MIDI pitch value: $pitch. Must be in range 0-127.")
-        return ""
+        Timber.w("Invalid MIDI pitch value: $pitch. Must be in range 0-127. Note will be ignored.")
+        return null
     }
     val noteNames = arrayOf("c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b")
-    val octave = (this.pitch / 12) - 1
-    val noteName = noteNames[this.pitch % 12]
+    val octave = (pitch / 12) - 1
+    val noteName = noteNames[pitch % 12]
     return "$noteName/$octave"
 }

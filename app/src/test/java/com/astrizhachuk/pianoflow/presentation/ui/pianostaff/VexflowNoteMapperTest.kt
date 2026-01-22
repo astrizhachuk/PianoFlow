@@ -54,4 +54,32 @@ class VexflowNoteMapperTest {
         val expectedJson = "[{\\\"keys\\\":[\\\"b/3\\\", \\\"c#/4\\\", \\\"g/5\\\"],\\\"duration\\\":\\\"w\\\"}]"
         assertEquals(expectedJson, json)
     }
+
+    @Test
+    fun `toVexflowJson with invalid pitch values should filter them out`() {
+        // Arrange
+        val notes = listOf(
+            Note(pitch = -1),
+            Note(pitch = 60),
+            Note(pitch = 128)
+        )
+        // Act
+        val json = notes.toVexflowJson()
+        // Assert
+        val expectedJson = "[{\\\"keys\\\":[\\\"c/4\\\"],\\\"duration\\\":\\\"w\\\"}]"
+        assertEquals(expectedJson, json)
+    }
+
+    @Test
+    fun `toVexflowJson with only invalid pitch values should return empty array`() {
+        // Arrange
+        val notes = listOf(
+            Note(pitch = -1),
+            Note(pitch = 128)
+        )
+        // Act
+        val json = notes.toVexflowJson()
+        // Assert
+        assertEquals("[]", json)
+    }
 }
