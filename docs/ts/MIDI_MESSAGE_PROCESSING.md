@@ -32,7 +32,7 @@
 **Presentation Layer**
 - **`PianoStaffViewModel`:** Новая `ViewModel` для экрана с нотным станом. Она получает `Flow` нот из `ObserveMidiMessagesUseCase` и преобразует его в состояние для UI.
 - **`PianoStaffScreen`:** `Composable`-экран, который отображает сыгранные ноты на нотном стане.
-- **`MainActivity`**: Основная `Activity` приложения, которая была переведена на Jetpack Compose с помощью `setContent` для отображения `PianoStaffScreen` и использует `MaterialTheme`.
+- **`MainActivity`**: Основная `Activity` приложения. Использует `setContent` для отображения `Composable`-иерархии, построенной на `Scaffold`, который управляет структурой экрана и содержит `SnackbarHost` для показа уведомлений.
 
 ```plantuml
 @startuml
@@ -44,7 +44,7 @@ System_Ext(midi_device, "MIDI Keyboard", "Физическое устройст�
 System_Ext(android_sdk, "Android SDK", "MidiReceiver, MidiOutputPort")
 
 Container_Boundary(presentation, "Presentation Layer") {
-    Component(activity, "MainActivity", "Activity", "Отображает Composable UI")
+    Component(activity, "MainActivity", "Activity", "Отображает Composable UI с помощью Scaffold.")
     Component(vm, "PianoStaffViewModel", "ViewModel", "Управляет состоянием UI, получая ноты и формируя PianoStaffUiState.")
     Component(screen, "PianoStaffScreen", "Composable", "Экран, который отображает нотный стан, получая состояние от ViewModel.")
     Component(staff, "PianoStaff", "Composable", "Компонент для непосредственной отрисовки нотного стана.")
@@ -129,15 +129,22 @@ class PianoStaffViewModel @Inject constructor(
 // com.astrizhachuk.pianoflow.presentation.ui.pianostaff.PianoStaffScreen.kt
 @Composable
 fun PianoStaffScreen(
+    modifier: Modifier = Modifier,
     viewModel: PianoStaffViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    PianoStaff(
-        trebleNotesJson = uiState.trebleNotesJson,
-        bassNotesJson = uiState.bassNotesJson,
-        modifier = Modifier.fillMaxSize()
-    )
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp, vertical = 32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        PianoStaff(
+            trebleNotesJson = uiState.trebleNotesJson,
+            bassNotesJson = uiState.bassNotesJson
+        )
+    }
 }
 ```
 

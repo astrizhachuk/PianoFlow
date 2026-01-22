@@ -4,7 +4,7 @@
 
 ### 1.1. Цель доработки
 
-Реализовать универсальный, переиспользуемый компонент для асинхронной отправки и отображения уведомлений пользователю (например, Toast/Snackbar).
+Реализовать универсальный, переиспользуемый компонент для асинхронной отправки и отображения уведомлений пользователю с помощью Jetpack Compose.
 
 ### 1.2. Базовые документы
 
@@ -18,21 +18,23 @@
 
 Для уведомления пользователя в приложении вводится механизм, состоящий из следующих компонентов в `Presentation Layer`:
 
-*   `UserNotifier` (интерфейс) и `UserNotifierImpl` (реализация): Обеспечивают асинхронную передачу UI-событий от `ViewModel` к `View` (`Activity`/`Fragment`) по принципу "издатель-подписчик".
+*   `UserNotifier` (интерфейс) и `UserNotifierImpl` (реализация): Обеспечивают асинхронную передачу UI-событий от `ViewModel` к UI-слою по принципу "издатель-подписчик".
 *   `UserMessage`: Модель данных для сообщения, отображаемого пользователю.
-*   `NotificationModule`: Hilt-модуль, который предоставляет зависимость `UserNotifier` для использования в других компонентах.
+*   `NotificationModule`: Hilt-модуль, который предоставляет зависимость `UserNotifier`.
+*   **`MainActivity`**: Выступает в роли хоста для `Composable`-компонентов, содержит `Scaffold` со `SnackbarHost`.
+*   **`ObserveNotifications`**: `Composable`-функция-наблюдатель, которая подписывается на `UserNotifier` и показывает `Snackbar`.
 
-Этот механизм позволяет `ViewModel` отправлять сообщения, не имея прямой ссылки на `View`, что соответствует принципам чистой архитектуры.
+Этот механизм позволяет `ViewModel` отправлять сообщения, не имея прямой ссылки на UI, что соответствует принципам чистой архитектуры.
 
 ```plantuml
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title C4 - Уровень 3: Компоненты механизма уведомлений
+title C4 - Уровень 3: Компоненты механизма уведомлений (Compose)
 
 Container_Boundary(presentation, "Presentation Layer") {
     Component(vm, "MidiConnectionViewModel", "ViewModel", "Формирует и отправляет сообщение.")
-    Component(ui, "Activity", "UI", "Отображает сообщение.")
+    Component(observer, "ObserveNotifications", "Composable", "Подписывается на UserNotifier и показывает Snackbar.")
 
     Component(notifier, "UserNotifier", "Interface", "Контракт для отправки и получения уведомлений.")
     Component(impl, "UserNotifierImpl", "Singleton", "Реализация шины событий на SharedFlow.")
@@ -43,7 +45,7 @@ Container_Boundary(presentation, "Presentation Layer") {
     Rel(di, notifier, "@Binds")
 
     Rel(vm, notifier, "Использует для отправки")
-    Rel(ui, notifier, "Использует для подписки")
+    Rel(observer, notifier, "Использует для подписки")
     
     Rel(vm, message, "Создает")
     Rel(notifier, message, "Передает")
@@ -143,59 +145,59 @@ end note
 
 ## 3. Жизненный цикл и взаимодействие компонентов
 
-Ключевая задача системы уведомлений — отделить компоненты, которые *создают* сообщения (издатели), от компонентов, которые их *отображают* (подписчики). Это достигается через центральную шину событий — `UserNotifier`.
-
 ### 3.1. Принцип работы
 
-Взаимодействие строится по принципу "издатель-подписчик":
+Взаимодействие строится по принципу "издатель-подписчик" в рамках архитектуры Jetpack Compose:
 
-1.  **Издатель** (например, `MidiConnectionViewModel`) на основе своей внутренней логики решает, что нужно уведомить пользователя. Например, изменилось состояние подключения MIDI-клавиатуры.
-2.  Он создает объект `UserMessage` и отправляет его в `UserNotifier`, который является синглтоном и доступен во всем приложении.
-3.  **Подписчик** (`Activity`) при своем создании подписывается на поток сообщений `messages` из `UserNotifier`.
-4.  Как только издатель отправляет новое сообщение, `Activity` немедленно его получает и отображает на экране (например, в виде `Toast`).
+1.  **Издатель** (например, `MidiConnectionViewModel`) на основе своей внутренней логики решает, что нужно уведомить пользователя.
+2.  Он создает объект `UserMessage` и отправляет его в `UserNotifier`.
+3.  **Подписчик** (`ObserveNotifications`) — это `Composable`-функция, размещенная внутри `Scaffold`.
+4.  С помощью `LaunchedEffect` подписчик создает долгоживущую корутину, которая подписывается на `Flow` сообщений из `UserNotifier`.
+5.  Как только издатель отправляет новое сообщение, `LaunchedEffect` его получает и вызывает `snackbarHostState.showSnackbar()` для отображения.
 
 ### 3.2. Последовательность событий
 
-Диаграмма ниже иллюстрирует типичный сценарий с учетом `repeatOnLifecycle`.
+Диаграмма ниже иллюстрирует сценарий с использованием `LaunchedEffect`.
 
 ```plantuml
 @startuml
-title Сценарий: Отображение уведомления (финальная версия)
+title Сценарий: Отображение уведомления в Jetpack Compose
 
-participant "Activity" as UI
+participant "MainActivity" as UI
+participant "ObserveNotifications\n(Composable)" as Observer
 participant "UserNotifier (Singleton)" as Notifier
 participant "ViewModel" as VM
 
 activate Notifier #Gainsboro
-note over Notifier: Singleton, существует в течение всего\nжизненного цикла приложения.
 
 activate UI
-UI -> UI : onCreate()
+UI -> Observer : (Composition)
+activate Observer
 
-== UI переходит в состояние STARTED ==
-UI -> Notifier : подписывается на messages.collect()
-activate UI #LightBlue
-note right of UI: **Корутина-сборщик** запущена.\nОна будет активна, пока UI > STARTED.
+== 'ObserveNotifications' входит в композицию ==
+Observer -> Observer : Запускается LaunchedEffect
+activate Observer #LightBlue
+note right: **Корутина-сборщик** запущена.\nОна будет активна, пока 'ObserveNotifications'\nнаходится в композиции.
 
-loop пока UI в состоянии STARTED
+loop пока 'ObserveNotifications' в композиции
 
-    note over UI, VM : Происходит событие, и VM отправляет уведомление
+    note over Observer, VM : Происходит событие, и VM отправляет уведомление
     activate VM
     VM -> Notifier : sendMessage(message)
     deactivate VM
 
-    Notifier -> UI : (message)
-    note right of UI: Корутина возобновляется (resume),\nобрабатывает сообщение...
-    UI -> UI: Отображает Toast
-    note right of UI: ...и **снова приостанавливается** (suspend)\nв ожидании следующего сообщения.
+    Notifier -> Observer : (message)
+    note right: Корутина возобновляется (resume),
+    Observer -> Observer : snackbarHostState.showSnackbar()
+    note right: ...и **снова приостанавливается** (suspend)
 
 end
 
-== UI переходит в состояние STOPPED ==
-note right of UI: `repeatOnLifecycle` отменяет\nкорутину-сборщик.
-deactivate UI #LightBlue
+== 'ObserveNotifications' покидает композицию ==
+note right: `LaunchedEffect` автоматически\nотменяет корутину-сборщик.
+deactivate Observer #LightBlue
 
-== UI переходит в состояние DESTROYED ==
+deactivate Observer
 deactivate UI
 deactivate Notifier
 @enduml
@@ -203,41 +205,37 @@ deactivate Notifier
 
 ### 3.3. Управление жизненным циклом
 
-Правильное управление жизненным циклом подписки — ключ к эффективной и безопасной работе с UI. С добавлением `repeatOnLifecycle` он становится строго детерминированным.
-
 *   **Издатель (`MidiConnectionViewModel`)**: Его жизненный цикл привязан к графу навигации или `Activity`. Он может отправлять сообщения в `UserNotifier` в любой момент, пока существует.
-*   **Шина событий (`UserNotifier`)**: Является синглтоном (`@Singleton`), поэтому живет на протяжении всего жизненного цикла приложения. Это гарантирует, что он всегда доступен для отправки и получения сообщений.
-*   **Подписчик (`Activity`)**: Подписка на сообщения (`messages.collect`) выполняется внутри блока `repeatOnLifecycle(Lifecycle.State.STARTED)`. Это определяет точный и однозначный жизненный цикл подписки:
-    *   **Подписка создается и становится активной**: когда `Activity` переходит в состояние `STARTED` (сразу после вызова `onStart()`). Именно в этот момент `Activity` начинает слушать и обрабатывать сообщения.
-    *   **Подписка умирает (отменяется)**: когда `Activity` уходит с экрана и переходит в состояние `STOPPED` (сразу после вызова `onStop()`). Сбор сообщений полностью прекращается.
+*   **Шина событий (`UserNotifier`)**: Является синглтоном (`@Singleton`), поэтому живет на протяжении всего жизненного цикла приложения.
+*   **Подписчик (`ObserveNotifications`)**: Жизненный цикл подписки теперь полностью управляется Jetpack Compose:
+    *   **Подписка создается**: когда `ObserveNotifications` впервые добавляется в композицию (появляется на экране), `LaunchedEffect` запускает корутину, которая подписывается на `Flow` сообщений.
+    *   **Подписка отменяется**: когда `ObserveNotifications` удаляется из композиции (например, при переходе на другой экран или закрытии `Activity`), `LaunchedEffect` автоматически отменяет корутину, безопасно прекращая подписку.
 
-Диаграмма состояний ниже наглядно иллюстрирует жизненный цикл подписки в `Activity`. 
+Диаграмма состояний ниже иллюстрирует жизненный цикл подписки в `Composable`.
 
 ```plantuml
 @startuml
-title Жизненный цикл подписки в Activity
+title Жизненный цикл подписки в Composable
 hide empty description
 
 state "Подписка неактивна" as Inactive
 state "Подписка активна" as Active
 
-[*] --> Inactive : onCreate
-Inactive --> Active : onStart
-Active --> Inactive : onStop
+[*] --> Inactive : (Composable не в композиции)
+Inactive --> Active : (Composable входит в композицию)
+Active --> Inactive : (Composable покидает композицию)
 
-Active --> [*] : onDestroy
-Inactive --> [*] : onDestroy
+Active --> [*] : (Activity уничтожена)
+Inactive --> [*] : (Activity уничтожена)
 @enduml
 ```
 
-При возвращении пользователя в `Activity` (повторный вызов `onStart`), `repeatOnLifecycle` запускает блок с подпиской **заново**. Окончательно вся корутина, запущенная в `lifecycleScope`, отменяется при уничтожении `Activity` (после вызова `onDestroy`).
-
-Таким образом, мы имеем гарантию, что UI обновляется только тогда, когда он виден пользователю, что предотвращает бесполезную работу в фоновом режиме и ошибки, связанные с обновлением невидимого интерфейса.
+Таким образом, мы имеем гарантию, что UI обновляется только тогда, когда он виден пользователю, при этом вся логика инкапсулирована внутри `Composable`-компонентов, что соответствует современным практикам.
 
 ## 4. Критерии приемки
 
-- При подключении MIDI-клавиатуры на экране появляется Toast с сообщением, содержащим ее имя.
-- При отключении MIDI-клавиатуры на экране появляется Toast с сообщением "MIDI-клавиатура отключена".
+- При подключении MIDI-клавиатуры на экране появляется уведомление (Snackbar) с сообщением, содержащим ее имя.
+- При отключении MIDI-клавиатуры на экране появляется уведомление (Snackbar) с сообщением "MIDI-клавиатура отключена".
 
 ## См. также
 

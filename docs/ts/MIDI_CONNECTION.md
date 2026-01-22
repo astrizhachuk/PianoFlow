@@ -10,7 +10,6 @@
 
 - [Архитектурные принципы](../plans/ARCHITECTURE_PRINCIPLES.md)
 - [Сценарии: Отслеживание состояния и уведомления](../uc/MIDI_KEYBOARD_CONNECTION_STATE.md)
-- [Техническое задание: Реализация механизма уведомлений](./MIDI_NOTIFICATION.md)
 
 ## 2. Архитектурное решение
 
@@ -31,6 +30,7 @@
 
 **Presentation Layer**
 - **`MidiConnectionViewModel`:** `ViewModel`, которая подписывается на `Flow` из `UseCase` и инициирует отображение уведомлений.
+- **`MainActivity`:** Основная `Activity` приложения. Использует `setContent` для отображения `Composable`-иерархии, построенной на `Scaffold`, который управляет структурой экрана и содержит `SnackbarHost` для показа уведомлений.
 
 ```plantuml
 @startuml
@@ -42,7 +42,7 @@ System_Ext(android_sdk, "Android SDK", "Контекст и системные �
 
 Container_Boundary(presentation, "Presentation Layer") {
     Component(vm, "MidiConnectionViewModel", "ViewModel", "Подписывается на изменения и инициирует уведомления.")
-    Component(activity, "MainActivity", "UI", "Запускает ViewModel и отображает UI.")
+    Component(activity, "MainActivity", "UI Host", "Отображает Composable UI, построенный на Scaffold.")
 }
 
 Container_Boundary(domain, "Domain Layer") {
@@ -197,13 +197,14 @@ DataModule::provideMidiDataSource ..> MidiDataSource : <<@Provides>>
     *   `closeDevice()` закрывает соединение (`openedDevice.close()`), обнуляет ссылку и отправляет в `_connectionState` значение `ConnectionState.Disconnected`.
 
 5.  **Потребление состояния на уровне UI**:
-    *   **`MidiConnectionViewModel`**, чей жизненный цикл привязан к `Activity`, получает `Flow<ConnectionState>` из `domain`-слоя.
-    *   Она преобразует этот поток в `StateFlow`, который хранит последнее полученное состояние. Это позволяет `Activity` (или `Fragment`) подписываться на него и всегда иметь актуальные данные.
-    *   `ViewModel` следит за состоянием и реагирует на его изменения (например, вызывая `ShowConnectionNotificationUseCase` для отображения уведомлений) только тогда, когда UI (например, `Activity`) активен и подписывается на `StateFlow`. Сам `MidiDataSource` при этом продолжает работать в фоне.
+    *   **`MidiConnectionViewModel`**, чей жизненный цикл привязан к `Activity`, получает `Flow<ConnectionState>` из `domain`-слоя и с помощью `ShowConnectionNotificationUseCase` передает сообщения в `UserNotifier`.
+    *   **`MainActivity`** в `setContent` создает `Scaffold` со `SnackbarHostState`.
+    *   Внутри `Scaffold` вызывается `Composable`-функция-наблюдатель, которая использует `LaunchedEffect` для подписки на `Flow` сообщений из `UserNotifier`.
+    *   При поступлении нового сообщения оно отображается через `snackbarHostState.showSnackbar()`. Этот подход гарантирует, что подписка активна только тогда, когда UI виден, а `MidiDataSource` продолжает работать в фоновом режиме.
 
 ### 3.2. Сводная диаграмма взаимодействия
 
-Эта диаграмма объединяет все ключевые сценарии: инициализацию, подключение, отключение и обработку ошибок. Она показывает, как `MidiDataSource` реагирует на различные события и изменяет свое состояние, а также как `MidiConnectionViewModel` инициирует уведомления для пользователя.
+Эта диаграмма объединяет все ключевые сценарии: инициализацию, подключение, отключение и обработку ошибок. Она показывает, как `MidiDataSource` реагирует на различные события и изменяет свое состояние, а также как `MidiConnectionViewModel` инициирует уведомления, которые затем отображаются в Composable UI.
 
 ```plantuml
 @startuml
@@ -216,7 +217,7 @@ end box
 
 participant "MidiDataSource" as DS
 participant "MidiConnectionViewModel" as VM
-participant "UI (Activity)" as UI
+participant "UI (Composable)" as UI
 
 == Инициализация и подключение ==
 
@@ -229,7 +230,7 @@ alt MIDI API не поддерживается на устройстве
     
     DS -> VM : new ConnectionState.Error
     activate VM
-    VM -> UI : Показывает уведомление
+    VM -> UI : Отображает уведомление через State
     deactivate VM
 
 else Отсутствуют необходимые разрешения
@@ -242,7 +243,7 @@ else Отсутствуют необходимые разрешения
 
     DS -> VM : new ConnectionState.Error
     activate VM
-    VM -> UI : Показывает уведомление
+    VM -> UI : Отображает уведомление через State
     deactivate VM
 
 else Устройство уже подключено или подключается новое
@@ -275,7 +276,7 @@ else Устройство уже подключено или подключае�
             
             DS -> VM : new ConnectionState.Connected
             activate VM
-            VM -> UI : Показывает уведомление
+            VM -> UI : Отображает уведомление через State
             deactivate VM
             
         else Ошибка открытия устройства
@@ -286,7 +287,7 @@ else Устройство уже подключено или подключае�
             
             DS -> VM : new ConnectionState.Error
             activate VM
-            VM -> UI : Показывает уведомление
+            VM -> UI : Отображает уведомление через State
             deactivate VM
         end
         deactivate DS
@@ -312,7 +313,7 @@ alt Отключено активное устройство
 
     DS -> VM : new ConnectionState.Disconnected
     activate VM
-    VM -> UI : Показывает уведомление
+    VM -> UI : Отображает уведомление через State
     deactivate VM
 else Отключено другое устройство
     DS -> DS : (ничего не делает)
@@ -330,6 +331,6 @@ deactivate DS
 - При запуске на устройстве, не поддерживающем MIDI, пользователь видит уведомление: "MIDI API не поддерживается на этом устройстве".
 - В случае отсутствия у приложения необходимых разрешений пользователь видит уведомление: "Отсутствуют необходимые разрешения для работы с MIDI".
 - При сбое во время открытия соединения с конкретной клавиатурой пользователь видит уведомление: "Не удалось подключиться к устройству: [имя устройства]".
-- Логика отслеживания и уведомления корректно работает при перезапусках `Activity` (с учетом `stateIn` и `WhileSubscribed`).
+- Логика отслеживания и уведомления корректно работает при перезапусках `Activity`.
 
 ---
