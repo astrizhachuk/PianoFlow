@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
@@ -32,17 +33,28 @@ class PianoStaffViewModel @Inject constructor(
     val uiState: StateFlow<PianoStaffUiState> = _uiState.asStateFlow()
 
     init {
+        Timber.i("init: ViewModel created.")
         viewModelScope.launch {
             observeMidiMessagesUseCase().collect { notes ->
+                Timber.d("collect: Received ${notes.size} notes.")
                 val (bassNotes, trebleNotes) = notes.partition { it.pitch < 60 }
+                Timber.d("collect: Partitioned notes - Bass: ${bassNotes.size}, Treble: ${trebleNotes.size}")
 
                 _uiState.update {
+                    val newTrebleJson = trebleNotes.toVexflowJson()
+                    val newBassJson = bassNotes.toVexflowJson()
+                    Timber.d("collect: Updating UI state - Treble JSON: $newTrebleJson, Bass JSON: $newBassJson")
                     it.copy(
-                        trebleNotesJson = trebleNotes.toVexflowJson(),
-                        bassNotesJson = bassNotes.toVexflowJson()
+                        trebleNotesJson = newTrebleJson,
+                        bassNotesJson = newBassJson
                     )
                 }
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        Timber.i("onCleared: ViewModel destroyed.")
     }
 }

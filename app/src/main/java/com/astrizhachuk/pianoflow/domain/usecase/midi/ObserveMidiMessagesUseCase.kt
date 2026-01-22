@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
@@ -26,24 +27,29 @@ class ObserveMidiMessagesUseCase @Inject constructor(
      * @return [Flow], который порождает списки нот ([List]<[Note]>).
      */
     operator fun invoke(): Flow<List<Note>> = channelFlow {
+        Timber.i("invoke: Starting to observe MIDI messages.")
         val notesBuffer = mutableListOf<Note>()
         var flushJob: Job? = null
 
         midiRepository.observeNotes().collect { note ->
+            Timber.d("collect: Received note: $note")
             // Если предыдущая задача отсутствует (null) или уже завершена,
             // это означает начало нового музыкального события.
             if (flushJob?.isCompleted ?: true) {
+                Timber.d("collect: New musical event started, clearing buffer.")
                 notesBuffer.clear()
             }
 
             // Отменяем любую ожидающую отправку, чтобы расширить временное окно для аккорда.
             flushJob?.cancel()
+            Timber.d("collect: Canceled previous flush job.")
 
             notesBuffer.add(note)
 
             // Запускаем новую отложенную задачу по отправке сгруппированных нот.
             flushJob = launch {
                 delay(CHORD_WINDOW_MS)
+                Timber.d("flushJob: Timer elapsed. Sending ${notesBuffer.size} notes.")
                 send(notesBuffer.toList())
             }
         }
