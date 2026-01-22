@@ -7,20 +7,24 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
-import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.PianoStaffScreen
+import com.astrizhachuk.pianoflow.presentation.model.UserMessage
 import com.astrizhachuk.pianoflow.presentation.service.UserNotifier
+import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.PianoStaffScreen
 import com.astrizhachuk.pianoflow.presentation.viewmodel.midi.MidiConnectionViewModel
-import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -36,19 +40,25 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        observeConnectionState()
+
         setContent {
+            val snackbarHostState = remember { SnackbarHostState() }
+
             MaterialTheme {
-                Surface(
+                Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    PianoStaffScreen()
+                    snackbarHost = { SnackbarHost(snackbarHostState) }
+                ) { innerPadding ->
+                    PianoStaffScreen(modifier = Modifier.padding(innerPadding))
+
+                    ObserveNotifications(
+                        messages = userNotifier.messages,
+                        snackbarHostState = snackbarHostState
+                    )
                 }
             }
         }
-
-        observeConnectionState()
-        observeNotifications(findViewById<android.view.View>(android.R.id.content))
     }
 
     /**
@@ -59,16 +69,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Подписывается на UI-уведомления от [UserNotifier] и отображает их в виде Snackbar.
-     * Сбор данных происходит только когда Activity находится в состоянии STARTED или выше,
-     * что предотвращает работу в фоновом режиме.
+     * Composable-функция, которая подписывается на UI-уведомления и отображает их в виде Snackbar.
+     * Логика подписки инкапсулирована внутри Jetpack Compose с помощью LaunchedEffect.
      */
-    private fun observeNotifications(view: android.view.View) {
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                userNotifier.messages.collectLatest { message ->
-                    Snackbar.make(view, message.text, Snackbar.LENGTH_SHORT).show()
-                }
+    @Composable
+    private fun ObserveNotifications(
+        messages: Flow<UserMessage>,
+        snackbarHostState: SnackbarHostState
+    ) {
+        LaunchedEffect(messages, snackbarHostState) {
+            messages.collectLatest { message ->
+                snackbarHostState.showSnackbar(message = message.text)
             }
         }
     }

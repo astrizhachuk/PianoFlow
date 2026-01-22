@@ -18,19 +18,20 @@ import com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffVi
  * Этот экран отслеживает состояние UI из [PianoStaffViewModel], чтобы получить ноты для отображения.
  * Он центрирует компоненту [PianoStaff], которая отвечает за отрисовку самого нотного стана и нот.
  *
+ * @param modifier Модификатор, применяемый к корневому контейнеру.
  * @param viewModel Экземпляр [PianoStaffViewModel], обычно предоставляемый через Hilt, который
  * поставляет состояние UI, включая JSON-представления нот для скрипичного и басового ключей.
  */
 @Composable
 fun PianoStaffScreen(
+    modifier: Modifier = Modifier,
     viewModel: PianoStaffViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 32.dp, vertical = 32.dp),
+        modifier = modifier
+            .fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         PianoStaff(
