@@ -67,7 +67,7 @@ class MidiConnectionViewModelTest {
         viewModel.connectionState.test {
             // Assert initial state
             assertEquals(ConnectionState.NoDevice, awaitItem())
-            
+
             // Act
             connectionStateFlow.emit(connectedState)
 
@@ -91,7 +91,7 @@ class MidiConnectionViewModelTest {
 
             // Act
             connectionStateFlow.emit(disconnectedState)
-            
+
             // Assert state update
             assertEquals(disconnectedState, awaitItem())
 
@@ -113,13 +113,13 @@ class MidiConnectionViewModelTest {
 
         viewModel.connectionState.test {
             awaitItem() // Initial state
-            
+
             // Act
             connectionStateFlow.emit(ConnectionState.Disconnected)
-            
+
             // Wait for state change
             awaitItem()
-            
+
             // Assert side-effect
             coVerify { userNotifier.sendMessage(testMessage) }
         }
@@ -159,7 +159,7 @@ class MidiConnectionViewModelTest {
             connectionStateFlow.emit(finalState)
             assertEquals(finalState, awaitItem())
         }
-        
+
         // Assert side-effects
         coVerify(exactly = 3) { showConnectionNotificationUseCase(any()) }
     }
@@ -183,7 +183,7 @@ class MidiConnectionViewModelTest {
 
             // Act again with the same state
             connectionStateFlow.emit(disconnectedState)
-            
+
             // Since StateFlow is distinct, no new item should be emitted
             // We can ensure channel is empty before cancelling
             expectNoEvents()
@@ -214,7 +214,7 @@ class MidiConnectionViewModelTest {
             // Act
             errorFlow.emit(connectedState)
             assertEquals(connectedState, awaitItem())
-            
+
             errorFlow.emit(errorState)
             assertEquals(errorState, awaitItem())
         }

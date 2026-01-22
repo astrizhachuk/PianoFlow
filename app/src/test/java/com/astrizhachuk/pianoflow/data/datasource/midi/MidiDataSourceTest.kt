@@ -40,7 +40,7 @@ import org.robolectric.annotation.Config
 import com.astrizhachuk.pianoflow.domain.model.MidiDevice as MidiDeviceDomain
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [23, 33])
+@Config(sdk = [23, Build.VERSION_CODES.TIRAMISU])
 class MidiDataSourceTest {
 
     @get:Rule
