@@ -4,12 +4,12 @@ import android.media.midi.MidiDeviceInfo
 import com.astrizhachuk.pianoflow.domain.model.MidiDevice
 
 /**
- * Интерфейс для маппинга моделей данных MIDI.
- * Определяет контракт для преобразования DTO из слоя данных в доменные модели.
+ * Interface for mapping MIDI data models.
+ * Defines the contract for converting DTOs from the data layer to domain models.
  */
 interface MidiDeviceMapper {
     /**
-     * Преобразует [MidiDeviceInfo] из слоя данных в [MidiDevice] доменного слоя.
+     * Converts [MidiDeviceInfo] from the data layer to [MidiDevice] of the domain layer.
      */
     fun toDomain(deviceInfo: MidiDeviceInfo): MidiDevice
 }

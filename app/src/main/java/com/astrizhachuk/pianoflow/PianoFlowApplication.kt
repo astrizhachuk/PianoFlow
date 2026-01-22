@@ -8,7 +8,7 @@ import timber.log.Timber
 import com.astrizhachuk.pianoflow.BuildConfig
 
 /**
- * Application класс для инициализации Hilt.
+ * Application class for Hilt initialization.
  */
 @HiltAndroidApp
 class PianoFlowApplication : Application() {

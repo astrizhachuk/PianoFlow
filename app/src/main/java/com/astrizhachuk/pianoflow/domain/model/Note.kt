@@ -1,9 +1,9 @@
 package com.astrizhachuk.pianoflow.domain.model
 
 /**
- * Доменная модель, представляющая одну MIDI-ноту.
+ * Domain model representing a single MIDI note.
  *
- * @param pitch MIDI-номер ноты (от 0 до 127).
+ * @param pitch MIDI note number (from 0 to 127).
  */
 data class Note(
     val pitch: Int

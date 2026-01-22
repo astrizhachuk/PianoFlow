@@ -8,10 +8,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
 /**
- * Use case, который преобразует состояние подключения [ConnectionState] в сообщение [UserMessage] для пользователя.
+ * Use case that converts the connection state [ConnectionState] into a [UserMessage] for the user.
  *
- * Инкапсулирует бизнес-логику определения, какой именно текст сообщения должен быть показан
- * для каждого конкретного состояния подключения MIDI-устройства.
+ * Encapsulates the business logic of determining which message text should be displayed
+ * for each specific state of the MIDI device connection.
  */
 class ShowConnectionNotificationUseCase @Inject constructor(
     @ApplicationContext private val context: Context

@@ -12,20 +12,20 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * Use case для наблюдения за входящими MIDI-сообщениями.
+ * Use case for observing incoming MIDI messages.
  *
- * Он получает поток отдельных нот от [MidiRepository] и группирует их в списки (аккорды).
- * Группировка происходит на основе временной близости: ноты, пришедшие в течение
- * короткого промежутка времени, считаются частью одного аккорда.
+ * It receives a stream of individual notes from the [MidiRepository] and groups them into lists (chords).
+ * The grouping is based on temporal proximity: notes that arrive within a short
+ * period of time are considered part of the same chord.
  *
- * Каждая новая эмиссия из этого use case представляет собой полный набор нот (аккорд),
- * который должен быть отображен на экране, заменяя предыдущий.
+ * Each new emission from this use case represents a complete set of notes (a chord)
+ * that should be displayed on the screen, replacing the previous one.
  */
 class ObserveMidiMessagesUseCase @Inject constructor(
     private val midiRepository: MidiRepository
 ) {
     /**
-     * @return [Flow], который порождает списки нот ([List]<[Note]>).
+     * @return A [Flow] that emits lists of notes ([List]<[Note]>).
      */
     operator fun invoke(): Flow<List<Note>> = channelFlow {
         trace("ObserveMidiMessagesUseCase.invoke") {
@@ -35,20 +35,20 @@ class ObserveMidiMessagesUseCase @Inject constructor(
 
             midiRepository.observeNotes().collect { note ->
                 Timber.d("collect: Received note: $note")
-                // Если предыдущая задача отсутствует (null) или уже завершена,
-                // это означает начало нового музыкального события.
+                // If the previous job is null or has already completed,
+                // it means a new musical event has started.
                 if (flushJob?.isCompleted ?: true) {
                     Timber.d("collect: New musical event started, clearing buffer.")
                     notesBuffer.clear()
                 }
 
-                // Отменяем любую ожидающую отправку, чтобы расширить временное окно для аккорда.
+                // Cancel any pending send to extend the time window for the chord.
                 flushJob?.cancel()
                 Timber.d("collect: Canceled previous flush job.")
 
                 notesBuffer.add(note)
 
-                // Запускаем новую отложенную задачу по отправке сгруппированных нот.
+                // Start a new delayed task to send the grouped notes.
                 flushJob = launch {
                     delay(CHORD_WINDOW_MS)
                     Timber.d("flushJob: Timer elapsed. Sending ${notesBuffer.size} notes.")
@@ -60,10 +60,10 @@ class ObserveMidiMessagesUseCase @Inject constructor(
 
     private companion object {
         /**
-         * Временное окно в миллисекундах для группировки нот в аккорд.
-         * Если ноты приходят в течение этого времени, они считаются частью одного аккорда.
-         * Значение 50 мс является компромиссом между отзывчивостью и точностью
-         * определения аккордов, сыгранных не идеально одновременно (арпеджиато).
+         * Time window in milliseconds for grouping notes into a chord.
+         * If notes arrive within this time, they are considered part of the same chord.
+         * A value of 50 ms is a compromise between responsiveness and accuracy
+         * in detecting chords that are not played perfectly simultaneously (arpeggiato).
          */
         const val CHORD_WINDOW_MS = 50L
     }

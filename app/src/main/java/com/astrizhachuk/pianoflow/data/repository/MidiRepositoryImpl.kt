@@ -8,14 +8,14 @@ import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 /**
- * Конкретная реализация интерфейса [MidiRepository].
+ * Concrete implementation of the [MidiRepository] interface.
  *
- * Этот класс служит единым источником истины для MIDI-данных, делегируя вызовы
- * к базовому [MidiDataSource]. Он абстрагирует реализацию источника данных
- * от доменного слоя, предоставляя чистый API для наблюдения за состоянием MIDI-соединения
- * и входящими событиями нот.
+ * This class serves as the single source of truth for MIDI data, delegating calls
+ * to the underlying [MidiDataSource]. It abstracts the data source implementation
+ * from the domain layer, providing a clean API for observing the state of the MIDI connection
+ * and incoming note events.
  *
- * @param midiDataSource Источник данных, отвечающий за обработку необработанной MIDI-связи.
+ * @param midiDataSource The data source responsible for handling raw MIDI communication.
  */
 class MidiRepositoryImpl @Inject constructor(
     private val midiDataSource: MidiDataSource

@@ -1,38 +1,38 @@
 package com.astrizhachuk.pianoflow.domain.model
 
 /**
- * Представляет различные состояния подключения MIDI-устройства.
+ * Represents the various states of a MIDI device connection.
  *
- * Этот запечатанный интерфейс используется для моделирования различных
- * возможных исходов при попытке подключения или взаимодействия с MIDI-устройством.
+ * This sealed interface is used to model the different
+ * possible outcomes when attempting to connect to or interact with a MIDI device.
  */
 sealed interface ConnectionState {
     /**
-     * Указывает на успешное подключение к MIDI-устройству.
+     * Indicates a successful connection to a MIDI device.
      *
-     * @property device Информация о подключенном устройстве.
+     * @property device Information about the connected device.
      */
     data class Connected(val device: MidiDevice) : ConnectionState
 
     /**
-     * Указывает, что MIDI-устройство было отключено.
+     * Indicates that the MIDI device has been disconnected.
      *
-     * Это состояние наступает, когда активное соединение было прервано.
+     * This state occurs when an active connection has been terminated.
      */
     data object Disconnected : ConnectionState
 
     /**
-     * Указывает на возникновение ошибки в процессе подключения или взаимодействия.
+     * Indicates that an error occurred during the connection or interaction process.
      *
-     * @property message Сообщение, описывающее ошибку.
+     * @property message A message describing the error.
      */
     data class Error(val message: String) : ConnectionState
 
     /**
-     * Указывает на отсутствие доступных для подключения MIDI-устройств.
+     * Indicates that there are no available MIDI devices to connect to.
      *
-     * Это начальное состояние или состояние, когда все устройства были отключены
-     * и новых не найдено.
+     * This is the initial state or the state when all devices have been disconnected
+     * and no new ones have been found.
      */
     data object NoDevice : ConnectionState
 }

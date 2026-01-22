@@ -16,23 +16,23 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Hilt-модуль, отвечающий за предоставление зависимостей, связанных со слоем данных.
+ * Hilt module responsible for providing dependencies related to the data layer.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class DataModule {
 
     /**
-     * Связывает интерфейс [MidiRepository], определенный в доменном слое,
-     * с его конкретной реализацией [MidiRepositoryImpl] из слоя данных.
+     * Binds the [MidiRepository] interface, defined in the domain layer,
+     * to its concrete implementation [MidiRepositoryImpl] from the data layer.
      */
     @Binds
     @Suppress("unused")
     abstract fun bindMidiRepository(impl: MidiRepositoryImpl): MidiRepository
 
     /**
-     * Связывает интерфейс [MidiDeviceMapper], определенный в доменном слое,
-     * с его конкретной реализацией [MidiDeviceMapperImpl] из слоя данных.
+     * Binds the [MidiDeviceMapper] interface, defined in the domain layer,
+     * to its concrete implementation [MidiDeviceMapperImpl] from the data layer.
      */
     @Binds
     @Suppress("unused")
@@ -40,8 +40,8 @@ abstract class DataModule {
 
     companion object {
         /**
-         * Предоставляет [MidiDataSource] как синглтон. Этот источник данных является
-         * основной точкой взаимодействия с Android MIDI API.
+         * Provides [MidiDataSource] as a singleton. This data source is the
+         * main point of interaction with the Android MIDI API.
          */
         @Provides
         @Singleton
@@ -54,7 +54,7 @@ abstract class DataModule {
         }
 
         /**
-         * Предоставляет [MidiMessageParser] как синглтон.
+         * Provides [MidiMessageParser] as a singleton.
          */
         @Provides
         @Singleton

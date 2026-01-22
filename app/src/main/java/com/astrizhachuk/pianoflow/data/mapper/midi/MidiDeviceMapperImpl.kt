@@ -6,29 +6,29 @@ import com.astrizhachuk.pianoflow.domain.model.MidiDevice
 import javax.inject.Inject
 
 /**
- * Реализация интерфейса [MidiDeviceMapper], отвечающая за преобразование данных
- * из слоя данных (Data) в доменный слой (Domain).
+ * Implementation of the [MidiDeviceMapper] interface, responsible for converting data
+ * from the data layer to the domain layer.
  *
- * Основная задача этого класса — преобразовать системную модель [MidiDeviceInfo],
- * специфичную для Android MIDI API, в чистую доменную модель [MidiDevice],
- * которая не зависит от каких-либо фреймворков.
+ * The main task of this class is to convert the system model [MidiDeviceInfo],
+ * specific to the Android MIDI API, into a clean domain model [MidiDevice],
+ * which does not depend on any frameworks.
  */
 class MidiDeviceMapperImpl @Inject constructor() : MidiDeviceMapper {
 
     /**
-     * Преобразует объект [MidiDeviceInfo] из Android MIDI API в доменную модель [MidiDevice].
+     * Converts a [MidiDeviceInfo] object from the Android MIDI API to the domain model [MidiDevice].
      *
-     * Извлекает ключевые свойства из `Bundle`, содержащегося в [MidiDeviceInfo]:
-     * - Имя устройства из [MidiDeviceInfo.PROPERTY_NAME]. Для USB-устройств: имя производителя + имя продукта.
-     * - Имя производителя из [MidiDeviceInfo.PROPERTY_MANUFACTURER].
-     * - Имя продукта из [MidiDeviceInfo.PROPERTY_PRODUCT].
+     * Extracts key properties from the `Bundle` contained in [MidiDeviceInfo]:
+     * - Device name from [MidiDeviceInfo.PROPERTY_NAME]. For USB devices: manufacturer name + product name.
+     * - Manufacturer name from [MidiDeviceInfo.PROPERTY_MANUFACTURER].
+     * - Product name from [MidiDeviceInfo.PROPERTY_PRODUCT].
      *
-     * Если какое-либо из этих свойств отсутствует или равно `null`, метод подставляет
-     * пустую строку `""` в качестве значения по умолчанию, обеспечивая стабильность
-     * и предсказуемость доменной модели.
+     * If any of these properties are missing or `null`, the method substitutes
+     * an empty string `""` as the default value, ensuring the stability
+     * and predictability of the domain model.
      *
-     * @param deviceInfo Системный объект с информацией о MIDI-устройстве.
-     * @return Объект доменной модели [MidiDevice], готовый для использования в бизнес-логике.
+     * @param deviceInfo System object with information about the MIDI device.
+     * @return A [MidiDevice] domain model object, ready for use in business logic.
      */
     override fun toDomain(deviceInfo: MidiDeviceInfo): MidiDevice {
         val properties = deviceInfo.properties

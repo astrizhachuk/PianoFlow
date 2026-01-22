@@ -4,16 +4,16 @@ import android.util.Log
 import timber.log.Timber
 
 /**
- * Дерево Timber для отправки отчетов о сбоях и логирования ошибок в release-сборках.
- * В реальном приложении это должно быть интегрировано с сервисом для сбора отчетов о сбоях,
- * например, с Firebase Crashlytics.
+ * A Timber tree for sending crash reports and logging errors in release builds.
+ * In a real application, this should be integrated with a crash reporting service,
+ * for example, Firebase Crashlytics.
  */
 class CrashReportingTree : Timber.Tree() {
 
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
         if (priority == Log.ERROR || priority == Log.WARN) {
-            // В реальном приложении здесь будет логика отправки в сервис для сбора отчетов о сбоях.
-            // Например, с Crashlytics:
+            // In a real application, there would be logic here for sending to a crash reporting service.
+            // For example, with Crashlytics:
             // FirebaseCrashlytics.getInstance().recordException(t ?: Exception(message))
         }
     }

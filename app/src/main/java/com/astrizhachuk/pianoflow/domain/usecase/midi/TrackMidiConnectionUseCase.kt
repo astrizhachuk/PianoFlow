@@ -4,10 +4,10 @@ import com.astrizhachuk.pianoflow.domain.repository.MidiRepository
 import javax.inject.Inject
 
 /**
- * Use case, который предоставляет поток данных о состоянии подключения MIDI-устройства.
+ * Use case that provides a data stream of the MIDI device connection state.
  *
- * Этот класс служит мостом между слоем данных ([MidiRepository]) и слоем представления (ViewModel),
- * предоставляя простой и изолированный способ для наблюдения за состоянием подключения.
+ * This class serves as a bridge between the data layer ([MidiRepository]) and the presentation layer (ViewModel),
+ * providing a simple and isolated way to observe the connection state.
  */
 class TrackMidiConnectionUseCase @Inject constructor(
     private val midiRepository: MidiRepository

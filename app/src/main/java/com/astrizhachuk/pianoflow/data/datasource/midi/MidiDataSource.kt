@@ -23,19 +23,19 @@ import javax.inject.Inject
 import android.media.midi.MidiDevice as MidiDeviceApi
 
 /**
- * Источник данных, инкапсулирующий всю логику работы с Android MIDI API.
+ * Data source that encapsulates all the logic for working with the Android MIDI API.
  *
- * Этот класс отвечает за:
- * - Регистрацию и отмену регистрации обратных вызовов для отслеживания подключения/отключения MIDI-устройств.
- * - Открытие и закрытие соединения с MIDI-устройствами.
- * - Предоставление состояния подключения в виде `Flow` для остальной части приложения.
+ * This class is responsible for:
+ * - Registering and unregistering callbacks to track the connection/disconnection of MIDI devices.
+ * - Opening and closing connections to MIDI devices.
+ * - Providing the connection state as a `Flow` to the rest of the application.
  *
- * Является классом-одиночкой (@Singleton), так как должен существовать в единственном экземпляре на протяжении
- * всего жизненного цикла приложения, чтобы непрерывно отслеживать состояние MIDI-устройств.
+ * It is a singleton class (@Singleton) as it must exist as a single instance throughout
+ * the entire application lifecycle to continuously monitor the state of MIDI devices.
  *
- * @param context Контекст приложения, необходимый для доступа к системным сервисам, таким как [MidiManager].
- * @param midiDeviceMapper Преобразователь для преобразования системной модели [MidiDeviceInfo] в доменную модель.
- * @param midiMessageParser Парсер для извлечения данных из MIDI-сообщений.
+ * @param context The application context, necessary for accessing system services like [MidiManager].
+ * @param midiDeviceMapper A mapper for converting the system model [MidiDeviceInfo] to the domain model.
+ * @param midiMessageParser A parser for extracting data from MIDI messages.
  */
 class MidiDataSource @Inject constructor(
     private val context: Context,
@@ -50,29 +50,29 @@ class MidiDataSource @Inject constructor(
     private val _notes = MutableSharedFlow<Note>(extraBufferCapacity = 64)
 
     /**
-     * Публичный поток (Flow), представляющий текущее состояние подключения MIDI-устройства.
+     * Public flow representing the current state of the MIDI device connection.
      *
-     * Подписчики могут отслеживать изменения и реагировать на состояния:
-     * - [ConnectionState.NoDevice]: Устройства не найдены.
-     * - [ConnectionState.Connected]: Устройство успешно подключено.
-     * - [ConnectionState.Disconnected]: Устройство было отключено.
-     * - [ConnectionState.Error]: Произошла ошибка.
+     * Subscribers can track changes and react to states:
+     * - [ConnectionState.NoDevice]: No devices found.
+     * - [ConnectionState.Connected]: The device is successfully connected.
+     * - [ConnectionState.Disconnected]: The device has been disconnected.
+     * - [ConnectionState.Error]: An error has occurred.
      */
     val connectionState = _connectionState.asStateFlow()
 
     /**
-     * Публичный поток принятых MIDI нот.
+     * Public flow of received MIDI notes.
      */
     val notes = _notes.asSharedFlow()
 
     /**
-     * Обратный вызов для системного [MidiManager], который отслеживает физическое
-     * подключение и отключение MIDI-устройств к Android-устройству.
+     * A callback for the system [MidiManager] that tracks the physical
+     * connection and disconnection of MIDI devices to the Android device.
      */
     private val deviceCallback = object : MidiManager.DeviceCallback() {
         /**
-         * Вызывается системой при подключении нового MIDI-устройства.
-         * Запускает процесс поиска и открытия первого доступного устройства.
+         * Called by the system when a new MIDI device is connected.
+         * Starts the process of finding and opening the first available device.
          */
         override fun onDeviceAdded(device: MidiDeviceInfo) {
             Timber.i("onDeviceAdded: Device detected: %s", device.deviceName(context))
@@ -80,8 +80,8 @@ class MidiDataSource @Inject constructor(
         }
 
         /**
-         * Вызывается системой при отключении MIDI-устройства.
-         * Если отключенное устройство является текущим открытым устройством, закрывает его.
+         * Called by the system when a MIDI device is disconnected.
+         * If the disconnected device is the currently open device, it closes it.
          */
         override fun onDeviceRemoved(device: MidiDeviceInfo) {
             Timber.w("onDeviceRemoved: Device disconnected: %s", device.deviceName(context))
@@ -124,13 +124,13 @@ class MidiDataSource @Inject constructor(
     }
 
     /**
-     * Полностью освобождает все ресурсы, используемые [MidiDataSource].
-     * Отменяет регистрацию обратного вызова и закрывает открытое устройство.
+     * Completely releases all resources used by [MidiDataSource].
+     * Unregisters the callback and closes the open device.
      *
-     * В текущей архитектуре, где [MidiDataSource] является классом-одиночкой (@Singleton),
-     * этот метод не вызывается в обычном потоке работы приложения. Однако он предоставляет
-     * необходимый механизм для явного управления ресурсами в случаях, когда
-     * жизненным циклом этого компонента требуется управлять вручную.
+     * In the current architecture, where [MidiDataSource] is a singleton class (@Singleton),
+     * this method is not called in the normal application workflow. However, it provides
+     * the necessary mechanism for explicit resource management in cases where
+     * the lifecycle of this component needs to be managed manually.
      */
     @Suppress("unused")
     fun close() {
@@ -140,9 +140,9 @@ class MidiDataSource @Inject constructor(
     }
 
     /**
-     * Ищет первое доступное MIDI-устройство в системе и инициирует его открытие.
-     * Если устройства не найдены, устанавливает состояние в [ConnectionState.NoDevice].
-     * Безопасно обрабатывает SecurityException, если у приложения нет разрешений.
+     * Finds the first available MIDI device in the system and initiates its opening.
+     * If no devices are found, sets the state to [ConnectionState.NoDevice].
+     * Safely handles SecurityException if the application does not have permissions.
      */
     private fun openFirstAvailableDevice() {
         Timber.d("openFirstAvailableDevice: Looking for devices.")
@@ -162,11 +162,11 @@ class MidiDataSource @Inject constructor(
     }
 
     /**
-     * Открывает соединение с указанным MIDI-устройством.
-     * Перед открытием нового устройства закрывает любое ранее открытое.
-     * Обрабатывает результат асинхронного вызова [MidiManager.openDevice].
+     * Opens a connection to the specified MIDI device.
+     * Before opening a new device, it closes any previously opened one.
+     * Handles the result of the asynchronous call to [MidiManager.openDevice].
      *
-     * @param deviceInfo Информация о MIDI-устройстве, которое необходимо открыть.
+     * @param deviceInfo Information about the MIDI device to be opened.
      */
     private fun openDevice(deviceInfo: MidiDeviceInfo) {
         Timber.i("openDevice: Opening device: %s", deviceInfo.deviceName(context))
@@ -192,14 +192,14 @@ class MidiDataSource @Inject constructor(
     }
 
     /**
-     * Находит и настраивает выходной порт для получения MIDI-данных с устройства.
+     * Finds and configures an output port to receive MIDI data from the device.
      *
-     * В контексте Android MIDI API, "выходной" порт устройства — это порт, из которого
-     * приложение может *читать* данные (т.е. устройство "выводит" данные в приложение).
-     * Этот метод находит первый доступный порт типа [MidiDeviceInfo.PortInfo.TYPE_OUTPUT],
-     * открывает его и подключает к нему [midiMessageReceiver] для прослушивания входящих MIDI-сообщений.
+     * In the context of the Android MIDI API, a device's "output" port is the port from which
+     * the application can *read* data (i.e., the device "outputs" data to the application).
+     * This method finds the first available port of type [MidiDeviceInfo.PortInfo.TYPE_OUTPUT],
+     * opens it, and connects [midiMessageReceiver] to it to listen for incoming MIDI messages.
      *
-     * @param device Открытое MIDI-устройство ([MidiDeviceApi]), для которого нужно настроить порт.
+     * @param device The opened MIDI device ([MidiDeviceApi]) for which the port needs to be configured.
      */
     private fun setupOutputPort(device: MidiDeviceApi) {
         val portInfo = device.info.ports.firstOrNull { it.type == MidiDeviceInfo.PortInfo.TYPE_OUTPUT }
@@ -213,8 +213,8 @@ class MidiDataSource @Inject constructor(
     }
 
     /**
-     * Корректно закрывает текущее открытое MIDI-устройство, освобождает ресурсы
-     * и обновляет состояние подключения на [ConnectionState.Disconnected].
+     * Correctly closes the currently open MIDI device, releases resources,
+     * and updates the connection state to [ConnectionState.Disconnected].
      */
     private fun closeDevice() {
         openedDevice?.also {
@@ -228,10 +228,10 @@ class MidiDataSource @Inject constructor(
     }
 
     /**
-     * Проверяет, является ли предоставленное устройство [device] текущим открытым устройством.
+     * Checks if the provided [device] is the currently open device.
      *
-     * @param device Устройство для проверки.
-     * @return `true`, если ID предоставленного устройства совпадает с ID текущего открытого устройства, иначе `false`.
+     * @param device The device to check.
+     * @return `true` if the ID of the provided device matches the ID of the currently open device, otherwise `false`.
      */
     private fun isCurrentDevice(device: MidiDeviceInfo): Boolean {
         return openedDevice?.info?.id == device.id
@@ -239,17 +239,17 @@ class MidiDataSource @Inject constructor(
 }
 
 /**
- * Регистрирует обратный вызов для отслеживания MIDI-устройств,
- * используя подходящий API в зависимости от версии Android и обеспечивая выполнение в одном потоке.
+ * Registers a callback to track MIDI devices,
+ * using the appropriate API depending on the Android version and ensuring execution on a single thread.
  *
- * Для Android 13 (API 33) и выше используется [MidiManager.registerDeviceCallback]
- * с указанием транспорта [MidiManager.TRANSPORT_MIDI_BYTE_STREAM]. Предоставленный [handler]
- * адаптируется в `Executor` для выполнения колбэка в нужном потоке.
- * Для более старых версий используется устаревший метод [MidiManager.registerDeviceCallback],
- * которому [handler] передается напрямую.
+ * For Android 13 (API 33) and higher, [MidiManager.registerDeviceCallback] is used
+ * specifying the [MidiManager.TRANSPORT_MIDI_BYTE_STREAM] transport. The provided [handler]
+ * is adapted into an `Executor` to execute the callback on the correct thread.
+ * For older versions, the deprecated [MidiManager.registerDeviceCallback] method is used,
+ * to which the [handler] is passed directly.
  *
- * @param callback Обратный вызов для событий устройств.
- * @param handler Handler, в потоке которого будут выполняться обратные вызовы.
+ * @param callback The callback for device events.
+ * @param handler The Handler on whose thread the callbacks will be executed.
  */
 private fun MidiManager.registerDeviceCallbackCompat(
     callback: MidiManager.DeviceCallback,
@@ -268,11 +268,11 @@ private fun MidiManager.registerDeviceCallbackCompat(
 }
 
 /**
- * Возвращает первое доступное MIDI-устройство, используя подходящий API в зависимости от версии Android.
+ * Returns the first available MIDI device, using the appropriate API depending on the Android version.
  *
- * Для Android 13 (API 33) и выше используется [MidiManager.getDevicesForTransport]
- * для получения устройств, подключенных через [MidiManager.TRANSPORT_MIDI_BYTE_STREAM].
- * Для более старых версий используется устаревший метод [MidiManager.getDevices].
+ * For Android 13 (API 33) and higher, [MidiManager.getDevicesForTransport] is used
+ * to get devices connected via [MidiManager.TRANSPORT_MIDI_BYTE_STREAM].
+ * For older versions, the deprecated [MidiManager.getDevices] method is used.
  */
 private fun MidiManager.getFirstAvailableDevice(): MidiDeviceInfo? {
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -284,9 +284,9 @@ private fun MidiManager.getFirstAvailableDevice(): MidiDeviceInfo? {
 }
 
 /**
- * Вспомогательное свойство-расширение для безопасного получения имени [MidiDeviceInfo].
+ * Helper extension property to safely get the name of a [MidiDeviceInfo].
  *
- * Возвращает имя устройства из его свойств или `context.getString(R.string.midi_unknown_device)`, если имя отсутствует.
+ * Returns the device name from its properties, or `context.getString(R.string.midi_unknown_device)` if the name is missing.
  */
 private fun MidiDeviceInfo.deviceName(context: Context): String {
     return properties.getString(MidiDeviceInfo.PROPERTY_NAME)
