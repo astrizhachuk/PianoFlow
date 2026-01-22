@@ -14,6 +14,7 @@ import com.astrizhachuk.pianoflow.data.datasource.midi.MidiMessageParser
 import com.astrizhachuk.pianoflow.data.mapper.midi.MidiDeviceMapperImpl
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
 import com.astrizhachuk.pianoflow.domain.model.Note
+import io.mockk.CapturingSlot
 import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
@@ -35,38 +36,21 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [Build.VERSION_CODES.TIRAMISU])
 class MidiRepositoryImplTest {
 
     @get:Rule
     val mockkRule = MockKRule(this)
 
-    private lateinit var repository: MidiRepositoryImpl
-    private lateinit var context: Context
-    private lateinit var mapper: MidiDeviceMapperImpl
-
     @RelaxedMockK
     private lateinit var midiDataSource: MidiDataSource
-    @RelaxedMockK
-    private lateinit var midiManager: MidiManager
-    @RelaxedMockK
-    private lateinit var midiMessageParser: MidiMessageParser
+
+    private lateinit var repository: MidiRepositoryImpl
 
     @Before
     fun setup() {
-        // --- Integration Test Setup ---
-        context = RuntimeEnvironment.getApplication()
-        shadowOf(context.applicationContext as Application).setSystemService(Context.MIDI_SERVICE, midiManager)
-        mapper = MidiDeviceMapperImpl()
-        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
-
-        // --- Unit Test Setup ---
         repository = MidiRepositoryImpl(midiDataSource)
     }
-    
-    // --- Unit Test ---
-    
+
     @Test
     fun `observeConnectionState should proxy call to data source`() = runTest {
         // Arrange
@@ -94,18 +78,58 @@ class MidiRepositoryImplTest {
         // Assert
         assertEquals(expectedNote, actualNote)
     }
+}
 
-    // --- Integration Tests ---
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [23, Build.VERSION_CODES.TIRAMISU])
+class MidiRepositoryImplIntegrationTest {
+
+    @get:Rule
+    val mockkRule = MockKRule(this)
+
+    private lateinit var context: Context
+    private lateinit var mapper: MidiDeviceMapperImpl
+
+    @RelaxedMockK
+    private lateinit var midiManager: MidiManager
+    @RelaxedMockK
+    private lateinit var midiMessageParser: MidiMessageParser
+
+    @Before
+    fun setup() {
+        context = RuntimeEnvironment.getApplication()
+        shadowOf(context.applicationContext as Application).setSystemService(Context.MIDI_SERVICE, midiManager)
+        mapper = MidiDeviceMapperImpl()
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_MIDI, true)
+    }
 
     private fun createRepository(): MidiRepositoryImpl {
         val dataSource = MidiDataSource(context, mapper, midiMessageParser)
         return MidiRepositoryImpl(dataSource)
     }
 
+    private fun MidiManager.setupMockDevices(devices: Array<MidiDeviceInfo>) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            every { getDevicesForTransport(MidiManager.TRANSPORT_MIDI_BYTE_STREAM) } returns devices.toSet()
+        } else {
+            @Suppress("DEPRECATION")
+            every { this@setupMockDevices.devices } returns devices
+        }
+    }
+
+    private fun verifyRegisterDeviceCallback(callbackSlot: CapturingSlot<MidiManager.DeviceCallback>) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            verify { midiManager.registerDeviceCallback(eq(MidiManager.TRANSPORT_MIDI_BYTE_STREAM), any(), capture(callbackSlot)) }
+        } else {
+            @Suppress("DEPRECATION")
+            verify { midiManager.registerDeviceCallback(capture(callbackSlot), any()) }
+        }
+    }
+
     @Test
     fun `given no devices, observeNotes should return empty flow`() = runTest {
         // Arrange
-        every { midiManager.getDevicesForTransport(any()) } returns emptySet()
+        midiManager.setupMockDevices(emptyArray())
         val repository = createRepository()
 
         // Act & Assert
@@ -120,8 +144,8 @@ class MidiRepositoryImplTest {
         // Arrange
         val mockDeviceInfo = createMockMidiDeviceInfo(1, "Test Keyboard", "product", "manufacturer")
         val mockNativeDevice = mockk<android.media.midi.MidiDevice>(relaxed = true)
-        
-        every { midiManager.getDevicesForTransport(any()) } returns setOf(mockDeviceInfo)
+
+        midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
         val openListenerSlot = slot<MidiManager.OnDeviceOpenedListener>()
         every { midiManager.openDevice(eq(mockDeviceInfo), capture(openListenerSlot), any()) } answers {
             openListenerSlot.captured.onDeviceOpened(mockNativeDevice)
@@ -142,8 +166,8 @@ class MidiRepositoryImplTest {
         // Arrange
         val mockDeviceInfo = createMockMidiDeviceInfo(1, "Test Keyboard", "product", "manufacturer")
         val mockNativeDevice = mockk<android.media.midi.MidiDevice>(relaxed = true)
-        
-        every { midiManager.getDevicesForTransport(any()) } returns setOf(mockDeviceInfo)
+
+        midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
         val openListenerSlot = slot<MidiManager.OnDeviceOpenedListener>()
         every { midiManager.openDevice(eq(mockDeviceInfo), capture(openListenerSlot), any()) } answers {
             openListenerSlot.captured.onDeviceOpened(mockNativeDevice)
@@ -152,13 +176,13 @@ class MidiRepositoryImplTest {
         val repository = createRepository()
 
         val deviceCallbackSlot = slot<MidiManager.DeviceCallback>()
-        verify { midiManager.registerDeviceCallback(any(), any(), capture(deviceCallbackSlot)) }
+        verifyRegisterDeviceCallback(deviceCallbackSlot)
         val callback = deviceCallbackSlot.captured
 
         // Act & Assert
         repository.observeNotes().test {
             callback.onDeviceRemoved(mockDeviceInfo)
-            
+
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
         }
@@ -182,7 +206,7 @@ class MidiRepositoryImplTest {
     @Test
     fun `given no devices, observeConnectionState should emit NoDevice`() = runTest {
         // Arrange
-        every { midiManager.getDevicesForTransport(any()) } returns emptySet()
+        midiManager.setupMockDevices(emptyArray())
         val repository = createRepository()
 
         // Act & Assert
@@ -195,11 +219,11 @@ class MidiRepositoryImplTest {
     @Test
     fun `given device is added, observeConnectionState should emit Connected`() = runTest {
         // Arrange
-        every { midiManager.getDevicesForTransport(any()) } returns emptySet()
+        midiManager.setupMockDevices(emptyArray())
         val repository = createRepository()
 
         val deviceCallbackSlot = slot<MidiManager.DeviceCallback>()
-        verify { midiManager.registerDeviceCallback(any(), any(), capture(deviceCallbackSlot)) }
+        verifyRegisterDeviceCallback(deviceCallbackSlot)
         val callback = deviceCallbackSlot.captured
 
         val openListenerSlot = slot<MidiManager.OnDeviceOpenedListener>()
@@ -215,7 +239,7 @@ class MidiRepositoryImplTest {
             assertEquals("Initial state should be NoDevice", ConnectionState.NoDevice, awaitItem())
 
             // Update mock: now MidiManager should report the new device
-            every { midiManager.getDevicesForTransport(any()) } returns setOf(mockDeviceInfo)
+            midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
             callback.onDeviceAdded(mockDeviceInfo)
 
             val state = awaitItem()
@@ -235,7 +259,7 @@ class MidiRepositoryImplTest {
         val mockNativeDevice = mockk<android.media.midi.MidiDevice>(relaxed = true) {
             every { info } returns mockDeviceInfo
         }
-        every { midiManager.getDevicesForTransport(any()) } returns setOf(mockDeviceInfo)
+        midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
         val openListenerSlot = slot<MidiManager.OnDeviceOpenedListener>()
         every { midiManager.openDevice(eq(mockDeviceInfo), capture(openListenerSlot), any()) } answers {
             openListenerSlot.captured.onDeviceOpened(mockNativeDevice)
@@ -246,7 +270,7 @@ class MidiRepositoryImplTest {
 
         // Capture the device callback for later use
         val deviceCallbackSlot = slot<MidiManager.DeviceCallback>()
-        verify { midiManager.registerDeviceCallback(any(), any(), capture(deviceCallbackSlot)) }
+        verifyRegisterDeviceCallback(deviceCallbackSlot)
         val callback = deviceCallbackSlot.captured
 
         // Act & Assert
@@ -264,11 +288,11 @@ class MidiRepositoryImplTest {
     @Test
     fun `given device fails to open, observeConnectionState should emit Error`() = runTest {
         // Arrange
-        every { midiManager.getDevicesForTransport(any()) } returns emptySet()
+        midiManager.setupMockDevices(emptyArray())
         val repository = createRepository()
 
         val deviceCallbackSlot = slot<MidiManager.DeviceCallback>()
-        verify { midiManager.registerDeviceCallback(any(), any(), capture(deviceCallbackSlot)) }
+        verifyRegisterDeviceCallback(deviceCallbackSlot)
         val callback = deviceCallbackSlot.captured
 
         val openListenerSlot = slot<MidiManager.OnDeviceOpenedListener>()
@@ -283,7 +307,7 @@ class MidiRepositoryImplTest {
             assertEquals(ConnectionState.NoDevice, awaitItem())
 
             // Update mock: now MidiManager should report the new device
-            every { midiManager.getDevicesForTransport(any()) } returns setOf(mockDeviceInfo)
+            midiManager.setupMockDevices(arrayOf(mockDeviceInfo))
             callback.onDeviceAdded(mockDeviceInfo)
 
             val state = awaitItem()
