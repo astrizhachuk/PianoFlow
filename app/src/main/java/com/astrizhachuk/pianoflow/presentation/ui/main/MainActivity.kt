@@ -1,0 +1,86 @@
+package com.astrizhachuk.pianoflow.presentation.ui.main
+
+import android.os.Bundle
+import android.view.WindowManager
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
+import com.astrizhachuk.pianoflow.presentation.model.UserMessage
+import com.astrizhachuk.pianoflow.presentation.service.UserNotifier
+import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.PianoStaffScreen
+import com.astrizhachuk.pianoflow.presentation.viewmodel.midi.MidiConnectionViewModel
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.launchIn
+import javax.inject.Inject
+
+@AndroidEntryPoint
+class MainActivity : AppCompatActivity() {
+
+    private val viewModel: MidiConnectionViewModel by viewModels()
+
+    @Inject
+    lateinit var userNotifier: UserNotifier
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        observeConnectionState()
+
+        setContent {
+            val snackbarHostState = remember { SnackbarHostState() }
+
+            MaterialTheme {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    snackbarHost = { SnackbarHost(snackbarHostState) }
+                ) { innerPadding ->
+                    PianoStaffScreen(modifier = Modifier.padding(innerPadding))
+
+                    ObserveNotifications(
+                        messages = userNotifier.messages,
+                        snackbarHostState = snackbarHostState
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Запускает отслеживание состояния MIDI-подключения.
+     */
+    private fun observeConnectionState() {
+        viewModel.connectionState.launchIn(lifecycleScope)
+    }
+
+    /**
+     * Composable-функция, которая подписывается на UI-уведомления и отображает их в виде Snackbar.
+     * Логика подписки инкапсулирована внутри Jetpack Compose с помощью LaunchedEffect.
+     */
+    @Composable
+    private fun ObserveNotifications(
+        messages: Flow<UserMessage>,
+        snackbarHostState: SnackbarHostState
+    ) {
+        LaunchedEffect(messages, snackbarHostState) {
+            messages.collectLatest { message ->
+                snackbarHostState.showSnackbar(message = message.text)
+            }
+        }
+    }
+}
