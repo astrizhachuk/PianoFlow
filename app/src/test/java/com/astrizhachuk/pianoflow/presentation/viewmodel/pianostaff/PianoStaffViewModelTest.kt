@@ -15,10 +15,12 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
+import org.junit.Assert
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.lang.reflect.Method
 
 @ExperimentalCoroutinesApi
 class PianoStaffViewModelTest {
@@ -133,6 +135,22 @@ class PianoStaffViewModelTest {
             val finalState = awaitItem()
             assertEquals("[]", finalState.trebleNotesJson)
             assertEquals("[]", finalState.bassNotesJson)
+        }
+    }
+
+    @Test
+    fun `onCleared does not throw exception`() {
+        // Act & Assert
+        // Этот тест проверяет, что protected-метод onCleared() может быть выполнен без сбоев.
+        // Так как метод protected, для его вызова в тесте используется рефлексия.
+        // Если исключение не будет брошено, тест считается пройденным.
+        try {
+            val method: Method = PianoStaffViewModel::class.java.getDeclaredMethod("onCleared")
+            method.isAccessible = true // Делаем protected-метод доступным для вызова
+            method.invoke(viewModel)
+        } catch (e: Exception) {
+            // Принудительно проваливаем тест, если было поймано любое исключение
+            Assert.fail("onCleared() should not throw an exception, but threw $e")
         }
     }
 }
