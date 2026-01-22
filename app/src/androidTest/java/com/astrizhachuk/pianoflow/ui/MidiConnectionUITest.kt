@@ -1,12 +1,10 @@
 package com.astrizhachuk.pianoflow.ui
 
 import android.content.Context
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.withText
-import androidx.test.ext.junit.rules.ActivityScenarioRule
 import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.data.di.DataModule
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
@@ -30,7 +28,7 @@ class MidiConnectionUITest {
     val hiltRule = HiltAndroidRule(this)
 
     @get:Rule(order = 1)
-    val activityRule = ActivityScenarioRule(MainActivity::class.java)
+    val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     private val fakeMidiRepository = FakeMidiRepository()
 
@@ -54,8 +52,8 @@ class MidiConnectionUITest {
         fakeMidiRepository.emitState(ConnectionState.Connected(device))
 
         // Then: Check that the UI has updated and shows the connected device name
-        onView(withText(context.getString(R.string.midi_device_connected, device.name)))
-            .check(matches(isDisplayed()))
+        val expectedText = context.getString(R.string.midi_device_connected, device.name)
+        composeTestRule.onNodeWithText(expectedText).assertIsDisplayed()
     }
 
     @Test
@@ -68,8 +66,8 @@ class MidiConnectionUITest {
         fakeMidiRepository.emitState(ConnectionState.Disconnected)
 
         // Then: Check that the UI displays a disconnection message
-        onView(withText(context.getString(R.string.midi_device_disconnected)))
-            .check(matches(isDisplayed()))
+        val expectedText = context.getString(R.string.midi_device_disconnected)
+        composeTestRule.onNodeWithText(expectedText).assertIsDisplayed()
     }
 
     @Test
@@ -79,7 +77,6 @@ class MidiConnectionUITest {
         fakeMidiRepository.emitState(ConnectionState.Error(errorMessage))
 
         // Then: Check that an error message is displayed on the screen
-        onView(withText(errorMessage))
-            .check(matches(isDisplayed()))
+        composeTestRule.onNodeWithText(errorMessage).assertIsDisplayed()
     }
 }
