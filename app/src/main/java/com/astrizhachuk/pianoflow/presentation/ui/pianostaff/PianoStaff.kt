@@ -10,15 +10,15 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.tracing.trace
 
 /**
- * Composable-функция, которая отображает фортепианный нотный стан с музыкальными нотами с помощью WebView.
+ * Composable-компонент, который отвечает за отрисовку музыкального стана.
  *
- * Эта функция отрисовывает полный нотный стан (скрипичный и басовый ключи), загружая HTML-файл
- * из папки assets, который использует библиотеку VexFlow для рендеринга музыкальной нотации.
- * Ноты для отображения передаются в виде JSON-строк и рисуются на нотном стане
- * с помощью вызова JavaScript-функции внутри WebView.
+ * Этот компонент использует [AndroidView] для встраивания [WebView]. В `WebView` загружается
+ * локальный HTML-файл (`vexflow.html`), который использует библиотеку VexFlow для визуализации
+ * музыкальных нот. Ноты передаются в `WebView` в виде JSON-строки.
  *
- * @param notesJson JSON-строка, представляющая ноты для обоих станов (скрипичного и басового).
- * @param modifier Модификатор, который будет применен к контейнеру WebView.
+ * @param notesJson JSON-строка, содержащая ноты для отрисовки. Она должна иметь
+ *                  структуру `{ "treble": [...], "bass": [...] }`.
+ * @param modifier Модификатор, который будет применен к `AndroidView`.
  */
 @Composable
 fun PianoStaff(
@@ -35,7 +35,6 @@ fun PianoStaff(
                     )
                     settings.javaScriptEnabled = true
                     webChromeClient = WebChromeClient()
-                    // Возвращаем загрузку основного, рабочего файла
                     loadUrl("file:///android_asset/vexflow.html")
                 }
             }

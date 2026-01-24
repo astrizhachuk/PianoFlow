@@ -12,14 +12,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffViewModel
 
 /**
- * Компонента-экран, которая отображает нотный стан (скрипичный и басовый ключи) с музыкальными нотами.
+ * Composable-экран, который отображает музыкальный нотный стан.
  *
- * Этот экран отслеживает состояние UI из [PianoStaffViewModel], чтобы получить ноты для отображения.
- * Он центрирует компоненту [PianoStaff], которая отвечает за отрисовку самого нотного стана и нот.
+ * Этот экран является точкой входа для отображения [PianoStaff]. Он подключается к [PianoStaffViewModel]
+ * для получения актуального состояния UI (`notesJson`) и передает его в `PianoStaff` для отрисовки.
  *
- * @param modifier Модификатор, применяемый к корневому контейнеру.
- * @param viewModel Экземпляр [PianoStaffViewModel], обычно предоставляемый через Hilt, который
- * поставляет состояние UI, включая JSON-представления нот.
+ * @param modifier Модификатор, применяемый к корневому контейнеру Box.
+ * @param viewModel ViewModel, предоставляемая через Hilt, которая управляет состоянием экрана.
  */
 @Composable
 fun PianoStaffScreen(
@@ -29,12 +28,9 @@ fun PianoStaffScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Box(
-        modifier = modifier
-            .fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        PianoStaff(
-            notesJson = uiState.notesJson
-        )
+        PianoStaff(notesJson = uiState.notesJson)
     }
 }

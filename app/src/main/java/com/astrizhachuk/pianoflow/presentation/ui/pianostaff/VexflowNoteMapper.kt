@@ -8,8 +8,12 @@ import timber.log.Timber
 private val GHOST_NOTE_RANGE = 36..72
 
 /**
- * Преобразует список играемых нот в JSON-структуру для VexFlow,
- * разделяя их по нотоносцам и добавляя "призрачные" ноты в скобках.
+ * Преобразует список играемых нот в JSON-структуру для VexFlow.
+ *
+ * Эта функция разделяет ноты по нотоносцам (скрипичный и басовый) и добавляет
+ * дублирующие "призрачные" ноты для тех, что находятся в пограничной зоне.
+ * "Призрачные" ноты помечаются специальным флагом, чтобы их можно было отрисовать
+ * другим цветом на фронтенде.
  */
 fun List<Note>.toVexflowJson(): String {
     Timber.d("toVexflowJson() called with notes: $this")
@@ -17,55 +21,50 @@ fun List<Note>.toVexflowJson(): String {
         return "{\"treble\":[], \"bass\":[]}"
     }
 
-    // 1. Разделяем ноты на основные и те, для которых нужны "призраки"
-    val primaryTrebleNotes = this.filter { it.pitch >= 60 }
-    val primaryBassNotes = this.filter { it.pitch < 60 }
+    // 1. Разделяем все ноты по их основному нотоносцу
+    val trebleNotes = this.filter { it.pitch >= 60 }
+    val bassNotes = this.filter { it.pitch < 60 }
 
-    val ghostNotesForTreble = primaryBassNotes.filter { it.pitch in GHOST_NOTE_RANGE }
-    val ghostNotesForBass = primaryTrebleNotes.filter { it.pitch in GHOST_NOTE_RANGE }
+    // 2. Находим "призрачные" ноты, которые нужно дублировать на соседних станах
+    val ghostNotesForTreble = bassNotes.filter { it.pitch in GHOST_NOTE_RANGE }
+    val ghostNotesForBass = trebleNotes.filter { it.pitch in GHOST_NOTE_RANGE }
 
-    // 2. Собираем JSON-объекты для каждого стана
-    val trebleNoteObjects = mutableListOf<String>()
-    val bassNoteObjects = mutableListOf<String>()
+    // 3. Формируем JSON-объекты для каждого стана
+    val trebleNoteObjects = createNoteObjects(primary = trebleNotes, ghost = ghostNotesForTreble)
+    val bassNoteObjects = createNoteObjects(primary = bassNotes, ghost = ghostNotesForBass)
 
-    // Основной аккорд для скрипичного ключа
-    if (primaryTrebleNotes.isNotEmpty()) {
-        primaryTrebleNotes.mapNotNull { it.pitchToVexflow() }.takeIf { it.isNotEmpty() }?.let {
-            trebleNoteObjects.add(createVexflowNoteJson(it, isGhost = false))
-        }
-    }
-    // "Призрачный" аккорд для скрипичного ключа
-    if (ghostNotesForTreble.isNotEmpty()) {
-        ghostNotesForTreble.mapNotNull { it.pitchToVexflow() }.takeIf { it.isNotEmpty() }?.let {
-            trebleNoteObjects.add(createVexflowNoteJson(it, isGhost = true))
-        }
-    }
-
-    // Основной аккорд для басового ключа
-    if (primaryBassNotes.isNotEmpty()) {
-        primaryBassNotes.mapNotNull { it.pitchToVexflow() }.takeIf { it.isNotEmpty() }?.let {
-            bassNoteObjects.add(createVexflowNoteJson(it, isGhost = false))
-        }
-    }
-    // "Призрачный" аккорд для басового ключа
-    if (ghostNotesForBass.isNotEmpty()) {
-        ghostNotesForBass.mapNotNull { it.pitchToVexflow() }.takeIf { it.isNotEmpty() }?.let {
-            bassNoteObjects.add(createVexflowNoteJson(it, isGhost = true))
-        }
-    }
-
-    // 3. Формируем итоговую JSON-строку
-    val result = "{\"treble\":${trebleNoteObjects.joinToString(",", "[", "]")}, \"bass\":${bassNoteObjects.joinToString(",", "[", "]")}}"
+    // 4. Собираем итоговую JSON-строку
+    val result = "{\"treble\":$trebleNoteObjects, \"bass\":$bassNoteObjects}"
     Timber.d("toVexflowJson() result: $result")
     return result
 }
 
-private fun createVexflowNoteJson(keys: List<String>, isGhost: Boolean): String {
-    val sortedKeys = keys.joinToString(separator = ", ") { "\"$it\"" }
-    val ghostJson = if (isGhost) ", \"ghost\":true" else ""
-    return "{\"keys\":[$sortedKeys], \"duration\":\"w\"$ghostJson}"
+/**
+ * Создает JSON-представление нот для одного нотоносца.
+ */
+private fun createNoteObjects(primary: List<Note>, ghost: List<Note>): String {
+    val objects = mutableListOf<String>()
+    primary.mapNotNull { it.pitchToVexflow() }.takeIf { it.isNotEmpty() }?.let {
+        objects.add(createVexflowNoteJson(it, isGhost = false))
+    }
+    ghost.mapNotNull { it.pitchToVexflow() }.takeIf { it.isNotEmpty() }?.let {
+        objects.add(createVexflowNoteJson(it, isGhost = true))
+    }
+    return objects.joinToString(separator = ",", prefix = "[", postfix = "]")
 }
 
+/**
+ * Создает JSON-строку для одного аккорда (обычного или призрачного).
+ */
+private fun createVexflowNoteJson(keys: List<String>, isGhost: Boolean): String {
+    val keysJson = keys.joinToString(separator = ", ") { "\"$it\"" }
+    val ghostJson = if (isGhost) ", \"ghost\":true" else ""
+    return "{\"keys\":[$keysJson], \"duration\":\"w\"$ghostJson}"
+}
+
+/**
+ * Преобразует высоту MIDI-ноты в строковый формат VexFlow ("нота/октава").
+ */
 private fun Note.pitchToVexflow(): String? {
     if (pitch !in 0..127) {
         Timber.w("Invalid MIDI pitch value: $pitch.")
