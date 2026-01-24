@@ -15,12 +15,13 @@
 
 <script>
     /**
-     * Отрисовывает полный нотный стан, разделяя обычные и "призрачные" ноты.
+     * Отрисовывает полный нотный стан, адаптируясь к ориентации экрана.
+     * Эта функция вызывается напрямую из Kotlin каждый раз, когда нужно обновить стан.
      */
-    function drawGrandStaff(trebleNotesData, bassNotesData) {
+    function drawGrandStaff(trebleNotesData, bassNotesData, orientation) {
         const div = document.getElementById("staff");
         if (!div || (div.clientWidth === 0 || div.clientHeight === 0)) {
-            requestAnimationFrame(() => drawGrandStaff(trebleNotesData, bassNotesData));
+            requestAnimationFrame(() => drawGrandStaff(trebleNotesData, bassNotesData, orientation));
             return;
         }
 
@@ -32,10 +33,20 @@
             renderer.resize(div.clientWidth, div.clientHeight);
             const context = renderer.getContext();
 
-            const staveWidth = div.clientWidth - 20;
-            // Максимально увеличиваем расстояние между станами
-            const trebleStave = new Vex.Flow.Stave(10, 80, staveWidth).addClef("treble").addTimeSignature("4/4");
-            const bassStave = new Vex.Flow.Stave(10, 220, staveWidth).addClef("bass").addTimeSignature("4/4");
+            // --- Настройки для разных ориентаций ---
+            let settings;
+            if (orientation === 'landscape') {
+                // Пропорциональное масштабирование и скорректированное расстояние для ландшафта
+                settings = { scale: 0.75, trebleY: 80, bassY: 220 };
+            } else { // portrait
+                settings = { scale: 1.0, trebleY: 80, bassY: 220 };
+            }
+
+            context.scale(settings.scale, settings.scale);
+            const staveWidth = (div.clientWidth / settings.scale) - 20;
+
+            const trebleStave = new Vex.Flow.Stave(10, settings.trebleY, staveWidth).addClef("treble").addTimeSignature("4/4");
+            const bassStave = new Vex.Flow.Stave(10, settings.bassY, staveWidth).addClef("bass").addTimeSignature("4/4");
 
             trebleStave.setContext(context).draw();
             bassStave.setContext(context).draw();
@@ -43,7 +54,6 @@
             new Vex.Flow.StaveConnector(trebleStave, bassStave).setType(Vex.Flow.StaveConnector.type.BRACE).setContext(context).draw();
             new Vex.Flow.StaveConnector(trebleStave, bassStave).setType(Vex.Flow.StaveConnector.type.SINGLE_LEFT).setContext(context).draw();
 
-            // Создаем и отрисовываем голоса для каждого стана
             drawVoices(context, trebleStave, trebleNotesData);
             drawVoices(context, bassStave, bassNotesData);
 
@@ -83,7 +93,6 @@
             noteData.clef = clef;
             const staveNote = new Vex.Flow.StaveNote(noteData);
             if (isGhost) {
-                // Устанавливаем серый цвет для "призрачных" нот
                 staveNote.setStyle({ fillStyle: "grey", strokeStyle: "grey" });
             }
             return staveNote;
@@ -96,8 +105,9 @@
         return voice;
     }
 
+    // Первоначальная отрисовка при загрузке DOM. Можно передать пустые данные.
     document.addEventListener('DOMContentLoaded', () => {
-         drawGrandStaff([], []);
+         drawGrandStaff([], [], 'portrait');
     });
 </script>
 </body>
