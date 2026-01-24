@@ -1,3 +1,4 @@
+
 package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 
 import android.view.ViewGroup
@@ -16,16 +17,12 @@ import androidx.tracing.trace
  * Ноты для отображения передаются в виде JSON-строк и рисуются на нотном стане
  * с помощью вызова JavaScript-функции внутри WebView.
  *
- * @param trebleNotesJson JSON-строка, представляющая ноты для отрисовки на скрипичном ключе.
- *                        Формат должен быть совместим с библиотекой VexFlow.
- * @param bassNotesJson JSON-строка, представляющая ноты для отрисовки на басовом ключе.
- *                      Формат должен быть совместим с библиотекой VexFlow.
+ * @param notesJson JSON-строка, представляющая ноты для обоих станов (скрипичного и басового).
  * @param modifier Модификатор, который будет применен к контейнеру WebView.
  */
 @Composable
 fun PianoStaff(
-    trebleNotesJson: String,
-    bassNotesJson: String,
+    notesJson: String,
     modifier: Modifier = Modifier
 ) {
     AndroidView(
@@ -38,15 +35,25 @@ fun PianoStaff(
                     )
                     settings.javaScriptEnabled = true
                     webChromeClient = WebChromeClient()
+                    // Возвращаем загрузку основного, рабочего файла
                     loadUrl("file:///android_asset/vexflow.html")
                 }
             }
         },
         update = { webView ->
             trace("PianoStaff:WebView:update") {
-                webView.evaluateJavascript("drawNotes('$trebleNotesJson', '$bassNotesJson')", null)
+                val script = """
+                    try {
+                        const data = JSON.parse('$notesJson');
+                        drawGrandStaff(data.treble, data.bass);
+                    } catch (e) {
+                        console.error('Error executing script: ', e);
+                    }
+                """
+                webView.evaluateJavascript(script, null)
             }
         },
         modifier = modifier
     )
 }
+

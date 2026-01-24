@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -13,15 +14,17 @@
 <script src="./vexflow.js"></script>
 
 <script>
-    function drawNotes(trebleNotesJson, bassNotesJson) {
+    /**
+     * Отрисовывает полный нотный стан, разделяя обычные и "призрачные" ноты.
+     */
+    function drawGrandStaff(trebleNotesData, bassNotesData) {
         const div = document.getElementById("staff");
         if (!div || (div.clientWidth === 0 || div.clientHeight === 0)) {
-            requestAnimationFrame(() => drawNotes(trebleNotesJson, bassNotesJson));
+            requestAnimationFrame(() => drawGrandStaff(trebleNotesData, bassNotesData));
             return;
         }
 
         div.innerHTML = '';
-
         if (typeof Vex === 'undefined' || typeof Vex.Flow === 'undefined') return;
 
         try {
@@ -30,8 +33,9 @@
             const context = renderer.getContext();
 
             const staveWidth = div.clientWidth - 20;
-            const trebleStave = new Vex.Flow.Stave(10, 60, staveWidth).addClef("treble").addTimeSignature("4/4");
-            const bassStave = new Vex.Flow.Stave(10, 140, staveWidth).addClef("bass").addTimeSignature("4/4");
+            // Максимально увеличиваем расстояние между станами
+            const trebleStave = new Vex.Flow.Stave(10, 80, staveWidth).addClef("treble").addTimeSignature("4/4");
+            const bassStave = new Vex.Flow.Stave(10, 220, staveWidth).addClef("bass").addTimeSignature("4/4");
 
             trebleStave.setContext(context).draw();
             bassStave.setContext(context).draw();
@@ -39,39 +43,62 @@
             new Vex.Flow.StaveConnector(trebleStave, bassStave).setType(Vex.Flow.StaveConnector.type.BRACE).setContext(context).draw();
             new Vex.Flow.StaveConnector(trebleStave, bassStave).setType(Vex.Flow.StaveConnector.type.SINGLE_LEFT).setContext(context).draw();
 
-            drawVoice(context, trebleStave, trebleNotesJson, 'treble');
-            drawVoice(context, bassStave, bassNotesJson, 'bass');
+            // Создаем и отрисовываем голоса для каждого стана
+            drawVoices(context, trebleStave, trebleNotesData);
+            drawVoices(context, bassStave, bassNotesData);
 
         } catch (e) {
             console.error("VexFlow rendering error: ", e);
         }
     }
 
-    function drawVoice(context, stave, notesJson, clef) {
-        if (notesJson && notesJson !== '[]') {
-            const notes = JSON.parse(notesJson).map(noteData => {
-                noteData.clef = clef;
-                // The noteData.keys already contains strings like "c#/4"
-                return new Vex.Flow.StaveNote(noteData);
-            });
+    /**
+     * Создает и отрисовывает голоса (обычный и "призрачный") для одного нотного стана.
+     */
+    function drawVoices(context, stave, notesData) {
+        if (!notesData || notesData.length === 0) return;
 
-            if (notes.length > 0) {
-                const voice = new Vex.Flow.Voice({num_beats: 4, beat_value: 4});
-                voice.setStrict(false);
-                voice.addTickables(notes);
+        const normalNotes = notesData.filter(d => !d.ghost);
+        const ghostNotes = notesData.filter(d => d.ghost);
 
-                // Explicitly tell VexFlow to apply accidentals to the voice.
-                // This is a static method on the Accidental class.
-                Vex.Flow.Accidental.applyAccidentals([voice]);
+        const voices = [];
+        if (normalNotes.length > 0) {
+            voices.push(createVoice(normalNotes, stave.getClef(), false));
+        }
+        if (ghostNotes.length > 0) {
+            voices.push(createVoice(ghostNotes, stave.getClef(), true));
+        }
 
-                const formatter = new Vex.Flow.Formatter().joinVoices([voice]).format([voice], stave.getWidth() - 50);
-                voice.draw(context, stave);
-            }
+        if (voices.length > 0) {
+            new Vex.Flow.Formatter().joinVoices(voices).format(voices, stave.getWidth() - 50);
+            voices.forEach(v => v.draw(context, stave));
         }
     }
 
-    // Первоначальная отрисовка
-    drawNotes('[]', '[]');
+    /**
+     * Создает один голос из массива нот.
+     */
+    function createVoice(notesData, clef, isGhost) {
+        const notes = notesData.map(noteData => {
+            noteData.clef = clef;
+            const staveNote = new Vex.Flow.StaveNote(noteData);
+            if (isGhost) {
+                // Устанавливаем серый цвет для "призрачных" нот
+                staveNote.setStyle({ fillStyle: "grey", strokeStyle: "grey" });
+            }
+            return staveNote;
+        });
+
+        const voice = new Vex.Flow.Voice({ num_beats: 4, beat_value: 4 });
+        voice.setStrict(false);
+        voice.addTickables(notes);
+        Vex.Flow.Accidental.applyAccidentals([voice]);
+        return voice;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+         drawGrandStaff([], []);
+    });
 </script>
 </body>
 </html>

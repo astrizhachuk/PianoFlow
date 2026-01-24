@@ -1,13 +1,12 @@
+
 package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffViewModel
@@ -20,7 +19,7 @@ import com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffVi
  *
  * @param modifier Модификатор, применяемый к корневому контейнеру.
  * @param viewModel Экземпляр [PianoStaffViewModel], обычно предоставляемый через Hilt, который
- * поставляет состояние UI, включая JSON-представления нот для скрипичного и басового ключей.
+ * поставляет состояние UI, включая JSON-представления нот.
  */
 @Composable
 fun PianoStaffScreen(
@@ -35,8 +34,7 @@ fun PianoStaffScreen(
         contentAlignment = Alignment.Center
     ) {
         PianoStaff(
-            trebleNotesJson = uiState.trebleNotesJson,
-            bassNotesJson = uiState.bassNotesJson
+            notesJson = uiState.notesJson
         )
     }
 }
