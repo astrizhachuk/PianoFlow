@@ -16,11 +16,13 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * ViewModel для экрана нотного стана.
+ * ViewModel for the piano staff screen.
  *
- * Эта ViewModel отвечает за получение MIDI-сообщений (в виде списка нот) от `ObserveMidiMessagesUseCase`,
- * их преобразование в JSON-формат для VexFlow и предоставление этого JSON в виде [PianoStaffUiState]
- * для отрисовки на экране.
+ * This ViewModel is responsible for observing MIDI messages, which are received as a list of notes
+ * from the [ObserveMidiMessagesUseCase]. It then converts these notes into a JSON format suitable
+ * for VexFlow and exposes this JSON within a [PianoStaffUiState] to be rendered by the UI.
+ *
+ * @param observeMidiMessagesUseCase The use case for observing incoming MIDI messages.
  */
 @HiltViewModel
 class PianoStaffViewModel @Inject constructor(
