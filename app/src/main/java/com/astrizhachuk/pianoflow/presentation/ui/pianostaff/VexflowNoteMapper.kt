@@ -17,8 +17,7 @@ private val GHOST_NOTE_RANGE = 36..72
 
 private enum class Staff { TREBLE, BASS }
 
-// Intermediate data class to hold pre-calculated properties for each note.
-private data class ProcessedNote(val key: String, val primaryStaff: Staff, val isGhostCandidate: Boolean)
+private data class ProcessedNote(val key: String, val staff: Staff, val isGhost: Boolean = false)
 
 /**
  * Converts a list of played [Note] objects into a JSON string formatted for VexFlow.
@@ -42,43 +41,55 @@ private data class ProcessedNote(val key: String, val primaryStaff: Staff, val i
  */
 fun List<Note>.toVexflowJson(): String {
     Timber.d("toVexflowJson() called with notes: $this")
-    if (this.isEmpty()) {
+
+    if (isEmpty()) {
         return "{\"treble\":[], \"bass\":[]}"
     }
 
-    val result = this.mapNotNull { note ->
-        note.pitchToVexflow()?.let {
-            ProcessedNote(
-                key = it,
-                primaryStaff = if (note.pitch >= 60) Staff.TREBLE else Staff.BASS,
-                isGhostCandidate = note.pitch in GHOST_NOTE_RANGE
-            )
-        }
-    }.groupBy { it.primaryStaff }.let { notesByStaff ->
-        val staffJsons = Staff.entries.associate { staff ->
-            val primaryNotes = notesByStaff[staff] ?: emptyList()
-            val ghostSourceNotes = notesByStaff[if (staff == Staff.TREBLE) Staff.BASS else Staff.TREBLE] ?: emptyList()
+    return flatMap(::toProcessedNotes)
+        .let(::buildStaffJson)
+        .also { result -> Timber.d("toVexflowJson() result: $result") }
+}
 
-            val primaryKeys = primaryNotes.map { it.key }
-            val ghostKeys = ghostSourceNotes
-                .filter { it.isGhostCandidate }
-                .map { it.key }
+/**
+ * Converts a single Note to a list of ProcessedNotes (primary and optionally ghost).
+ */
+private fun toProcessedNotes(note: Note): List<ProcessedNote> {
+    return note.pitchToVexflow()?.let { key ->
+        val primaryStaff = if (note.pitch >= 60) Staff.TREBLE else Staff.BASS
+        val ghostStaff = if (primaryStaff == Staff.TREBLE) Staff.BASS else Staff.TREBLE
 
-            val primaryJson = primaryKeys.takeIf { it.isNotEmpty() }?.let { createVexflowNoteJson(it, isGhost = false) }
-            val ghostJson = ghostKeys.takeIf { it.isNotEmpty() }?.let { createVexflowNoteJson(it, isGhost = true) }
+        listOfNotNull(
+            ProcessedNote(key, primaryStaff),
+            ProcessedNote(key, ghostStaff, isGhost = true).takeIf { note.pitch in GHOST_NOTE_RANGE }
+        )
+    } ?: emptyList()
+}
 
-            val staffJsonContent = listOfNotNull(primaryJson, ghostJson).joinToString(separator = ",", prefix = "[", postfix = "]")
-
-            staff.name.lowercase() to staffJsonContent
-        }
-
-        staffJsons.entries.joinToString(separator = ", ", prefix = "{", postfix = "}") { (staffName, json) ->
-            "\"$staffName\":$json"
-        }
+/**
+ * Builds the final JSON structure from processed notes.
+ */
+private fun buildStaffJson(processedNotes: List<ProcessedNote>): String {
+    return Staff.entries.associate { staff ->
+        staff.name.lowercase() to buildStaffContent(processedNotes, staff)
+    }.entries.joinToString(", ", "{", "}") { (staffName, json) ->
+        "\"$staffName\":$json"
     }
+}
 
-    Timber.d("toVexflowJson() result: $result")
-    return result
+/**
+ * Builds the JSON content (primary and ghost notes) for a specific staff.
+ */
+private fun buildStaffContent(processedNotes: List<ProcessedNote>, staff: Staff): String {
+    return processedNotes
+        .filter { it.staff == staff }
+        .groupBy { it.isGhost }
+        .let { notesByGhost ->
+            listOfNotNull(
+                notesByGhost[false]?.map { it.key }?.let { createVexflowNoteJson(it, isGhost = false) },
+                notesByGhost[true]?.map { it.key }?.let { createVexflowNoteJson(it, isGhost = true) }
+            ).joinToString(",", "[", "]")
+        }
 }
 
 /**
@@ -95,9 +106,9 @@ fun List<Note>.toVexflowJson(): String {
  * @return A JSON formatted string representing the chord.
  */
 private fun createVexflowNoteJson(keys: List<String>, isGhost: Boolean): String {
-    val keysJson = keys.joinToString(separator = ", ") { "\"$it\"" }
-    val ghostJson = if (isGhost) ", \"ghost\":true" else ""
-    return "{\"keys\":[$keysJson], \"duration\":\"w\"$ghostJson}"
+    val keysJson = keys.joinToString(", ") { "\"$it\"" }
+    val ghostAttr = if (isGhost) ", \"ghost\":true" else ""
+    return "{\"keys\":[$keysJson], \"duration\":\"w\"$ghostAttr}"
 }
 
 /**
