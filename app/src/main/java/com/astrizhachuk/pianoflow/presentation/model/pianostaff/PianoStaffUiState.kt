@@ -1,9 +1,10 @@
 package com.astrizhachuk.pianoflow.presentation.model.pianostaff
 
 /**
- * Представляет состояние UI для экрана нотного стана.
+ * Represents the UI state for the piano staff screen.
  *
- * @param notesJson JSON-строка, содержащая ноты для обоих станов (скрипичного и басового).
+ * @param notesJson A JSON string containing the notes for both the treble and bass clefs.
+ *                  It defaults to an empty structure: `{"treble":[], "bass":[]}`.
  */
 data class PianoStaffUiState(
     val notesJson: String = "{\"treble\":[], \"bass\":[]}"
