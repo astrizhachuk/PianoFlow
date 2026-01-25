@@ -12,13 +12,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffViewModel
 
 /**
- * Composable-экран, который отображает музыкальный нотный стан.
+ * A Composable screen that displays a musical staff.
  *
- * Этот экран является точкой входа для отображения [PianoStaff]. Он подключается к [PianoStaffViewModel]
- * для получения актуального состояния UI (`notesJson`) и передает его в `PianoStaff` для отрисовки.
+ * This screen serves as the entry point for displaying the [PianoStaff]. It connects to the
+ * [PianoStaffViewModel] to observe the current UI state (`notesJson`) and passes it
+ * down to the [PianoStaff] composable for rendering.
  *
- * @param modifier Модификатор, применяемый к корневому контейнеру Box.
- * @param viewModel ViewModel, предоставляемая через Hilt, которая управляет состоянием экрана.
+ * @param modifier The modifier to be applied to the root Box container.
+ * @param viewModel The ViewModel, provided by Hilt, which manages the screen's state.
  */
 @Composable
 fun PianoStaffScreen(

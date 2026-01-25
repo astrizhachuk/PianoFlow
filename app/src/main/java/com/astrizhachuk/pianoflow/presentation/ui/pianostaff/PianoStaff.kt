@@ -19,15 +19,20 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
 
 /**
- * Composable-компонент, который отвечает за отрисовку музыкального стана.
+ * A composable that renders a musical staff.
  *
- * Этот компонент использует [AndroidView] для встраивания [WebView]. В `WebView` загружается
- * локальный HTML-файл (`vexflow.html`), который использует библиотеку VexFlow для визуализации
- * музыкальных нот. Ноты передаются в `WebView` в виде JSON-строки.
+ * This component utilizes an [AndroidView] to embed a [WebView]. The `WebView`
+ * loads a local HTML file (`vexflow.html`) which leverages the VexFlow.js library
+ * to visualize musical notes. The notes to be rendered are passed into the `WebView`
+ * as a JSON string.
  *
- * @param notesJson JSON-строка, содержащая ноты для отрисовки. Она должна иметь
- *                  структуру `{ "treble": [...], "bass": [...] }`.
- * @param modifier Модификатор, который будет применен к `AndroidView`.
+ * Communication with the JavaScript in the `WebView` is handled via `evaluateJavascript`.
+ * The composable also tracks its own size to adjust the staff's orientation
+ * (portrait or landscape) for optimal rendering.
+ *
+ * @param notesJson A JSON string containing the notes to be drawn. It is expected
+ *                  to have a structure like `{ "treble": [...], "bass": [...] }`.
+ * @param modifier The modifier to be applied to the underlying [AndroidView].
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
