@@ -108,8 +108,7 @@ interface MidiRepository {
 ```kotlin
 // com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState.kt
 data class PianoStaffUiState(
-    val trebleNotesJson: String = "[]",
-    val bassNotesJson: String = "[]"
+    val notesJson: String = "[]"
 )
 
 // com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffViewModel.kt
@@ -141,8 +140,7 @@ fun PianoStaffScreen(
         contentAlignment = Alignment.Center
     ) {
         PianoStaff(
-            trebleNotesJson = uiState.trebleNotesJson,
-            bassNotesJson = uiState.bassNotesJson
+            notesJson = uiState.notesJson
         )
     }
 }
@@ -288,10 +286,8 @@ deactivate Receiver
 
 4.  **Отображение на UI**:
     *   `PianoStaffViewModel` подписывается на `Flow<List<Note>>` от `ObserveMidiMessagesUseCase`.
-    *   Внутри `ViewModel` ноты разделяются на два списка: для басового (`pitch < 60`) и скрипичного ключей.
-    *   Каждый из списков преобразуется в JSON-строку с помощью `toVexflowJson()`.
-    *   `PianoStaffViewModel` обновляет свой `StateFlow<PianoStaffUiState>`, который содержит две JSON-строки: `trebleNotesJson` и `bassNotesJson`.
-    *   `PianoStaffScreen`, подписанный на `uiState`, получает эти JSON-строки и передает их в `Composable`-компонент `PianoStaff` для финальной отрисовки.
+    *   `PianoStaffViewModel` преобразует список нот в JSON-строку с помощью `toVexflowJson()` и обновляет свой `StateFlow<PianoStaffUiState>`, который содержит JSON-строку `notesJson`.
+    *   `PianoStaffScreen`, подписанный на `uiState`, получает эту JSON-строку и передает ее в `Composable`-компонент `PianoStaff` для финальной отрисовки.
 
 ```plantuml
 @startuml
@@ -326,7 +322,6 @@ UC -> VM : Отправляет Flow<List<Note>>
 deactivate UC
 activate VM
 
-VM -> VM : Разделяет ноты на басовые и скрипичные
 VM -> VM : Преобразует списки нот в JSON
 VM -> VM : Обновляет uiState
 VM -> Screen : Передает новое состояние (UiState с JSON)
@@ -357,7 +352,7 @@ deactivate Screen
 1.  **Инициализация `WebView`:** При создании `PianoStaff` `Composable`, `AndroidView` инициализирует `WebView` и загружает локальный HTML-файл `file:///android_asset/vexflow.html`.
 2.  **Передача данных:** При каждом обновлении состояния `uiState` в `PianoStaffScreen` вызывается `update`-блок `AndroidView`.
 3.  **Вызов JavaScript:** Внутри `update` происходит вызов JavaScript-функции `drawNotes` в `WebView` с помощью метода `evaluateJavascript`.
-4.  **Отрисовка в `WebView`:** В качестве аргументов в `drawNotes` передаются две JSON-строки: `trebleNotesJson` и `bassNotesJson`. JavaScript-код в `vexflow.html` парсит эти строки и использует VexFlow API для отрисовки нот на SVG-холсте внутри `WebView`.
+4.  **Отрисовка в `WebView`:** В качестве аргумента в `drawNotes` передается JSON-строка `notesJson`. JavaScript-код в `vexflow.html` парсит эту строку и использует VexFlow API для отрисовки нот на SVG-холсте внутри `WebView`.
 
 **Диаграмма взаимодействия**
 
@@ -381,7 +376,7 @@ box "VexFlow (HTML/JavaScript)" #LightYellow
     participant "VexFlow.js" as VexFlowLib
 end box
 
-Screen -> StaffComposable : Передает JSON-строки
+Screen -> StaffComposable : Передает JSON-строку
 activate StaffComposable
 
 StaffComposable -> AndroidView : (update)
@@ -393,7 +388,7 @@ activate WebView
 WebView -> HtmlPage : Вызывает JS-функцию
 activate HtmlPage
 
-HtmlPage -> DrawJsFunc : drawNotes(trebleJson, bassJson)
+HtmlPage -> DrawJsFunc : drawNotes(notesJson)
 activate DrawJsFunc
 
 DrawJsFunc -> VexFlowLib : Использует API для отрисовки
