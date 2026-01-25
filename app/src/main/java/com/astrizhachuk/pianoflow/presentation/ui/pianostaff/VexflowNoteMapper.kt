@@ -15,23 +15,22 @@ import timber.log.Timber
  */
 private val GHOST_NOTE_RANGE = 36..72
 
+private enum class Staff { TREBLE, BASS }
+
+// Intermediate data class to hold pre-calculated properties for each note.
+private data class ProcessedNote(val key: String, val primaryStaff: Staff, val isGhostCandidate: Boolean)
+
 /**
  * Converts a list of played [Note] objects into a JSON string formatted for VexFlow.
  *
  * This function processes a list of MIDI notes and organizes them for display on a grand staff
- * (treble and bass clefs). It performs the following steps:
+ * (treble and bass clefs). It follows a two-step process:
  *
- * 1.  **Separates Notes:** Divides the notes into two groups based on their pitch:
- *     -   **Treble Clef:** Notes with MIDI pitch 60 (Middle C) and above.
- *     -   **Bass Clef:** Notes with MIDI pitch below 60.
- *
- * 2.  **Creates "Ghost" Notes:** To improve readability for notes in the middle range (C2 to C5,
- *     inclusive), it creates duplicate "ghost" notes on the adjacent staff. For example, a C4
- *     played on the right hand (treble clef) will also appear as a ghost note on the bass clef.
- *
- * 3.  **Generates JSON:** Constructs a JSON object with `treble` and `bass` keys. Each key holds an
- *     array of VexFlow note objects. Ghost notes are flagged with a `"ghost": true` property,
- *     allowing them to be styled differently in the frontend (e.g., with lower opacity).
+ * 1.  **Processing:** Each note is mapped to a `ProcessedNote` object, which contains its VexFlow key,
+ *      its primary staff (treble or bass), and whether it's a candidate for ghosting.
+ * 2.  **JSON Generation:** The list of `ProcessedNote` objects is then used to build the final JSON.
+ *      For each staff, we filter the list to find its primary and ghost notes and assemble them
+ *      into the required JSON structure.
  *
  * The final JSON structure looks like this:
  * ```json
@@ -40,7 +39,6 @@ private val GHOST_NOTE_RANGE = 36..72
  *   "bass": [{"keys":["g/3"], "duration":"w"}]
  * }
  * ```
- *
  */
 fun List<Note>.toVexflowJson(): String {
     Timber.d("toVexflowJson() called with notes: $this")
@@ -48,59 +46,39 @@ fun List<Note>.toVexflowJson(): String {
         return "{\"treble\":[], \"bass\":[]}"
     }
 
-    val trebleNotes = mutableListOf<Note>()
-    val bassNotes = mutableListOf<Note>()
-    val ghostNotesForTreble = mutableListOf<Note>()
-    val ghostNotesForBass = mutableListOf<Note>()
+    val result = this.mapNotNull { note ->
+        note.pitchToVexflow()?.let {
+            ProcessedNote(
+                key = it,
+                primaryStaff = if (note.pitch >= 60) Staff.TREBLE else Staff.BASS,
+                isGhostCandidate = note.pitch in GHOST_NOTE_RANGE
+            )
+        }
+    }.groupBy { it.primaryStaff }.let { notesByStaff ->
+        val staffJsons = Staff.entries.associate { staff ->
+            val primaryNotes = notesByStaff[staff] ?: emptyList()
+            val ghostSourceNotes = notesByStaff[if (staff == Staff.TREBLE) Staff.BASS else Staff.TREBLE] ?: emptyList()
 
-    this.forEach { note ->
-        when {
-            note.pitch > 72 -> { // Definitely treble, outside ghost range
-                trebleNotes.add(note)
-            }
-            note.pitch >= 60 -> { // Treble, but inside ghost range
-                trebleNotes.add(note)
-                ghostNotesForBass.add(note)
-            }
-            note.pitch >= 36 -> { // Bass, but inside ghost range
-                bassNotes.add(note)
-                ghostNotesForTreble.add(note)
-            }
-            else -> { // Definitely bass, outside ghost range
-                bassNotes.add(note)
-            }
+            val primaryKeys = primaryNotes.map { it.key }
+            val ghostKeys = ghostSourceNotes
+                .filter { it.isGhostCandidate }
+                .map { it.key }
+
+            val primaryJson = primaryKeys.takeIf { it.isNotEmpty() }?.let { createVexflowNoteJson(it, isGhost = false) }
+            val ghostJson = ghostKeys.takeIf { it.isNotEmpty() }?.let { createVexflowNoteJson(it, isGhost = true) }
+
+            val staffJsonContent = listOfNotNull(primaryJson, ghostJson).joinToString(separator = ",", prefix = "[", postfix = "]")
+
+            staff.name.lowercase() to staffJsonContent
+        }
+
+        staffJsons.entries.joinToString(separator = ", ", prefix = "{", postfix = "}") { (staffName, json) ->
+            "\"$staffName\":$json"
         }
     }
 
-    val trebleNoteObjects = createNoteObjects(primary = trebleNotes, ghost = ghostNotesForTreble)
-    val bassNoteObjects = createNoteObjects(primary = bassNotes, ghost = ghostNotesForBass)
-
-    val result = "{\"treble\":$trebleNoteObjects, \"bass\":$bassNoteObjects}"
     Timber.d("toVexflowJson() result: $result")
     return result
-}
-
-/**
- * Creates a JSON array string representing notes for a single staff.
- *
- * This function takes two lists of notes: primary notes that belong to the staff,
- * and ghost notes that are duplicates from the adjacent staff. It converts them
- * into a JSON array of VexFlow note objects. Ghost notes are marked with a special flag.
- *
- * @param primary A list of `Note` objects that primarily belong to this staff.
- * @param ghost A list of `Note` objects to be displayed as "ghost" notes on this staff.
- * @return A string representing a JSON array of VexFlow note objects.
- *         Example: `[{"keys":["c/4", "e/4"], "duration":"w"}, {"keys":["a/3"], "duration":"w", "ghost":true}]`
- */
-private fun createNoteObjects(primary: List<Note>, ghost: List<Note>): String {
-    val objects = mutableListOf<String>()
-    primary.mapNotNull { it.pitchToVexflow() }.takeIf { it.isNotEmpty() }?.let {
-        objects.add(createVexflowNoteJson(it, isGhost = false))
-    }
-    ghost.mapNotNull { it.pitchToVexflow() }.takeIf { it.isNotEmpty() }?.let {
-        objects.add(createVexflowNoteJson(it, isGhost = true))
-    }
-    return objects.joinToString(separator = ",", prefix = "[", postfix = "]")
 }
 
 /**
