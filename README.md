@@ -43,7 +43,7 @@ The application includes the following features:
         -   The app waits for the correct note to be played.
         -   Moves to the next note upon a correct press.
         -   Monitors the sequence and accuracy of the performance.
-    -   Other training modes are planned for future development.
+    -   For better readability, a **Ghost Notes** feature displays notes in the crossover area on both staves simultaneously.
 
 4.  **MIDI Message Processing:**
     -   Handles key press and release events.
@@ -55,3 +55,4 @@ The application includes the following features:
     -   Displays information about the keys being pressed.
     -   Indicates the currently expected note from the file.
     -   Analyzes and provides an assessment of the performance.
+
