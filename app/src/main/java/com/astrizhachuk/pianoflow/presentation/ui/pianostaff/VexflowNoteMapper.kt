@@ -48,11 +48,29 @@ fun List<Note>.toVexflowJson(): String {
         return "{\"treble\":[], \"bass\":[]}"
     }
 
-    val trebleNotes = this.filter { it.pitch >= 60 }
-    val bassNotes = this.filter { it.pitch < 60 }
+    val trebleNotes = mutableListOf<Note>()
+    val bassNotes = mutableListOf<Note>()
+    val ghostNotesForTreble = mutableListOf<Note>()
+    val ghostNotesForBass = mutableListOf<Note>()
 
-    val ghostNotesForTreble = bassNotes.filter { it.pitch in GHOST_NOTE_RANGE }
-    val ghostNotesForBass = trebleNotes.filter { it.pitch in GHOST_NOTE_RANGE }
+    this.forEach { note ->
+        when {
+            note.pitch > 72 -> { // Definitely treble, outside ghost range
+                trebleNotes.add(note)
+            }
+            note.pitch >= 60 -> { // Treble, but inside ghost range
+                trebleNotes.add(note)
+                ghostNotesForBass.add(note)
+            }
+            note.pitch >= 36 -> { // Bass, but inside ghost range
+                bassNotes.add(note)
+                ghostNotesForTreble.add(note)
+            }
+            else -> { // Definitely bass, outside ghost range
+                bassNotes.add(note)
+            }
+        }
+    }
 
     val trebleNoteObjects = createNoteObjects(primary = trebleNotes, ghost = ghostNotesForTreble)
     val bassNoteObjects = createNoteObjects(primary = bassNotes, ghost = ghostNotesForBass)
