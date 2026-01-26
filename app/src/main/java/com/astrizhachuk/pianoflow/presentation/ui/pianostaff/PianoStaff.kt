@@ -52,6 +52,20 @@ fun PianoStaff(
         }
     }
 
+    AndroidView(
+        factory = {
+            webView.apply {
+                webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        isPageLoaded = true
+                    }
+                }
+                loadUrl("file:///android_asset/vexflow.html")
+            }
+        },
+        modifier = modifier.onSizeChanged { viewSize = it }
+    )
+
     LaunchedEffect(notesJson, viewSize, isPageLoaded) {
         if (!isPageLoaded || viewSize == IntSize.Zero) return@LaunchedEffect
 
@@ -70,18 +84,4 @@ fun PianoStaff(
         """
         webView.evaluateJavascript(script, null)
     }
-
-    AndroidView(
-        factory = {
-            webView.apply {
-                webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView?, url: String?) {
-                        isPageLoaded = true
-                    }
-                }
-                loadUrl("file:///android_asset/vexflow.html")
-            }
-        },
-        modifier = modifier.onSizeChanged { viewSize = it }
-    )
 }

@@ -396,7 +396,7 @@ note on link
 end note
 
 state WaitingForSize
-WaitingForSize : // Это промежуточное состояние, ожидающее размера
+WaitingForSize : Страница загружена (isPageLoaded = true),\nно размер компонента еще не определен (viewSize = IntSize.Zero)
 
 WaitingForSize --> ReadyToDraw : onSizeChanged(size) [size != IntSize.Zero]
 note on link
