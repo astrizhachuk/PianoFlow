@@ -434,7 +434,6 @@ box "Presentation Layer (Kotlin/Compose)" #LightBlue
 end box
 
 box "WebView (Java/Android)" #LightGreen
-    participant "AndroidView" as AndroidView
     participant "WebView" as WebView
     participant "WebViewClient" as WebViewClient
 end box
@@ -444,33 +443,49 @@ box "VexFlow (HTML/JavaScript)" #LightYellow
     participant "drawGrandStaff()" as DrawJsFunc
 end box
 
-VM -> Screen : Обновляет UiState (с notesJson)
-activate Screen
+== Инициализация компонента ==
 
-Screen -> StaffComposable : Передает новый notesJson
+Screen -> StaffComposable : Начальная композиция
 activate StaffComposable
 
-alt Первый запуск
-    StaffComposable -> WebView : create()
-    WebView -> WebViewClient : set
-    WebView -> HtmlPage : loadUrl(...)
-    HtmlPage -> WebViewClient : onPageFinished()
-    WebViewClient -> StaffComposable : isPageLoaded = true
-end
+note over StaffComposable, WebView: WebView и WebViewClient создаются\nи живут все время жизни компонента.
 
-alt notesJson, viewSize или isPageLoaded изменились
-    StaffComposable -> StaffComposable : LaunchedEffect
-    StaffComposable -> WebView : evaluateJavascript("drawGrandStaff(...)")
-    activate WebView
-    WebView -> HtmlPage : Вызывает JS-функцию
-    activate HtmlPage
-    HtmlPage -> DrawJsFunc : drawGrandStaff(treble, bass, orientation)
-    deactivate HtmlPage
-    deactivate WebView
-end
+StaffComposable -> WebView : create() & remember()
+StaffComposable -> WebViewClient : webViewClient = ...
+StaffComposable -> WebView : loadUrl(".../vexflow.html")
+
+note right of WebView: Загрузка HTML происходит асинхронно
+
+... через некоторое время ...
+
+HtmlPage -> WebViewClient : onPageFinished()
+activate WebViewClient
+WebViewClient -> StaffComposable : isPageLoaded = true
+deactivate WebViewClient
+
+deactivate StaffComposable
+
+== Обновление нот ==
+
+VM -> Screen : Обновляет UiState (с новым notesJson)
+activate Screen
+
+Screen -> StaffComposable : Рекомпозиция (передает новый notesJson)
+activate StaffComposable
+
+StaffComposable -> StaffComposable : Запускается LaunchedEffect
+StaffComposable -> WebView : evaluateJavascript("drawGrandStaff(...)")
+
+note right of WebView: Выполнение JS также асинхронно
+
+... JS выполняется внутри WebView ...
+WebView -> HtmlPage : Вызывает JS-функцию
+activate HtmlPage
+HtmlPage -> DrawJsFunc : drawGrandStaff(...)
+deactivate HtmlPage
+
 deactivate StaffComposable
 deactivate Screen
-
 
 @enduml
 ```
