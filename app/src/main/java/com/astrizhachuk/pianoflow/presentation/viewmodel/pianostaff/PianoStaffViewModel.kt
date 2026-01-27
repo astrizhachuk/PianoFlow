@@ -1,8 +1,8 @@
+
 package com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tracing.trace
 import com.astrizhachuk.pianoflow.domain.usecase.midi.ObserveMidiMessagesUseCase
 import com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState
 import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.toVexflowJson
@@ -16,56 +16,31 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * ViewModel для экрана нотного стана.
+ * ViewModel for the piano staff screen.
  *
- * Эта ViewModel отвечает за получение MIDI-сообщений, их обработку в музыкальные ноты
- * и предоставление состояния для UI, чтобы отображать ноты на нотном стане.
- * Она разделяет ноты на скрипичный и басовый ключи и преобразует их в JSON-формат,
- * подходящий для библиотеки рендеринга, такой как VexFlow.
+ * This ViewModel is responsible for observing MIDI messages, which are received as a list of notes
+ * from the [ObserveMidiMessagesUseCase]. It then converts these notes into a JSON format suitable
+ * for VexFlow and exposes this JSON within a [PianoStaffUiState] to be rendered by the UI.
  *
- * @param observeMidiMessagesUseCase Use case для получения входящих MIDI-сообщений.
+ * @param observeMidiMessagesUseCase The use case for observing incoming MIDI messages.
  */
 @HiltViewModel
 class PianoStaffViewModel @Inject constructor(
-    observeMidiMessagesUseCase: ObserveMidiMessagesUseCase
+    private val observeMidiMessagesUseCase: ObserveMidiMessagesUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PianoStaffUiState())
     val uiState: StateFlow<PianoStaffUiState> = _uiState.asStateFlow()
 
     init {
-        trace("PianoStaffViewModel.init") {
-            Timber.i("init: ViewModel created.")
-            viewModelScope.launch {
-                observeMidiMessagesUseCase().collect { notes ->
-                    Timber.d("collect: Received ${notes.size} notes.")
-                    val (bassNotes, trebleNotes) = notes.partition { it.pitch < 60 }
-                    Timber.d("collect: Partitioned notes - Bass: ${bassNotes.size}, Treble: ${trebleNotes.size}")
-
-                    _uiState.update {
-                        val newTrebleJson = trebleNotes.toVexflowJson()
-                        val newBassJson = bassNotes.toVexflowJson()
-                        Timber.d("collect: Updating UI state - Treble JSON: $newTrebleJson, Bass JSON: $newBassJson")
-                        it.copy(
-                            trebleNotesJson = newTrebleJson,
-                            bassNotesJson = newBassJson
-                        )
-                    }
+        Timber.i("Initializing PianoStaffViewModel and starting to observe MIDI messages.")
+        viewModelScope.launch {
+            observeMidiMessagesUseCase().collect { notes ->
+                Timber.d("Received ${notes.size} notes, updating UI state.")
+                _uiState.update {
+                    it.copy(notesJson = notes.toVexflowJson())
                 }
             }
         }
-    }
-
-    /**
-     * Вызывается, когда ViewModel больше не используется и будет уничтожена.
-     *
-     * Этот метод переопределен для добавления логирования в целях отладки. Он фиксирует
-     * момент уничтожения ViewModel, что помогает отслеживать ее жизненный цикл и выявлять
-     * возможные утечки памяти или некорректное поведение.
-     * Все корутины, запущенные в `viewModelScope`, автоматически отменяются при вызове этого метода.
-     */
-    override fun onCleared() {
-        super.onCleared()
-        Timber.i("onCleared: ViewModel destroyed.")
     }
 }

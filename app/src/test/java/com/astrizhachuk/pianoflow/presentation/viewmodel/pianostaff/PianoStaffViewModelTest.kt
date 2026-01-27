@@ -15,12 +15,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Assert
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.lang.reflect.Method
 
 @ExperimentalCoroutinesApi
 class PianoStaffViewModelTest {
@@ -44,14 +42,14 @@ class PianoStaffViewModelTest {
     fun setUp() {
         midiMessagesFlow = MutableSharedFlow()
         every { observeMidiMessagesUseCase() } returns midiMessagesFlow
-        viewModel = PianoStaffViewModel(observeMidiMessagesUseCase)
         // Мокируем статическую функцию-расширение
         mockkStatic(mapperFile)
+        viewModel = PianoStaffViewModel(observeMidiMessagesUseCase)
     }
 
     @After
     fun tearDown() {
-        // Отменяем мок после каждого теста, чтобы не влиять на другие тесты
+        // Отменяем мок после каждого теста
         unmockkStatic(mapperFile)
     }
 
@@ -59,21 +57,19 @@ class PianoStaffViewModelTest {
     fun `uiState starts with initial empty json state`() = runTest {
         // Assert
         viewModel.uiState.test {
-            val expectedState = PianoStaffUiState(trebleNotesJson = "[]", bassNotesJson = "[]")
+            val expectedState = PianoStaffUiState(notesJson = "{\"treble\":[], \"bass\":[]}")
             assertEquals(expectedState, awaitItem())
         }
     }
 
     @Test
-    fun `when notes are emitted, ViewModel partitions them and uses mapper`() = runTest {
+    fun `when notes are emitted, ViewModel uses mapper to update notesJson`() = runTest {
         // Arrange
-        val bassNote = Note(pitch = 59)
-        val trebleNote = Note(pitch = 60)
-        val notes = listOf(bassNote, trebleNote)
+        val notes = listOf(Note(pitch = 59), Note(pitch = 60))
+        val expectedJson = "mock_json_for_notes"
 
-        // Задаем поведение для мока: при вызове toVexflowJson возвращать заглушки
-        every { listOf(bassNote).toVexflowJson() } returns "bass_json_mock"
-        every { listOf(trebleNote).toVexflowJson() } returns "treble_json_mock"
+        // Задаем поведение для мока: при вызове toVexflowJson с любым списком возвращать заглушку
+        every { notes.toVexflowJson() } returns expectedJson
 
         viewModel.uiState.test {
             assertEquals(PianoStaffUiState(), awaitItem()) // Проверяем начальное состояние
@@ -82,75 +78,34 @@ class PianoStaffViewModelTest {
             midiMessagesFlow.emit(notes)
 
             // Assert
-            // Проверяем, что ViewModel правильно использовала результаты от мок-маппера
             val newState = awaitItem()
-            assertEquals("treble_json_mock", newState.trebleNotesJson)
-            assertEquals("bass_json_mock", newState.bassNotesJson)
-        }
-    }
-
-    @Test
-    fun `when only treble notes are emitted, bass json is empty`() = runTest {
-        // Arrange
-        val trebleChord = listOf(Note(60), Note(64), Note(67))
-        val emptyBassList = emptyList<Note>()
-
-        every { trebleChord.toVexflowJson() } returns "chord_json_mock"
-        // Логика для пустого списка простая, но для чистоты изоляции мокируем и ее
-        every { emptyBassList.toVexflowJson() } returns "[]"
-
-        viewModel.uiState.test {
-            assertEquals(PianoStaffUiState(), awaitItem())
-
-            // Act
-            midiMessagesFlow.emit(trebleChord)
-
-            // Assert
-            val newState = awaitItem()
-            assertEquals("chord_json_mock", newState.trebleNotesJson)
-            assertEquals("[]", newState.bassNotesJson)
+            assertEquals(expectedJson, newState.notesJson)
         }
     }
 
     @Test
     fun `when use case emits an empty list then uiState is updated with empty json`() = runTest {
-        // Этот тест не требует сложной логики моков, так как проверяет простой путь,
-        // но мы оставляем мок для консистентности
-
         // Arrange
-        every { listOf(Note(pitch = 60)).toVexflowJson() } returns "any_json"
-        every { emptyList<Note>().toVexflowJson() } returns "[]"
+        val initialNotes = listOf(Note(pitch = 60))
+        val initialJson = "initial_json"
+        val emptyJson = "{\"treble\":[], \"bass\":[]}"
+
+        every { initialNotes.toVexflowJson() } returns initialJson
+        every { emptyList<Note>().toVexflowJson() } returns emptyJson
 
         viewModel.uiState.test {
             assertEquals(PianoStaffUiState(), awaitItem())
 
             // Сначала эмитируем непустой список, чтобы состояние изменилось
-            midiMessagesFlow.emit(listOf(Note(pitch = 60)))
-            awaitItem() // Пропускаем это состояние
+            midiMessagesFlow.emit(initialNotes)
+            assertEquals(initialJson, awaitItem().notesJson)
 
             // Act: Эмитируем пустой список
             midiMessagesFlow.emit(emptyList())
 
             // Assert
             val finalState = awaitItem()
-            assertEquals("[]", finalState.trebleNotesJson)
-            assertEquals("[]", finalState.bassNotesJson)
-        }
-    }
-
-    @Test
-    fun `onCleared does not throw exception`() {
-        // Act & Assert
-        // Этот тест проверяет, что protected-метод onCleared() может быть выполнен без сбоев.
-        // Так как метод protected, для его вызова в тесте используется рефлексия.
-        // Если исключение не будет брошено, тест считается пройденным.
-        try {
-            val method: Method = PianoStaffViewModel::class.java.getDeclaredMethod("onCleared")
-            method.isAccessible = true // Делаем protected-метод доступным для вызова
-            method.invoke(viewModel)
-        } catch (e: Exception) {
-            // Принудительно проваливаем тест, если было поймано любое исключение
-            Assert.fail("onCleared() should not throw an exception, but threw $e")
+            assertEquals(emptyJson, finalState.notesJson)
         }
     }
 }

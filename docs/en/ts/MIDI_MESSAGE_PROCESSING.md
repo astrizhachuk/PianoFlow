@@ -108,8 +108,7 @@ interface MidiRepository {
 ```kotlin
 // com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState.kt
 data class PianoStaffUiState(
-    val trebleNotesJson: String = "[]",
-    val bassNotesJson: String = "[]"
+    val notesJson: String = "[]"
 )
 
 // com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffViewModel.kt
@@ -141,8 +140,7 @@ fun PianoStaffScreen(
         contentAlignment = Alignment.Center
     ) {
         PianoStaff(
-            trebleNotesJson = uiState.trebleNotesJson,
-            bassNotesJson = uiState.bassNotesJson
+            notesJson = uiState.notesJson
         )
     }
 }
@@ -288,10 +286,8 @@ deactivate Receiver
 
 4.  **Displaying on the UI**:
     *   `PianoStaffViewModel` subscribes to the `Flow<List<Note>>` from `ObserveMidiMessagesUseCase`.
-    *   Inside the `ViewModel`, the notes are divided into two lists: for the bass (`pitch < 60`) and treble clefs.
-    *   Each of the lists is converted to a JSON string using `toVexflowJson()`.
-    *   `PianoStaffViewModel` updates its `StateFlow<PianoStaffUiState>`, which contains two JSON strings: `trebleNotesJson` and `bassNotesJson`.
-    *   `PianoStaffScreen`, which is subscribed to `uiState`, receives these JSON strings and passes them to the `PianoStaff` `Composable` component for final drawing.
+    *   `PianoStaffViewModel` converts the list of notes into a JSON string using `toVexflowJson()` and updates its `StateFlow<PianoStaffUiState>`, which contains the `notesJson` JSON string.
+    *   `PianoStaffScreen`, which is subscribed to `uiState`, receives this JSON string and passes it to the `PianoStaff` `Composable` component for final drawing.
 
 ```plantuml
 @startuml
@@ -326,7 +322,6 @@ UC -> VM : Sends Flow<List<Note>>
 deactivate UC
 activate VM
 
-VM -> VM : Divides notes into bass and treble
 VM -> VM : Converts note lists to JSON
 VM -> VM : Updates uiState
 VM -> Screen : Passes the new state (UiState with JSON)
@@ -357,7 +352,7 @@ The musical staff is drawn using a `WebView` and the [VexFlow](https://www.vexfl
 1.  **`WebView` Initialization:** When the `PianoStaff` `Composable` is created, `AndroidView` initializes the `WebView` and loads the local HTML file `file:///android_asset/vexflow.html`.
 2.  **Data Transfer:** Each time the `uiState` is updated in `PianoStaffScreen`, the `update` block of `AndroidView` is called.
 3.  **JavaScript Invocation:** Inside `update`, the JavaScript function `drawNotes` is called in the `WebView` using the `evaluateJavascript` method.
-4.  **Drawing in `WebView`:** Two JSON strings are passed as arguments to `drawNotes`: `trebleNotesJson` and `bassNotesJson`. The JavaScript code in `vexflow.html` parses these strings and uses the VexFlow API to draw notes on an SVG canvas inside the `WebView`.
+4.  **Drawing in `WebView`:** The `notesJson` JSON string is passed as an argument to `drawNotes`. The JavaScript code in `vexflow.html` parses this string and uses the VexFlow API to draw notes on an SVG canvas inside the `WebView`.
 
 **Interaction Diagram**
 
@@ -381,7 +376,7 @@ box "VexFlow (HTML/JavaScript)" #LightYellow
     participant "VexFlow.js" as VexFlowLib
 end box
 
-Screen -> StaffComposable : Passes JSON strings
+Screen -> StaffComposable : Passes JSON string
 activate StaffComposable
 
 StaffComposable -> AndroidView : (update)
@@ -393,7 +388,7 @@ activate WebView
 WebView -> HtmlPage : Invokes JS function
 activate HtmlPage
 
-HtmlPage -> DrawJsFunc : drawNotes(trebleJson, bassJson)
+HtmlPage -> DrawJsFunc : drawNotes(notesJson)
 activate DrawJsFunc
 
 DrawJsFunc -> VexFlowLib : Uses API for drawing

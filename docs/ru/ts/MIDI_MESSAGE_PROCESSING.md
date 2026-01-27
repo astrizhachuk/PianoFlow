@@ -108,18 +108,27 @@ interface MidiRepository {
 ```kotlin
 // com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState.kt
 data class PianoStaffUiState(
-    val trebleNotesJson: String = "[]",
-    val bassNotesJson: String = "[]"
+    val notesJson: String = "{"treble":[], "bass":[]}"
 )
 
 // com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffViewModel.kt
 @HiltViewModel
 class PianoStaffViewModel @Inject constructor(
-    observeMidiMessagesUseCase: ObserveMidiMessagesUseCase
+    private val observeMidiMessagesUseCase: ObserveMidiMessagesUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PianoStaffUiState())
     val uiState: StateFlow<PianoStaffUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            observeMidiMessagesUseCase().collect { notes ->
+                _uiState.update {
+                    it.copy(notesJson = notes.toVexflowJson())
+                }
+            }
+        }
+    }
 }
 ```
 
@@ -135,15 +144,10 @@ fun PianoStaffScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 32.dp, vertical = 32.dp),
+        modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        PianoStaff(
-            trebleNotesJson = uiState.trebleNotesJson,
-            bassNotesJson = uiState.bassNotesJson
-        )
+        PianoStaff(notesJson = uiState.notesJson)
     }
 }
 ```
@@ -288,10 +292,8 @@ deactivate Receiver
 
 4.  **Отображение на UI**:
     *   `PianoStaffViewModel` подписывается на `Flow<List<Note>>` от `ObserveMidiMessagesUseCase`.
-    *   Внутри `ViewModel` ноты разделяются на два списка: для басового (`pitch < 60`) и скрипичного ключей.
-    *   Каждый из списков преобразуется в JSON-строку с помощью `toVexflowJson()`.
-    *   `PianoStaffViewModel` обновляет свой `StateFlow<PianoStaffUiState>`, который содержит две JSON-строки: `trebleNotesJson` и `bassNotesJson`.
-    *   `PianoStaffScreen`, подписанный на `uiState`, получает эти JSON-строки и передает их в `Composable`-компонент `PianoStaff` для финальной отрисовки.
+    *   `PianoStaffViewModel` преобразует список нот в JSON-строку с помощью `toVexflowJson()` и обновляет свой `StateFlow<PianoStaffUiState>`, который содержит JSON-строку `notesJson`.
+    *   `PianoStaffScreen`, подписанный на `uiState`, получает эту JSON-строку и передает ее в `Composable`-компонент `PianoStaff` для финальной отрисовки.
 
 ```plantuml
 @startuml
@@ -326,7 +328,6 @@ UC -> VM : Отправляет Flow<List<Note>>
 deactivate UC
 activate VM
 
-VM -> VM : Разделяет ноты на басовые и скрипичные
 VM -> VM : Преобразует списки нот в JSON
 VM -> VM : Обновляет uiState
 VM -> Screen : Передает новое состояние (UiState с JSON)
@@ -348,16 +349,77 @@ deactivate Screen
 
 **Ключевые компоненты:**
 
-- **`PianoStaff` Composable:** Оборачивает `AndroidView`, в котором создается и настраивается `WebView`.
+- **`PianoStaff` Composable:** Оборачивает `AndroidView`, в котором создается и настраивается `WebView`. Этот компонент отвечает за управление жизненным циклом `WebView` и его перерисовку.
+- **`VexflowNoteMapper.kt`**: Содержит логику преобразования `List<Note>` в конечный JSON-объект. Эта логика включает разделение нот по нотоносцам и создание "фантомных" нот для удобочитаемости.
 - **`vexflow.html`:** HTML-файл, расположенный в `app/src/main/assets/`. Он содержит базовую разметку, стили и основной JavaScript-код для работы с VexFlow.
 - **`vexflow.js`:** Сама библиотека VexFlow (версия [4.2.2](https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js)), также расположенная в `assets`.
 
 **Процесс работы:**
 
-1.  **Инициализация `WebView`:** При создании `PianoStaff` `Composable`, `AndroidView` инициализирует `WebView` и загружает локальный HTML-файл `file:///android_asset/vexflow.html`.
-2.  **Передача данных:** При каждом обновлении состояния `uiState` в `PianoStaffScreen` вызывается `update`-блок `AndroidView`.
-3.  **Вызов JavaScript:** Внутри `update` происходит вызов JavaScript-функции `drawNotes` в `WebView` с помощью метода `evaluateJavascript`.
-4.  **Отрисовка в `WebView`:** В качестве аргументов в `drawNotes` передаются две JSON-строки: `trebleNotesJson` и `bassNotesJson`. JavaScript-код в `vexflow.html` парсит эти строки и использует VexFlow API для отрисовки нот на SVG-холсте внутри `WebView`.
+1.  **Инициализация `WebView`:** `PianoStaff` создает и запоминает (`remember`) экземпляр `WebView`. Устанавливается `WebViewClient`, который отслеживает окончание загрузки страницы.
+2.  **Загрузка страницы:** `WebView` загружает `vexflow.html`. Когда загрузка завершена, `onPageFinished` обновляет флаг состояния `isPageLoaded`.
+3.  **Отслеживание размера:** Модификатор `onSizeChanged` отслеживает изменения размера `Composable`-компонента и обновляет состояние `viewSize`.
+4.  **Передача данных и отрисовка:** `LaunchedEffect` следит за изменением любого из трех состояний: `notesJson`, `viewSize` или `isPageLoaded`. Когда все условия выполнены (страница загружена, размер известен, и пришли новые ноты), `LaunchedEffect` выполняет следующие действия:
+    *   Определяет ориентацию (`landscape` или `portrait`) на основе размеров `viewSize`.
+    *   Формирует и выполняет JavaScript-код, который сначала очищает предыдущий SVG-элемент, а затем вызывает функцию `drawGrandStaff` с данными о нотах и ориентации.
+5.  **Формат JSON:** Данные передаются в виде единого JSON-объекта, который содержит отдельные массивы для скрипичного и басового ключей.
+    ```json
+    {
+      "treble": [{"keys":["c/5"], "duration":"w"}, {"keys":["g/4"], "duration":"w", "ghost":true}],
+      "bass": [{"keys":["c/4"], "duration":"w"}, {"keys":["e/3", "g/3"], "duration":"w"}]
+    }
+    ```
+
+**Диаграмма состояний жизненного цикла `PianoStaff`**
+
+Эта диаграмма показывает, как `PianoStaff` управляет своим состоянием для корректной отрисовки.
+
+```plantuml
+@startuml
+title Диаграмма состояний PianoStaff
+
+[*] --> Initializing : Composable входит в композицию
+
+state Initializing
+Initializing : Создается WebView
+Initializing : isPageLoaded = false
+Initializing : viewSize = IntSize.Zero
+
+Initializing --> LoadingPage : webView.loadUrl(...)
+
+state LoadingPage
+LoadingPage : Ожидание onPageFinished
+
+LoadingPage --> WaitingForSize : onPageFinished()
+note on link
+  isPageLoaded = true
+end note
+
+state WaitingForSize
+WaitingForSize : Страница загружена (isPageLoaded = true),\nно размер компонента еще не определен (viewSize = IntSize.Zero)
+
+WaitingForSize --> ReadyToDraw : onSizeChanged(size) [size != IntSize.Zero]
+note on link
+  viewSize обновлен
+end note
+
+state ReadyToDraw
+ReadyToDraw : isPageLoaded = true
+ReadyToDraw : viewSize известен
+
+state Drawing
+Drawing : Выполняется evaluateJavascript(...)
+
+ReadyToDraw --> Drawing : notesJson изменился
+Drawing --> ReadyToDraw : Отрисовка завершена
+
+ReadyToDraw --> Drawing : viewSize изменился
+note on link
+  Перерисовка с новым размером
+end note
+
+@enduml
+```
 
 **Диаграмма взаимодействия**
 
@@ -366,49 +428,64 @@ deactivate Screen
 title Диаграмма взаимодействия: Отображение нот через WebView
 
 box "Presentation Layer (Kotlin/Compose)" #LightBlue
+    participant "PianoStaffViewModel" as VM
     participant "PianoStaffScreen" as Screen
     participant "PianoStaff" as StaffComposable
 end box
 
 box "WebView (Java/Android)" #LightGreen
-    participant "AndroidView" as AndroidView
     participant "WebView" as WebView
+    participant "WebViewClient" as WebViewClient
 end box
 
 box "VexFlow (HTML/JavaScript)" #LightYellow
     participant "vexflow.html" as HtmlPage
-    participant "drawNotes()" as DrawJsFunc
-    participant "VexFlow.js" as VexFlowLib
+    participant "drawGrandStaff()" as DrawJsFunc
 end box
 
-Screen -> StaffComposable : Передает JSON-строки
+== Инициализация компонента ==
+
+Screen -> StaffComposable : Начальная композиция
 activate StaffComposable
 
-StaffComposable -> AndroidView : (update)
-activate AndroidView
+note over StaffComposable, WebView: WebView и WebViewClient создаются\nи живут все время жизни компонента.
 
-AndroidView -> WebView : evaluateJavascript("drawNotes(...)")
-activate WebView
+StaffComposable -> WebView : create() & remember()
+StaffComposable -> WebViewClient : webViewClient = ...
+StaffComposable -> WebView : loadUrl(".../vexflow.html")
 
+note right of WebView: Загрузка HTML происходит асинхронно
+
+... через некоторое время ...
+
+HtmlPage -> WebViewClient : onPageFinished()
+activate WebViewClient
+WebViewClient -> StaffComposable : isPageLoaded = true
+deactivate WebViewClient
+
+deactivate StaffComposable
+
+== Обновление нот ==
+
+VM -> Screen : Обновляет UiState (с новым notesJson)
+activate Screen
+
+Screen -> StaffComposable : Рекомпозиция (передает новый notesJson)
+activate StaffComposable
+
+StaffComposable -> StaffComposable : Запускается LaunchedEffect
+StaffComposable -> WebView : evaluateJavascript("drawGrandStaff(...)")
+
+note right of WebView: Выполнение JS также асинхронно
+
+... JS выполняется внутри WebView ...
 WebView -> HtmlPage : Вызывает JS-функцию
 activate HtmlPage
-
-HtmlPage -> DrawJsFunc : drawNotes(trebleJson, bassJson)
-activate DrawJsFunc
-
-DrawJsFunc -> VexFlowLib : Использует API для отрисовки
-activate VexFlowLib
-VexFlowLib --> DrawJsFunc : SVG-элементы нот
-deactivate VexFlowLib
-
-DrawJsFunc --> HtmlPage : Вставляет SVG в DOM
-
-HtmlPage --> WebView : Отображает результат
-deactivate DrawJsFunc
+HtmlPage -> DrawJsFunc : drawGrandStaff(...)
 deactivate HtmlPage
-deactivate WebView
-deactivate AndroidView
+
 deactivate StaffComposable
+deactivate Screen
 
 @enduml
 ```
@@ -421,6 +498,7 @@ deactivate StaffComposable
 - Система реагирует только на сообщения о нажатии клавиш (`Note On`); сообщения об отпускании (`Note Off`) и другие типы MIDI-сообщений игнорируются.
 - Визуализация нот на экране происходит без видимых задержек после нажатия клавиши.
 - Функционал стабильно работает при быстром и многократном нажатии клавиш, приложение не падает и не зависает.
+- При повороте экрана нотный стан корректно перерисовывается с учетом новой ориентации.
 
 ## См. также
 
