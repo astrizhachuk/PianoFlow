@@ -39,6 +39,7 @@ import java.util.Locale
  *                  `"treble"` and `"bass"` keys, each with a list of note objects.
  *                  Example: `{"treble":[{"keys":["c/4"],"duration":"q"}],"bass":[]}`.
  * @param modifier The modifier to be applied to the WebView container.
+ * @param isPortrait A boolean flag indicating the orientation of the staff.
  * @param onChordAnalyzed A callback function that is invoked with the name of the detected chord
  *                        (e.g., "Cmaj7") or `null` if no chord could be identified or if no notes
  *                        were provided.
@@ -48,6 +49,7 @@ import java.util.Locale
 fun PianoStaff(
     modifier: Modifier = Modifier,
     notesJson: String,
+    isPortrait: Boolean,
     onChordAnalyzed: (String?) -> Unit
 ) {
     val context = LocalContext.current
@@ -89,25 +91,12 @@ fun PianoStaff(
         }
     }
 
-    // Вычисляем параметры для отображения, которые зависят только от размера.
-    // Это позволяет не пересчитывать их при каждом изменении нот.
-    val visualConfig = remember(viewSize) {
-        if (viewSize == IntSize.Zero) {
-            null
-        } else {
-            object {
-                val orientation = if (viewSize.width > viewSize.height) "landscape" else "portrait"
-                val width = (viewSize.width / context.resources.displayMetrics.density).toInt()
-                val height = (viewSize.height / context.resources.displayMetrics.density).toInt()
-            }
-        }
-    }
+    // Обновляем отображение при изменении нот или ориентации.
+    LaunchedEffect(notesJson, isPortrait, isPageLoaded) {
+        if (!isPageLoaded || viewSize == IntSize.Zero) return@LaunchedEffect
 
-    // Обновляем отображение при изменении нот или конфигурации отображения.
-    LaunchedEffect(notesJson, visualConfig, isPageLoaded) {
-        if (!isPageLoaded || visualConfig == null) return@LaunchedEffect
-
-        val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, '${visualConfig.orientation}', ${visualConfig.width}, ${visualConfig.height});"
+        // Теперь размеры не передаются, JS их определяет сам, а ориентация передается как boolean
+        val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, $isPortrait);"
         webView.evaluateJavascript(drawScript, null)
     }
 }
@@ -127,7 +116,6 @@ private fun WebView.handleChordAnalysis(notesJson: String, onChordAnalyzed: (Str
                     noteName
                 }
             }
-            // --- ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ: Сортируем ноты перед отправкой в Tonal.js ---
             .sorted()
     } catch (e: Exception) {
         Timber.tag("ChordAnalysis").e(e, "Failed to parse notesJson")

@@ -4,10 +4,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <style>
         body, html {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            display: flex; align-items: center; justify-content: center;
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
         }
-        #staff { display: inline-block; }
+        #staff {
+            width: 100%;
+            height: 100%;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -65,10 +68,18 @@
         return "Аккорд не определен";
     }
 
-    function drawGrandStaff(trebleNotesData, bassNotesData, orientation, width, height) {
+    function drawGrandStaff(trebleNotesData, bassNotesData, isPortrait) {
         const div = document.getElementById("staff");
         if (!div) return;
         div.innerHTML = '';
+
+        const width = div.clientWidth;
+        const height = div.clientHeight;
+
+        if (width <= 0 || height <= 0) {
+            console.log("JS: Container has no size yet.");
+            return;
+        }
 
         if (typeof Vex === 'undefined' || typeof Vex.Flow === 'undefined') return;
 
@@ -78,10 +89,10 @@
             const context = renderer.getContext();
 
             let settings;
-            if (orientation === 'landscape') {
-                settings = { scale: 0.75, trebleY: 80, bassY: 260 };
-            } else { // portrait
+            if (isPortrait) {
                 settings = { scale: 1.0, trebleY: 80, bassY: 260 };
+            } else { // landscape
+                settings = { scale: 0.75, trebleY: 80, bassY: 260 };
             }
 
             context.scale(settings.scale, settings.scale);

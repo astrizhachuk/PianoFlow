@@ -32,7 +32,7 @@ import com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffVi
  * is collected from the [PianoStaffViewModel] and updated via callbacks.
  *
  * @param modifier The modifier to be applied to the screen's root layout.
- * @param viewModel The [PianoStaffViewModel] instance used for state management,
+ * @param viewModel The [PianoStaffViewModel] instance for state management,
  *                  provided by Hilt.
  */
 @Composable
@@ -57,6 +57,7 @@ fun PianoStaffScreen(
         PianoStaff(
             modifier = staffModifier,
             notesJson = uiState.notesJson,
+            isPortrait = isPortrait,
             onChordAnalyzed = { viewModel.updateChordName(it) }
         )
     }
