@@ -91,8 +91,8 @@ fun PianoStaff(
         }
     }
 
-    // Обновляем отображение при изменении нот или ориентации.
-    LaunchedEffect(notesJson, isPortrait, isPageLoaded) {
+    // Обновляем отображение при изменении нот, ориентации или размера.
+    LaunchedEffect(notesJson, isPortrait, isPageLoaded, viewSize) {
         if (!isPageLoaded || viewSize == IntSize.Zero) return@LaunchedEffect
 
         // Теперь размеры не передаются, JS их определяет сам, а ориентация передается как boolean
