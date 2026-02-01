@@ -24,6 +24,9 @@ coroutines = "1.8.1"
 # Logging
 timber = "5.0.1"
 
+# JSON
+gson = "2.10.1"
+
 # Testing
 junit = "4.13.2"
 mockk = "1.13.11"
@@ -59,6 +62,9 @@ coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-
 
 # Logging
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+
+# JSON
+gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 
 # Compose
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
