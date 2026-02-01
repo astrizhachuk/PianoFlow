@@ -82,22 +82,34 @@ fun PianoStaff(
         modifier = modifier.onSizeChanged { viewSize = it }
     )
 
-    LaunchedEffect(notesJson, viewSize, isPageLoaded) {
-        if (!isPageLoaded || viewSize == IntSize.Zero) return@LaunchedEffect
-
-        webView.handleVisuals(notesJson, viewSize)
-        webView.handleChordAnalysis(notesJson, onChordAnalyzed)
+    // Анализ аккордов теперь отделен и запускается только при изменении нот.
+    LaunchedEffect(notesJson, isPageLoaded) {
+        if (isPageLoaded) {
+            webView.handleChordAnalysis(notesJson, onChordAnalyzed)
+        }
     }
-}
 
-@SuppressLint("SetJavaScriptEnabled")
-private fun WebView.handleVisuals(notesJson: String, viewSize: IntSize) {
-    val orientation = if (viewSize.width > viewSize.height) "landscape" else "portrait"
-    val width = (viewSize.width / context.resources.displayMetrics.density).toInt()
-    val height = (viewSize.height / context.resources.displayMetrics.density).toInt()
+    // Вычисляем параметры для отображения, которые зависят только от размера.
+    // Это позволяет не пересчитывать их при каждом изменении нот.
+    val visualConfig = remember(viewSize) {
+        if (viewSize == IntSize.Zero) {
+            null
+        } else {
+            object {
+                val orientation = if (viewSize.width > viewSize.height) "landscape" else "portrait"
+                val width = (viewSize.width / context.resources.displayMetrics.density).toInt()
+                val height = (viewSize.height / context.resources.displayMetrics.density).toInt()
+            }
+        }
+    }
 
-    val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, '$orientation', $width, $height);"
-    evaluateJavascript(drawScript, null)
+    // Обновляем отображение при изменении нот или конфигурации отображения.
+    LaunchedEffect(notesJson, visualConfig, isPageLoaded) {
+        if (!isPageLoaded || visualConfig == null) return@LaunchedEffect
+
+        val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, '${visualConfig.orientation}', ${visualConfig.width}, ${visualConfig.height});"
+        webView.evaluateJavascript(drawScript, null)
+    }
 }
 
 private fun WebView.handleChordAnalysis(notesJson: String, onChordAnalyzed: (String?) -> Unit) {
