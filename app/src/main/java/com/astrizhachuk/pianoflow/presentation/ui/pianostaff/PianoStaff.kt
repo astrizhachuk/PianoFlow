@@ -84,52 +84,60 @@ fun PianoStaff(
     LaunchedEffect(notesJson, viewSize, isPageLoaded) {
         if (!isPageLoaded || viewSize == IntSize.Zero) return@LaunchedEffect
 
-        Timber.tag("ChordAnalysis").d("Input notesJson: %s", notesJson)
+        webView.handleVisuals(notesJson, viewSize)
+        webView.handleChordAnalysis(notesJson, onChordAnalyzed)
+    }
+}
 
-        val orientation = if (viewSize.width > viewSize.height) "landscape" else "portrait"
-        val width = (viewSize.width / context.resources.displayMetrics.density).toInt()
-        val height = (viewSize.height / context.resources.displayMetrics.density).toInt()
+@SuppressLint("SetJavaScriptEnabled")
+private fun WebView.handleVisuals(notesJson: String, viewSize: IntSize) {
+    val orientation = if (viewSize.width > viewSize.height) "landscape" else "portrait"
+    val width = (viewSize.width / context.resources.displayMetrics.density).toInt()
+    val height = (viewSize.height / context.resources.displayMetrics.density).toInt()
 
-        val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, '$orientation', $width, $height);"
-        webView.evaluateJavascript(drawScript, null)
+    val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, '$orientation', $width, $height);"
+    evaluateJavascript(drawScript, null)
+}
 
-        val notesForAnalysis = try {
-            val notesMap = Gson().fromJson(notesJson, Map::class.java) as Map<String, List<Map<String, Any>>>
-            val allNotes = (notesMap["treble"].orEmpty() + notesMap["bass"].orEmpty())
-            allNotes.map { it["keys"] as List<String> }.flatten().distinct()
-                .map { noteName ->
-                    val parts = noteName.split("/")
-                    if (parts.size == 2) {
-                        parts[0].replaceFirstChar { it.titlecase(Locale.ROOT) } + parts[1]
-                    } else {
-                        noteName
-                    }
-                }
-                // --- ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ: Сортируем ноты перед отправкой в Tonal.js ---
-                .sorted()
-        } catch (e: Exception) {
-            Timber.tag("ChordAnalysis").e(e, "Failed to parse notesJson")
-            emptyList<String>()
-        }
-        Timber.tag("ChordAnalysis").d("Parsed and SORTED notes for Tonal.js: %s", notesForAnalysis)
+private fun WebView.handleChordAnalysis(notesJson: String, onChordAnalyzed: (String?) -> Unit) {
+    Timber.tag("ChordAnalysis").d("Input notesJson: %s", notesJson)
 
-        if (notesForAnalysis.isNotEmpty()) {
-            val notesJsArray = notesForAnalysis.joinToString(prefix = "[", postfix = "]") { "'$it'" }
-            val analysisScript = "analyzeNotesWithTonal($notesJsArray)"
-            Timber.tag("ChordAnalysis").d("Executing JS: %s", analysisScript)
-
-            webView.evaluateJavascript(analysisScript) { result ->
-                Timber.tag("ChordAnalysis").d("JS raw result: %s", result)
-                val cleanedResult = result?.removeSurrounding("\"")
-
-                if (cleanedResult.isNullOrEmpty() || cleanedResult.equals("null", ignoreCase = true)) {
-                    onChordAnalyzed(null)
+    val notesForAnalysis = try {
+        val notesMap = Gson().fromJson(notesJson, Map::class.java) as Map<String, List<Map<String, Any>>>
+        val allNotes = (notesMap["treble"].orEmpty() + notesMap["bass"].orEmpty())
+        allNotes.map { it["keys"] as List<String> }.flatten().distinct()
+            .map { noteName ->
+                val parts = noteName.split("/")
+                if (parts.size == 2) {
+                    parts[0].replaceFirstChar { it.titlecase(Locale.ROOT) } + parts[1]
                 } else {
-                    onChordAnalyzed(cleanedResult)
+                    noteName
                 }
             }
-        } else {
-            onChordAnalyzed(null)
+            // --- ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ: Сортируем ноты перед отправкой в Tonal.js ---
+            .sorted()
+    } catch (e: Exception) {
+        Timber.tag("ChordAnalysis").e(e, "Failed to parse notesJson")
+        emptyList<String>()
+    }
+    Timber.tag("ChordAnalysis").d("Parsed and SORTED notes for Tonal.js: %s", notesForAnalysis)
+
+    if (notesForAnalysis.isNotEmpty()) {
+        val notesJsArray = notesForAnalysis.joinToString(prefix = "[", postfix = "]") { "'$it'" }
+        val analysisScript = "analyzeNotesWithTonal($notesJsArray)"
+        Timber.tag("ChordAnalysis").d("Executing JS: %s", analysisScript)
+
+        evaluateJavascript(analysisScript) { result ->
+            Timber.tag("ChordAnalysis").d("JS raw result: %s", result)
+            val cleanedResult = result?.removeSurrounding("\"")
+
+            if (cleanedResult.isNullOrEmpty() || cleanedResult.equals("null", ignoreCase = true)) {
+                onChordAnalyzed(null)
+            } else {
+                onChordAnalyzed(cleanedResult)
+            }
         }
+    } else {
+        onChordAnalyzed(null)
     }
 }
