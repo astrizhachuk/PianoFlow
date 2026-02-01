@@ -1,49 +1,91 @@
-
 <!DOCTYPE html>
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; }
-        #staff { width: 100%; height: 100%; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #staff { display: inline-block; }
     </style>
 </head>
 <body>
 <div id="staff"></div>
 
 <script src="./vexflow.js"></script>
+<script src="./tonal.min.js"></script>
 
 <script>
-    /**
-     * Отрисовывает полный нотный стан, адаптируясь к ориентации экрана.
-     * Эта функция вызывается напрямую из Kotlin каждый раз, когда нужно обновить стан.
-     */
-    function drawGrandStaff(trebleNotesData, bassNotesData, orientation) {
-        const div = document.getElementById("staff");
-        if (!div || (div.clientWidth === 0 || div.clientHeight === 0)) {
-            requestAnimationFrame(() => drawGrandStaff(trebleNotesData, bassNotesData, orientation));
-            return;
+    function analyzeNotesWithTonal(notes) {
+        console.log("JS: Received notes for analysis: " + JSON.stringify(notes));
+
+        if (!notes || notes.length === 0) {
+            console.log("JS: No notes to analyze.");
+            return null;
+        }
+        if (typeof Tonal === 'undefined') {
+            console.error("JS: Tonal.js not loaded!");
+            return "Tonal.js not loaded";
         }
 
+        if (notes.length === 1) {
+            const result = Tonal.Note.simplify(notes[0]);
+            console.log("JS: Single note simplified to: " + result);
+            return result;
+        }
+
+        const detectedChords = Tonal.Chord.detect(notes);
+        if (detectedChords.length > 0) {
+            let result = detectedChords[0];
+            console.log("JS: Detected chord: " + result);
+
+            // --- Простое и надежное исправление "CM" -> "C" ---
+            if (result === "CM") {
+                result = "C";
+                console.log("JS: Corrected to: " + result);
+            }
+            return result;
+        }
+
+        if (notes.length >= 3) {
+            try {
+                const pcset = Tonal.Pcset.get(notes);
+                if (pcset && pcset.forte) {
+                    const result = `Forte: ${pcset.forte}`;
+                    console.log("JS: Forte analysis result: " + result);
+                    return result;
+                }
+            } catch (e) {
+                 console.error("JS: Pcset analysis failed: ", e);
+            }
+        }
+
+        console.log("JS: Chord not identified.");
+        return "Аккорд не определен";
+    }
+
+    function drawGrandStaff(trebleNotesData, bassNotesData, orientation, width, height) {
+        const div = document.getElementById("staff");
+        if (!div) return;
         div.innerHTML = '';
+
         if (typeof Vex === 'undefined' || typeof Vex.Flow === 'undefined') return;
 
         try {
             const renderer = new Vex.Flow.Renderer(div, Vex.Flow.Renderer.Backends.SVG);
-            renderer.resize(div.clientWidth, div.clientHeight);
+            renderer.resize(width, height);
             const context = renderer.getContext();
 
-            // --- Настройки для разных ориентаций ---
             let settings;
             if (orientation === 'landscape') {
-                // Пропорциональное масштабирование и скорректированное расстояние для ландшафта
                 settings = { scale: 0.75, trebleY: 80, bassY: 260 };
             } else { // portrait
                 settings = { scale: 1.0, trebleY: 80, bassY: 260 };
             }
 
             context.scale(settings.scale, settings.scale);
-            const staveWidth = (div.clientWidth / settings.scale) - 20;
+            const staveWidth = (width / settings.scale) - 20;
 
             const trebleStave = new Vex.Flow.Stave(10, settings.trebleY, staveWidth).addClef("treble").addTimeSignature("4/4");
             const bassStave = new Vex.Flow.Stave(10, settings.bassY, staveWidth).addClef("bass").addTimeSignature("4/4");
@@ -62,42 +104,26 @@
         }
     }
 
-    /**
-     * Создает и отрисовывает голоса (обычный и "призрачный") для одного нотного стана.
-     */
     function drawVoices(context, stave, notesData) {
         if (!notesData || notesData.length === 0) return;
-
         const normalNotes = notesData.filter(d => !d.ghost);
         const ghostNotes = notesData.filter(d => d.ghost);
-
         const voices = [];
-        if (normalNotes.length > 0) {
-            voices.push(createVoice(normalNotes, stave.getClef(), false));
-        }
-        if (ghostNotes.length > 0) {
-            voices.push(createVoice(ghostNotes, stave.getClef(), true));
-        }
-
+        if (normalNotes.length > 0) voices.push(createVoice(normalNotes, stave.getClef(), false));
+        if (ghostNotes.length > 0) voices.push(createVoice(ghostNotes, stave.getClef(), true));
         if (voices.length > 0) {
             new Vex.Flow.Formatter().joinVoices(voices).format(voices, stave.getWidth() - 50);
             voices.forEach(v => v.draw(context, stave));
         }
     }
 
-    /**
-     * Создает один голос из массива нот.
-     */
     function createVoice(notesData, clef, isGhost) {
         const notes = notesData.map(noteData => {
             noteData.clef = clef;
             const staveNote = new Vex.Flow.StaveNote(noteData);
-            if (isGhost) {
-                staveNote.setStyle({ fillStyle: "grey", strokeStyle: "grey" });
-            }
+            if (isGhost) staveNote.setStyle({ fillStyle: "grey", strokeStyle: "grey" });
             return staveNote;
         });
-
         const voice = new Vex.Flow.Voice({ num_beats: 4, beat_value: 4 });
         voice.setStrict(false);
         voice.addTickables(notes);
@@ -105,10 +131,6 @@
         return voice;
     }
 
-    // Первоначальная отрисовка при загрузке DOM. Можно передать пустые данные.
-    document.addEventListener('DOMContentLoaded', () => {
-         drawGrandStaff([], [], 'portrait');
-    });
 </script>
 </body>
 </html>

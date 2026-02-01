@@ -1,8 +1,8 @@
-
 package com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.astrizhachuk.pianoflow.domain.model.Note
 import com.astrizhachuk.pianoflow.domain.usecase.midi.ObserveMidiMessagesUseCase
 import com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState
 import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.toVexflowJson
@@ -18,11 +18,12 @@ import javax.inject.Inject
 /**
  * ViewModel for the piano staff screen.
  *
- * This ViewModel is responsible for observing MIDI messages, which are received as a list of notes
- * from the [ObserveMidiMessagesUseCase]. It then converts these notes into a JSON format suitable
- * for VexFlow and exposes this JSON within a [PianoStaffUiState] to be rendered by the UI.
+ * This ViewModel is responsible for managing the UI state of the piano staff. It observes MIDI
+ * messages, converts them into a format suitable for rendering on a musical staff (for example, VexFlow),
+ * and updates the UI accordingly. It also handles the display of the currently detected chord name.
  *
- * @param observeMidiMessagesUseCase The use case for observing incoming MIDI messages.
+ * @param observeMidiMessagesUseCase The use case for observing incoming MIDI messages and converting
+ * them into a list of [Note]s.
  */
 @HiltViewModel
 class PianoStaffViewModel @Inject constructor(
@@ -42,5 +43,18 @@ class PianoStaffViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Updates the name of the chord displayed in the UI.
+     *
+     * This function is called to change the text representing the currently identified chord.
+     * It updates the `chordName` property within the `PianoStaffUiState`.
+     *
+     * @param name The new name of the chord as a [String].
+     */
+    fun updateChordName(name: String?) {
+        Timber.tag("ChordAnalysis").d("ViewModel updating chord name to: '%s'", name)
+        _uiState.update { it.copy(chordName = name) }
     }
 }
