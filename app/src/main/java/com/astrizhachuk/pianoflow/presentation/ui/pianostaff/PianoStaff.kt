@@ -46,8 +46,8 @@ import java.util.Locale
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun PianoStaff(
-    notesJson: String,
     modifier: Modifier = Modifier,
+    notesJson: String,
     onChordAnalyzed: (String?) -> Unit
 ) {
     val context = LocalContext.current

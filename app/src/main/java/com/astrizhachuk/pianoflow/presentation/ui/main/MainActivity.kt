@@ -6,6 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.lifecycleScope
 import com.astrizhachuk.pianoflow.presentation.model.UserMessage
 import com.astrizhachuk.pianoflow.presentation.service.UserNotifier
@@ -37,7 +40,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        //enableEdgeToEdge()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         observeConnectionState()
@@ -50,12 +53,20 @@ class MainActivity : AppCompatActivity() {
                     modifier = Modifier.fillMaxSize(),
                     snackbarHost = { SnackbarHost(snackbarHostState) }
                 ) { innerPadding ->
-                    PianoStaffScreen(modifier = Modifier.padding(innerPadding))
-
-                    ObserveNotifications(
-                        messages = userNotifier.messages,
-                        snackbarHostState = snackbarHostState
-                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(innerPadding)
+                            .fillMaxSize()
+                            .background(Color.Red)
+                    ) {
+                        PianoStaffScreen(
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        ObserveNotifications(
+                            messages = userNotifier.messages,
+                            snackbarHostState = snackbarHostState
+                        )
+                    }
                 }
             }
         }
