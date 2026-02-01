@@ -57,7 +57,6 @@ class MainActivity : AppCompatActivity() {
                         modifier = Modifier
                             .padding(innerPadding)
                             .fillMaxSize()
-                            .background(Color.Red)
                     ) {
                         PianoStaffScreen(
                             modifier = Modifier.fillMaxSize()
