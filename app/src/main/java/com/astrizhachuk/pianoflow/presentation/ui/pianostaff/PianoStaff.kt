@@ -157,21 +157,8 @@ private fun WebView.evaluateChordAnalysis(notes: List<String>, onChordAnalyzed: 
                     val finalResult = if (cleanedChordResult == "CM") "C" else cleanedChordResult
                     Timber.tag("ChordAnalysis").d("Chord detected: %s, final: %s", cleanedChordResult, finalResult)
                     onChordAnalyzed(finalResult)
-                } else if (notes.size >= 3) {
-                    // Если аккорд не определен, пробуем анализ по шкале Форте
-                    val forteScript = "getForte($notesJsArray)"
-                    Timber.tag("ChordAnalysis").d("Executing JS for Forte: %s", forteScript)
-                    evaluateJavascript(forteScript) { forteResult ->
-                        val finalForteResult = forteResult?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "null" }
-                        Timber.tag("ChordAnalysis").d("Forte result: %s", finalForteResult)
-                        if (finalForteResult != null) {
-                            onChordAnalyzed(finalForteResult)
-                        } else {
-                            onChordAnalyzed("Аккорд не определен")
-                        }
-                    }
                 } else {
-                    Timber.tag("ChordAnalysis").d("Chord not identified, not enough notes for Forte.")
+                    Timber.tag("ChordAnalysis").d("Chord not identified for notes: %s", notes)
                     onChordAnalyzed("Аккорд не определен")
                 }
             }

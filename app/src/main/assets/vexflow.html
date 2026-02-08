@@ -56,26 +56,6 @@
         }
     }
 
-    function getForte(notes) {
-        console.log("JS: Received notes for Forte analysis: " + JSON.stringify(notes));
-        if (typeof Tonal === 'undefined' || !notes || notes.length < 3) {
-            console.error("JS: Tonal.js not loaded or not enough notes for Forte analysis.");
-            return null;
-        }
-        try {
-            const pcset = Tonal.Pcset.get(notes);
-            if (pcset && pcset.forte) {
-                const result = `Forte: ${pcset.forte}`;
-                console.log("JS: Forte analysis result: " + result);
-                return result;
-            }
-            return null;
-        } catch (e) {
-             console.error("JS: Pcset analysis failed: ", e);
-             return null;
-        }
-    }
-
     function drawGrandStaff(trebleNotesData, bassNotesData, isPortrait) {
         const div = document.getElementById("staff");
         if (!div) return;
