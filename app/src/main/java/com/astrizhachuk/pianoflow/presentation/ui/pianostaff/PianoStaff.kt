@@ -44,7 +44,6 @@ import java.util.Locale
  *                        (e.g., "Cmaj7") or `null` if no chord could be identified or if no notes
  *                        were provided.
  */
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun PianoStaff(
     modifier: Modifier = Modifier,
@@ -84,10 +83,10 @@ fun PianoStaff(
         modifier = modifier.onSizeChanged { viewSize = it }
     )
 
-    // Анализ аккордов теперь отделен и запускается только при изменении нот.
     LaunchedEffect(notesJson, isPageLoaded) {
         if (isPageLoaded) {
-            webView.handleChordAnalysis(notesJson, onChordAnalyzed)
+            val notes = parseNotesForAnalysis(notesJson)
+            webView.evaluateChordAnalysis(notes, onChordAnalyzed)
         }
     }
 
@@ -101,44 +100,81 @@ fun PianoStaff(
     }
 }
 
-private fun WebView.handleChordAnalysis(notesJson: String, onChordAnalyzed: (String?) -> Unit) {
-    Timber.tag("ChordAnalysis").d("Input notesJson: %s", notesJson)
+private fun parseNotesForAnalysis(notesJson: String): List<String> {
+    Timber.tag("ChordAnalysis").d("Parsing notes: %s", notesJson)
+    return try {
+        val notesMap = Gson().fromJson(notesJson, Map::class.java) as? Map<String, List<Map<String, Any>>>
+            ?: return emptyList()
 
-    val notesForAnalysis = try {
-        val notesMap = Gson().fromJson(notesJson, Map::class.java) as Map<String, List<Map<String, Any>>>
-        val allNotes = (notesMap["treble"].orEmpty() + notesMap["bass"].orEmpty())
-        allNotes.map { it["keys"] as List<String> }.flatten().distinct()
+        (notesMap["treble"].orEmpty() + notesMap["bass"].orEmpty())
+            .asSequence() // Use sequence for better performance with multiple operations
+            .mapNotNull { it["keys"] as? List<String> }
+            .flatten()
+            .distinct()
             .map { noteName ->
-                val parts = noteName.split("/")
+                val parts = noteName.split('/')
                 if (parts.size == 2) {
-                    parts[0].replaceFirstChar { it.titlecase(Locale.ROOT) } + parts[1]
+                    // Tonal.js expects notes like "C#4", not "c#4"
+                    parts[0].replaceFirstChar { it.uppercase(Locale.ROOT) } + parts[1]
                 } else {
                     noteName
                 }
             }
             .sorted()
+            .toList()
     } catch (e: Exception) {
-        Timber.tag("ChordAnalysis").e(e, "Failed to parse notesJson")
-        emptyList<String>()
+        Timber.tag("ChordAnalysis").e(e, "Failed to parse notesJson for chord analysis")
+        emptyList()
     }
-    Timber.tag("ChordAnalysis").d("Parsed and SORTED notes for Tonal.js: %s", notesForAnalysis)
+}
 
-    if (notesForAnalysis.isNotEmpty()) {
-        val notesJsArray = notesForAnalysis.joinToString(prefix = "[", postfix = "]") { "'$it'" }
-        val analysisScript = "analyzeNotesWithTonal($notesJsArray)"
-        Timber.tag("ChordAnalysis").d("Executing JS: %s", analysisScript)
+private fun WebView.evaluateChordAnalysis(notes: List<String>, onChordAnalyzed: (String?) -> Unit) {
+    if (notes.isEmpty()) {
+        onChordAnalyzed(null)
+        return
+    }
 
-        evaluateJavascript(analysisScript) { result ->
-            Timber.tag("ChordAnalysis").d("JS raw result: %s", result)
-            val cleanedResult = result?.removeSurrounding("\"")
-
-            if (cleanedResult.isNullOrEmpty() || cleanedResult.equals("null", ignoreCase = true)) {
-                onChordAnalyzed(null)
-            } else {
-                onChordAnalyzed(cleanedResult)
+    when (notes.size) {
+        1 -> {
+            val note = notes[0]
+            val script = "simplifyNote('$note')"
+            Timber.tag("ChordAnalysis").d("Executing JS: %s", script)
+            evaluateJavascript(script) { result ->
+                val finalResult = result?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "null" }
+                Timber.tag("ChordAnalysis").d("JS raw result: %s, final: %s", result, finalResult)
+                onChordAnalyzed(finalResult)
             }
         }
-    } else {
-        onChordAnalyzed(null)
+        else -> {
+            val notesJsArray = notes.joinToString(prefix = "['", separator = "','", postfix = "']")
+            val script = "detectChord($notesJsArray)"
+            Timber.tag("ChordAnalysis").d("Executing JS: %s", script)
+            evaluateJavascript(script) { chordResult ->
+                val cleanedChordResult = chordResult?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "null" }
+
+                if (cleanedChordResult != null) {
+                    // Tonal.js может вернуть "CM" для до-мажора, исправим это
+                    val finalResult = if (cleanedChordResult == "CM") "C" else cleanedChordResult
+                    Timber.tag("ChordAnalysis").d("Chord detected: %s, final: %s", cleanedChordResult, finalResult)
+                    onChordAnalyzed(finalResult)
+                } else if (notes.size >= 3) {
+                    // Если аккорд не определен, пробуем анализ по шкале Форте
+                    val forteScript = "getForte($notesJsArray)"
+                    Timber.tag("ChordAnalysis").d("Executing JS for Forte: %s", forteScript)
+                    evaluateJavascript(forteScript) { forteResult ->
+                        val finalForteResult = forteResult?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "null" }
+                        Timber.tag("ChordAnalysis").d("Forte result: %s", finalForteResult)
+                        if (finalForteResult != null) {
+                            onChordAnalyzed(finalForteResult)
+                        } else {
+                            onChordAnalyzed("Аккорд не определен")
+                        }
+                    }
+                } else {
+                    Timber.tag("ChordAnalysis").d("Chord not identified, not enough notes for Forte.")
+                    onChordAnalyzed("Аккорд не определен")
+                }
+            }
+        }
     }
 }

@@ -20,52 +20,60 @@
 <script src="./tonal.min.js"></script>
 
 <script>
-    function analyzeNotesWithTonal(notes) {
-        console.log("JS: Received notes for analysis: " + JSON.stringify(notes));
-
-        if (!notes || notes.length === 0) {
-            console.log("JS: No notes to analyze.");
+    function simplifyNote(note) {
+        console.log("JS: Received note for simplification: " + note);
+        if (typeof Tonal === 'undefined' || !note) {
+            console.error("JS: Tonal.js not loaded or no note provided.");
             return null;
         }
-        if (typeof Tonal === 'undefined') {
-            console.error("JS: Tonal.js not loaded!");
-            return "Tonal.js not loaded";
-        }
-
-        if (notes.length === 1) {
-            const result = Tonal.Note.simplify(notes[0]);
+        try {
+            const result = Tonal.Note.simplify(note);
             console.log("JS: Single note simplified to: " + result);
             return result;
+        } catch(e) {
+            console.error("JS: Note simplification failed: ", e);
+            return null;
         }
+    }
 
-        const detectedChords = Tonal.Chord.detect(notes);
-        if (detectedChords.length > 0) {
-            let result = detectedChords[0];
-            console.log("JS: Detected chord: " + result);
-
-            // --- Простое и надежное исправление "CM" -> "C" ---
-            if (result === "CM") {
-                result = "C";
-                console.log("JS: Corrected to: " + result);
+    function detectChord(notes) {
+        console.log("JS: Received notes for chord detection: " + JSON.stringify(notes));
+        if (typeof Tonal === 'undefined' || !notes || notes.length === 0) {
+            console.error("JS: Tonal.js not loaded or no notes provided.");
+            return null;
+        }
+        try {
+            const detectedChords = Tonal.Chord.detect(notes);
+            if (detectedChords.length > 0) {
+                const result = detectedChords[0];
+                console.log("JS: Detected chord: " + result);
+                return result;
             }
-            return result;
+            return null;
+        } catch(e) {
+            console.error("JS: Chord detection failed: ", e);
+            return null;
         }
+    }
 
-        if (notes.length >= 3) {
-            try {
-                const pcset = Tonal.Pcset.get(notes);
-                if (pcset && pcset.forte) {
-                    const result = `Forte: ${pcset.forte}`;
-                    console.log("JS: Forte analysis result: " + result);
-                    return result;
-                }
-            } catch (e) {
-                 console.error("JS: Pcset analysis failed: ", e);
+    function getForte(notes) {
+        console.log("JS: Received notes for Forte analysis: " + JSON.stringify(notes));
+        if (typeof Tonal === 'undefined' || !notes || notes.length < 3) {
+            console.error("JS: Tonal.js not loaded or not enough notes for Forte analysis.");
+            return null;
+        }
+        try {
+            const pcset = Tonal.Pcset.get(notes);
+            if (pcset && pcset.forte) {
+                const result = `Forte: ${pcset.forte}`;
+                console.log("JS: Forte analysis result: " + result);
+                return result;
             }
+            return null;
+        } catch (e) {
+             console.error("JS: Pcset analysis failed: ", e);
+             return null;
         }
-
-        console.log("JS: Chord not identified.");
-        return "Аккорд не определен";
     }
 
     function drawGrandStaff(trebleNotesData, bassNotesData, isPortrait) {
