@@ -1,6 +1,5 @@
 package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 
-import android.annotation.SuppressLint
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
@@ -18,6 +17,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
 import com.google.gson.Gson
+import com.google.gson.JsonSyntaxException
+import com.google.gson.reflect.TypeToken
 import timber.log.Timber
 import java.util.Locale
 
@@ -100,16 +101,19 @@ fun PianoStaff(
     }
 }
 
+private data class NoteItem(val keys: List<String> = emptyList())
+private data class NotesRoot(val treble: List<NoteItem> = emptyList(), val bass: List<NoteItem> = emptyList())
+
 private fun parseNotesForAnalysis(notesJson: String): List<String> {
     Timber.tag("ChordAnalysis").d("Parsing notes: %s", notesJson)
     return try {
-        val notesMap = Gson().fromJson(notesJson, Map::class.java) as? Map<String, List<Map<String, Any>>>
-            ?: return emptyList()
+        val notesType = object : TypeToken<NotesRoot>() {}.type
+        val notes = Gson().fromJson<NotesRoot>(notesJson, notesType)
+            ?: NotesRoot()
 
-        (notesMap["treble"].orEmpty() + notesMap["bass"].orEmpty())
-            .asSequence() // Use sequence for better performance with multiple operations
-            .mapNotNull { it["keys"] as? List<String> }
-            .flatten()
+        (notes.treble + notes.bass)
+            .asSequence()
+            .flatMap { it.keys }
             .distinct()
             .map { noteName ->
                 val parts = noteName.split('/')
@@ -122,11 +126,12 @@ private fun parseNotesForAnalysis(notesJson: String): List<String> {
             }
             .sorted()
             .toList()
-    } catch (e: Exception) {
+    } catch (e: JsonSyntaxException) {
         Timber.tag("ChordAnalysis").e(e, "Failed to parse notesJson for chord analysis")
         emptyList()
     }
 }
+
 
 private fun WebView.evaluateChordAnalysis(notes: List<String>, onChordAnalyzed: (String?) -> Unit) {
     if (notes.isEmpty()) {
