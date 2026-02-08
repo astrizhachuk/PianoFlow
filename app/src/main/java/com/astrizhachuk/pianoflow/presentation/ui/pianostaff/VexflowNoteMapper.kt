@@ -2,7 +2,11 @@
 package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 
 import com.astrizhachuk.pianoflow.domain.model.Note
+import com.google.gson.Gson
+import com.google.gson.JsonSyntaxException
+import com.google.gson.reflect.TypeToken
 import timber.log.Timber
+import java.util.Locale
 
 /**
  * The range of MIDI note pitches that should be duplicated on the adjacent staff.
@@ -197,4 +201,35 @@ private fun Note.pitchToVexflow(): String? {
     val octave = (pitch / 12) - 1
     val noteName = noteNames[pitch % 12]
     return "$noteName/$octave"
+}
+
+private data class NoteItem(val keys: List<String> = emptyList())
+private data class NotesRoot(val treble: List<NoteItem> = emptyList(), val bass: List<NoteItem> = emptyList())
+
+fun parseNotesForAnalysis(notesJson: String): List<String> {
+    Timber.tag("ChordAnalysis").d("Parsing notes: %s", notesJson)
+    return try {
+        val notesType = object : TypeToken<NotesRoot>() {}.type
+        val notes = Gson().fromJson<NotesRoot>(notesJson, notesType)
+            ?: NotesRoot()
+
+        (notes.treble + notes.bass)
+            .asSequence()
+            .flatMap { it.keys }
+            .distinct()
+            .map { noteName ->
+                val parts = noteName.split('/')
+                if (parts.size == 2) {
+                    // Tonal.js expects notes like "C#4", not "c#4"
+                    parts[0].replaceFirstChar { it.uppercase(Locale.ROOT) } + parts[1]
+                } else {
+                    noteName
+                }
+            }
+            .sorted()
+            .toList()
+    } catch (e: JsonSyntaxException) {
+        Timber.tag("ChordAnalysis").e(e, "Failed to parse notesJson for chord analysis")
+        emptyList()
+    }
 }

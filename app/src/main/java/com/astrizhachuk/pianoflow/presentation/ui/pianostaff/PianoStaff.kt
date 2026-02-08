@@ -16,11 +16,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
-import com.google.gson.Gson
-import com.google.gson.JsonSyntaxException
-import com.google.gson.reflect.TypeToken
 import timber.log.Timber
-import java.util.Locale
 
 /**
  * A Composable that displays a piano staff with notes using a WebView and the VexFlow library.
@@ -100,38 +96,6 @@ fun PianoStaff(
         webView.evaluateJavascript(drawScript, null)
     }
 }
-
-private data class NoteItem(val keys: List<String> = emptyList())
-private data class NotesRoot(val treble: List<NoteItem> = emptyList(), val bass: List<NoteItem> = emptyList())
-
-private fun parseNotesForAnalysis(notesJson: String): List<String> {
-    Timber.tag("ChordAnalysis").d("Parsing notes: %s", notesJson)
-    return try {
-        val notesType = object : TypeToken<NotesRoot>() {}.type
-        val notes = Gson().fromJson<NotesRoot>(notesJson, notesType)
-            ?: NotesRoot()
-
-        (notes.treble + notes.bass)
-            .asSequence()
-            .flatMap { it.keys }
-            .distinct()
-            .map { noteName ->
-                val parts = noteName.split('/')
-                if (parts.size == 2) {
-                    // Tonal.js expects notes like "C#4", not "c#4"
-                    parts[0].replaceFirstChar { it.uppercase(Locale.ROOT) } + parts[1]
-                } else {
-                    noteName
-                }
-            }
-            .sorted()
-            .toList()
-    } catch (e: JsonSyntaxException) {
-        Timber.tag("ChordAnalysis").e(e, "Failed to parse notesJson for chord analysis")
-        emptyList()
-    }
-}
-
 
 private fun WebView.evaluateChordAnalysis(notes: List<String>, onChordAnalyzed: (String?) -> Unit) {
     if (notes.isEmpty()) {
