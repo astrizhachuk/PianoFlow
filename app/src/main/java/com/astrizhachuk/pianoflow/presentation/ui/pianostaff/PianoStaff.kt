@@ -16,6 +16,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
+import com.google.gson.JsonSyntaxException
 import timber.log.Timber
 
 /**
@@ -82,8 +83,13 @@ fun PianoStaff(
 
     LaunchedEffect(notesJson, isPageLoaded) {
         if (isPageLoaded) {
-            val notes = parseNotesForAnalysis(notesJson)
-            webView.evaluateChordAnalysis(notes, onChordAnalyzed)
+            try {
+                Timber.tag("ChordAnalysis").d("Parsing notes: %s", notesJson)
+                val notes = parseNotesForAnalysis(notesJson)
+                webView.evaluateChordAnalysis(notes, onChordAnalyzed)
+            } catch (e: JsonSyntaxException) {
+                Timber.tag("ChordAnalysis").e(e, "Failed to parse notesJson for chord analysis")
+            }
         }
     }
 

@@ -1,6 +1,7 @@
 package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 
 import com.astrizhachuk.pianoflow.domain.model.Note
+import com.google.gson.JsonSyntaxException
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -144,5 +145,77 @@ class VexflowNoteMapperTest {
         // Bass staff should have: Primary [b/1, c/2], Ghost [c/5]
         val expectedJson = "{\"treble\":[{\"keys\":[\"c/5\", \"c#/5\"], \"duration\":\"w\"},{\"keys\":[\"c/2\"], \"duration\":\"w\", \"ghost\":true}], \"bass\":[{\"keys\":[\"b/1\", \"c/2\"], \"duration\":\"w\"},{\"keys\":[\"c/5\"], \"duration\":\"w\", \"ghost\":true}]}"
         assertEquals(expectedJson, json)
+    }
+
+    @Test
+    fun `parseNotesForAnalysis with empty json returns empty list`() {
+        // Arrange
+        val json = "{}"
+
+        // Act
+        val result = parseNotesForAnalysis(json)
+
+        // Assert
+        assertEquals(emptyList<String>(), result)
+    }
+
+    @Test
+    fun `parseNotesForAnalysis with empty notes returns empty list`() {
+        // Arrange
+        val json = "{\"treble\":[], \"bass\":[]}"
+
+        // Act
+        val result = parseNotesForAnalysis(json)
+
+        // Assert
+        assertEquals(emptyList<String>(), result)
+    }
+
+    @Test
+    fun `parseNotesForAnalysis with notes in both clefs returns sorted list`() {
+        // Arrange
+        val json = "{\"treble\":[{\"keys\":[\"c/5\"]}], \"bass\":[{\"keys\":[\"c/4\"]}]}"
+
+        // Act
+        val result = parseNotesForAnalysis(json)
+
+        // Assert
+        val expected = listOf("C4", "C5")
+        assertEquals(expected, result)
+    }
+
+    @Test
+    fun `parseNotesForAnalysis with duplicate notes returns distinct list`() {
+        // Arrange
+        val json = "{\"treble\":[{\"keys\":[\"c/4\"]}], \"bass\":[{\"keys\":[\"c/4\"]}]}"
+
+        // Act
+        val result = parseNotesForAnalysis(json)
+
+        // Assert
+        val expected = listOf("C4")
+        assertEquals(expected, result)
+    }
+
+    @Test
+    fun `parseNotesForAnalysis with lowercase notes returns uppercase list`() {
+        // Arrange
+        val json = "{\"treble\":[{\"keys\":[\"c/4\", \"d#/5\"]}], \"bass\":[]}"
+
+        // Act
+        val result = parseNotesForAnalysis(json)
+
+        // Assert
+        val expected = listOf("C4", "D#5")
+        assertEquals(expected, result)
+    }
+
+    @Test(expected = JsonSyntaxException::class)
+    fun `parseNotesForAnalysis with invalid json throws exception`() {
+        // Arrange
+        val json = "invalid json"
+
+        // Act
+        parseNotesForAnalysis(json)
     }
 }
