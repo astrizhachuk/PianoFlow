@@ -255,15 +255,15 @@ fun parseNotesForAnalysis(notesJson: String): List<String> {
         .asSequence()
         .flatMap { it.keys }
         .distinct()
-        .map { noteName ->
-            val parts = noteName.split('/')
-            if (parts.size == 2) {
-                // Tonal.js expects notes like "C#4", not "c#4"
-                parts[0].replaceFirstChar { it.uppercase(Locale.ROOT) } + parts[1]
-            } else {
-                noteName
-            }
-        }
+        .map(::formatNoteForTonal)
         .sorted()
         .toList()
+}
+
+private fun formatNoteForTonal(noteName: String): String {
+    val parts = noteName.split('/')
+    if (parts.size != 2) return noteName
+
+    val (note, octave) = parts
+    return note.replaceFirstChar { it.uppercase(Locale.ROOT) } + octave
 }
