@@ -115,7 +115,7 @@ private fun WebView.evaluateChordAnalysis(
     chordNotDefined: String
 ) {
     if (notes.isEmpty()) {
-        Timber.tag("ChordAnalysis").d("Executing JS: null")
+        Timber.tag("ChordAnalysis").d("No notes to analyze.")
         onChordAnalyzed(null)
         return
     }
@@ -130,19 +130,26 @@ private fun WebView.evaluateChordAnalysis(
 
     Timber.tag("ChordAnalysis").d("Executing JS: %s", script)
     evaluateJavascript(script) { rawResult ->
-        val cleanedResult = rawResult?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "null" }
-        Timber.tag("ChordAnalysis").d("JS raw result: %s, final: %s", rawResult, cleanedResult)
-
-        val finalResult = when {
-            cleanedResult == "CM" -> "C" // Tonal.js
-            cleanedResult != null -> cleanedResult
-            notes.size > 1 -> chordNotDefined
-            else -> null
-        }
-
-        Timber.tag("ChordAnalysis").d("Chord not identified for notes: %s", finalResult)
+        val finalResult = processChordAnalysisResult(rawResult, notes, chordNotDefined)
         onChordAnalyzed(finalResult)
     }
 }
 
+private fun processChordAnalysisResult(
+    rawResult: String?,
+    notes: List<String>,
+    chordNotDefined: String
+): String? {
+    val cleanedResult = rawResult?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "null" }
+    Timber.tag("ChordAnalysis").d("JS raw result: %s, cleaned: %s", rawResult, cleanedResult)
 
+    val finalResult = when {
+        cleanedResult == "CM" -> "C" // Tonal.js
+        cleanedResult != null -> cleanedResult
+        notes.size > 1 -> chordNotDefined
+        else -> null
+    }
+
+    Timber.tag("ChordAnalysis").d("Chord analysis result: %s", finalResult)
+    return finalResult
+}
