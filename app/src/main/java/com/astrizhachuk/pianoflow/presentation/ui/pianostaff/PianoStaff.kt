@@ -14,8 +14,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
+import com.astrizhachuk.pianoflow.R
 import com.google.gson.JsonSyntaxException
 import timber.log.Timber
 
@@ -52,6 +54,7 @@ fun PianoStaff(
     val context = LocalContext.current
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var isPageLoaded by remember { mutableStateOf(false) }
+    val chordNotDefinedString = stringResource(id = R.string.chord_not_defined)
 
     val webView = remember {
         WebView(context).apply {
@@ -86,7 +89,7 @@ fun PianoStaff(
             try {
                 Timber.tag("ChordAnalysis").d("Parsing notes: %s", notesJson)
                 val notes = parseNotesForAnalysis(notesJson)
-                webView.evaluateChordAnalysis(notes, onChordAnalyzed)
+                webView.evaluateChordAnalysis(notes, onChordAnalyzed, chordNotDefinedString)
             } catch (e: JsonSyntaxException) {
                 Timber.tag("ChordAnalysis").e(e, "Failed to parse notesJson for chord analysis")
             }
@@ -103,16 +106,18 @@ fun PianoStaff(
     }
 }
 
-private fun WebView.evaluateChordAnalysis(notes: List<String>, onChordAnalyzed: (String?) -> Unit) {
-    if (notes.isEmpty()) {
-        onChordAnalyzed(null)
-        return
-    }
-
+private fun WebView.evaluateChordAnalysis(
+    notes: List<String>,
+    onChordAnalyzed: (String?) -> Unit,
+    chordNotDefinedString: String
+) {
     when (notes.size) {
+        0 -> {
+            Timber.tag("ChordAnalysis").d("Executing JS: %s", "null")
+            onChordAnalyzed(null)
+        }
         1 -> {
-            val note = notes[0]
-            val script = "simplifyNote('$note')"
+            val script = "simplifyNote('$notes[0]')"
             Timber.tag("ChordAnalysis").d("Executing JS: %s", script)
             evaluateJavascript(script) { result ->
                 val finalResult = result?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "null" }
@@ -134,7 +139,7 @@ private fun WebView.evaluateChordAnalysis(notes: List<String>, onChordAnalyzed: 
                     onChordAnalyzed(finalResult)
                 } else {
                     Timber.tag("ChordAnalysis").d("Chord not identified for notes: %s", notes)
-                    onChordAnalyzed("Аккорд не определен")
+                    onChordAnalyzed(chordNotDefinedString)
                 }
             }
         }

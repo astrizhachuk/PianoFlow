@@ -54,7 +54,6 @@ class PianoStaffViewModel @Inject constructor(
      * @param name The new name of the chord as a [String].
      */
     fun updateChordName(name: String?) {
-        Timber.tag("ChordAnalysis").d("ViewModel updating chord name to: '%s'", name)
         _uiState.update { it.copy(chordName = name) }
     }
 }
