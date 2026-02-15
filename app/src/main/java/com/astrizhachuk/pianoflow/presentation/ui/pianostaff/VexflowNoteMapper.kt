@@ -267,3 +267,39 @@ private fun formatNoteForTonal(noteName: String): String {
     val (note, octave) = parts
     return note.replaceFirstChar { it.uppercase(Locale.ROOT) } + octave
 }
+
+/**
+ * Processes the raw result from a JavaScript chord analysis library (like Tonal.js)
+ * to return a clean and standardized chord name.
+ *
+ * This function performs several key tasks:
+ * 1.  **Cleaning:** It removes surrounding quotes and handles empty or "null" string values
+ *     returned from the WebView.
+ * 2.  **Standardization:** Tonal.js may return major chords with an "M" suffix
+ *     (e.g., "CM" for C-Major). This function removes the "M" suffix to conform to
+ *     a more common notation (e.g., "C").
+ * 3.  **Handling Undefined Chords:** If multiple notes were analyzed (`isChord` is true)
+ *     but the library could not identify a chord, it returns the `chordNotDefined` string.
+ * 4.  **Handling Single Notes:** If a single note was analyzed, which doesn't form a chord,
+ *     the function returns `null`.
+ *
+ * @param rawChord The raw string returned from the JavaScript evaluation.
+ * @param isChord A flag indicating whether multiple notes (a chord) were analyzed (`true`) or a single note (`false`).
+ * @param chordNotDefined The string to return if a chord cannot be identified from multiple notes.
+ * @return A standardized chord name (e.g., "C", "Am"), the `chordNotDefined` string, or `null`.
+ */
+fun processChordAnalysisResult(
+    rawChord: String?,
+    isChord: Boolean,
+    chordNotDefined: String
+): String? {
+    val cleanedChord = rawChord?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "null" }
+
+    return when {
+        // Tonal.js may return "CM" for C-Major, so we remove the "M" for consistency.
+        cleanedChord?.endsWith("M") == true -> cleanedChord.removeSuffix("M")
+        cleanedChord != null -> cleanedChord
+        isChord -> chordNotDefined
+        else -> null
+    }
+}
