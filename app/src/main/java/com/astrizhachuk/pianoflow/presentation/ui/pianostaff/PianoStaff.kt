@@ -54,7 +54,7 @@ fun PianoStaff(
     val context = LocalContext.current
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var isPageLoaded by remember { mutableStateOf(false) }
-    val chordNotDefinedString = stringResource(id = R.string.chord_not_defined)
+    val chordNotDefined = stringResource(id = R.string.chord_not_defined)
 
     val webView = remember {
         WebView(context).apply {
@@ -89,7 +89,7 @@ fun PianoStaff(
             try {
                 Timber.tag("ChordAnalysis").d("Parsing notes: %s", notesJson)
                 val notes = parseNotesForAnalysis(notesJson)
-                webView.evaluateChordAnalysis(notes, onChordAnalyzed, chordNotDefinedString)
+                webView.evaluateChordAnalysis(notes, onChordAnalyzed, chordNotDefined)
             } catch (e: JsonSyntaxException) {
                 Timber.tag("ChordAnalysis").e(e, "Failed to parse notesJson for chord analysis")
             }
@@ -106,42 +106,43 @@ fun PianoStaff(
     }
 }
 
+private const val JS_SIMPLIFY_NOTE = "simplifyNote"
+private const val JS_DETECT_CHORD = "detectChord"
+
 private fun WebView.evaluateChordAnalysis(
     notes: List<String>,
     onChordAnalyzed: (String?) -> Unit,
-    chordNotDefinedString: String
+    chordNotDefined: String
 ) {
-    when (notes.size) {
-        0 -> {
-            Timber.tag("ChordAnalysis").d("Executing JS: %s", "null")
-            onChordAnalyzed(null)
-        }
-        1 -> {
-            val script = "simplifyNote('$notes[0]')"
-            Timber.tag("ChordAnalysis").d("Executing JS: %s", script)
-            evaluateJavascript(script) { result ->
-                val finalResult = result?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "null" }
-                Timber.tag("ChordAnalysis").d("JS raw result: %s, final: %s", result, finalResult)
-                onChordAnalyzed(finalResult)
-            }
-        }
+    if (notes.isEmpty()) {
+        Timber.tag("ChordAnalysis").d("Executing JS: null")
+        onChordAnalyzed(null)
+        return
+    }
+
+    val script = when (notes.size) {
+        1 -> "$JS_SIMPLIFY_NOTE('${notes.first()}')"
         else -> {
             val notesJsArray = notes.joinToString(prefix = "['", separator = "','", postfix = "']")
-            val script = "detectChord($notesJsArray)"
-            Timber.tag("ChordAnalysis").d("Executing JS: %s", script)
-            evaluateJavascript(script) { chordResult ->
-                val cleanedChordResult = chordResult?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "null" }
-
-                if (cleanedChordResult != null) {
-                    // Tonal.js может вернуть "CM" для до-мажора, исправим это
-                    val finalResult = if (cleanedChordResult == "CM") "C" else cleanedChordResult
-                    Timber.tag("ChordAnalysis").d("Chord detected: %s, final: %s", cleanedChordResult, finalResult)
-                    onChordAnalyzed(finalResult)
-                } else {
-                    Timber.tag("ChordAnalysis").d("Chord not identified for notes: %s", notes)
-                    onChordAnalyzed(chordNotDefinedString)
-                }
-            }
+            "$JS_DETECT_CHORD($notesJsArray)"
         }
     }
+
+    Timber.tag("ChordAnalysis").d("Executing JS: %s", script)
+    evaluateJavascript(script) { rawResult ->
+        val cleanedResult = rawResult?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "null" }
+        Timber.tag("ChordAnalysis").d("JS raw result: %s, final: %s", rawResult, cleanedResult)
+
+        val finalResult = when {
+            cleanedResult == "CM" -> "C" // Tonal.js
+            cleanedResult != null -> cleanedResult
+            notes.size > 1 -> chordNotDefined
+            else -> null
+        }
+
+        Timber.tag("ChordAnalysis").d("Chord not identified for notes: %s", finalResult)
+        onChordAnalyzed(finalResult)
+    }
 }
+
+
