@@ -3,6 +3,7 @@ package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 import com.astrizhachuk.pianoflow.domain.model.Note
 import com.google.gson.JsonSyntaxException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class VexflowNoteMapperTest {
@@ -217,5 +218,215 @@ class VexflowNoteMapperTest {
 
         // Act
         parseNotesForAnalysis(json)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with major chord suffix M returns chord name without it`() {
+        // Arrange
+        val rawResult = "\"CM\""
+        val isChord = true
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertEquals("C", result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with minor chord returns correct chord name`() {
+        // Arrange
+        val rawResult = "\"Am\""
+        val isChord = true
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertEquals("Am", result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with null result for a chord returns chordNotDefined`() {
+        // Arrange
+        val rawResult = null
+        val isChord = true
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertEquals(chordNotDefined, result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with null result for a single note returns null`() {
+        // Arrange
+        val rawResult = null
+        val isChord = false
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertNull(result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with string null for a chord returns chordNotDefined`() {
+        // Arrange
+        val rawResult = "\"null\""
+        val isChord = true
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertEquals(chordNotDefined, result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with blank result for a chord returns chordNotDefined`() {
+        // Arrange
+        val rawResult = "\"\""
+        val isChord = true
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertEquals(chordNotDefined, result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with no surrounding quotes returns correct chord name`() {
+        // Arrange
+        val rawResult = "Am" // No surrounding quotes
+        val isChord = true
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertEquals("Am", result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with whitespace result for a chord returns chordNotDefined`() {
+        // Arrange
+        val rawResult = "\" \""
+        val isChord = true
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertEquals(chordNotDefined, result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with unquoted null string for a chord returns chordNotDefined`() {
+        // Arrange
+        val rawResult = "null"
+        val isChord = true
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertEquals( chordNotDefined, result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with empty raw string for a chord returns chordNotDefined`() {
+        // Arrange
+        val rawResult = ""
+        val isChord = true
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertEquals(chordNotDefined, result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with empty raw string for a single note returns null`() {
+        // Arrange
+        val rawResult = ""
+        val isChord = false
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertNull(result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with only M suffix returns empty string`() {
+        // Arrange
+        val rawResult = "\"M\""
+        val isChord = true
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertEquals("", result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with unquoted whitespace for a chord returns chordNotDefined`() {
+        // Arrange
+        val rawResult = " "
+        val isChord = true
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertEquals(chordNotDefined, result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with unquoted whitespace for a single note returns null`() {
+        // Arrange
+        val rawResult = " "
+        val isChord = false
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertNull(result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with unquoted null string for a single note returns null`() {
+        // Arrange
+        val rawResult = "null"
+        val isChord = false
+        val chordNotDefined = "N/A"
+
+        // Act
+        val result = processChordAnalysisResult(rawResult, isChord, chordNotDefined)
+
+        // Assert
+        assertNull(result)
     }
 }
