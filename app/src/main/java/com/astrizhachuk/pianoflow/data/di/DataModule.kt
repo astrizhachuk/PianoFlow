@@ -1,6 +1,8 @@
 package com.astrizhachuk.pianoflow.data.di
 
 import android.content.Context
+import android.webkit.WebView
+import com.astrizhachuk.pianoflow.data.datasource.analysis.MusicScriptEngine
 import com.astrizhachuk.pianoflow.data.datasource.midi.MidiDataSource
 import com.astrizhachuk.pianoflow.data.datasource.midi.MidiMessageParser
 import com.astrizhachuk.pianoflow.data.mapper.midi.MidiDeviceMapperImpl
@@ -39,6 +41,34 @@ abstract class DataModule {
     abstract fun bindMidiDeviceMapper(impl: MidiDeviceMapperImpl): MidiDeviceMapper
 
     companion object {
+        /**
+         * Provides a WebView for executing JavaScript in the Data layer.
+         *
+         * This WebView is used only for chord analysis, not for rendering.
+         * It's separate from the UI WebView in PianoStaff to keep layers independent.
+         */
+        @Provides
+        @Singleton
+        fun provideWebView(@ApplicationContext context: Context): WebView {
+            return WebView(context).apply {
+                settings.javaScriptEnabled = true
+            }
+        }
+
+        /**
+         * Provides [MusicScriptEngine] for executing JavaScript code.
+         *
+         * This allows Repository to analyze chords without any UI involvement.
+         */
+        @Provides
+        @Singleton
+        fun provideMusicScriptEngine(webView: WebView): MusicScriptEngine {
+            return MusicScriptEngine(
+                webView = webView,
+                pageUrl = "file:///android_asset/tonal-analysis.html"
+            )
+        }
+
         /**
          * Provides [MidiDataSource] as a singleton. This data source is the
          * main point of interaction with the Android MIDI API.

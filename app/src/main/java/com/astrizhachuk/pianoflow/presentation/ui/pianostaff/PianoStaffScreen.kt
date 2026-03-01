@@ -45,9 +45,9 @@ fun PianoStaffScreen(
     val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
 
     val chordName: @Composable () -> Unit = {
-        uiState.chordName?.let {
+        uiState.chordName?.let { name ->
             Text(
-                text = it,
+                text = name,
                 style = MaterialTheme.typography.headlineMedium
             )
         }
@@ -57,8 +57,7 @@ fun PianoStaffScreen(
         PianoStaff(
             modifier = staffModifier,
             notesJson = uiState.notesJson,
-            isPortrait = isPortrait,
-            onChordAnalyzed = { viewModel.updateChordName(it) }
+            isPortrait = isPortrait
         )
     }
 
