@@ -42,9 +42,7 @@ class MusicScriptEngineTest {
     fun setUp() {
         val webViewClientSlot: CapturingSlot<WebViewClient> = slot()
         every { webView.webViewClient = capture(webViewClientSlot) } just runs
-
         musicScriptEngine = MusicScriptEngine(webView, pageUrl)
-
         webViewClient = webViewClientSlot.captured
     }
 
@@ -66,8 +64,6 @@ class MusicScriptEngineTest {
 
         // when
         musicScriptEngine.execute(script, onResultCallback)
-
-        // and when
         evaluateJavascriptCallbackSlot.captured.onReceiveValue(expectedResult)
 
         // then
@@ -102,8 +98,6 @@ class MusicScriptEngineTest {
 
         // when
         webViewClient.onPageFinished(webView, pageUrl)
-
-        // and when
         evaluateJavascriptCallbackSlot.captured.onReceiveValue(expectedResult)
 
         // then
@@ -131,8 +125,6 @@ class MusicScriptEngineTest {
 
         // when
         webViewClient.onPageFinished(webView, pageUrl)
-
-        // and when
         evaluateJavascriptCallbackSlot1.captured.onReceiveValue(expectedResult1)
         evaluateJavascriptCallbackSlot2.captured.onReceiveValue(expectedResult2)
 
@@ -160,22 +152,25 @@ class MusicScriptEngineTest {
 
     @Test
     fun `when queued javascript execution fails then onResult is called with null`() {
-        // given: webview is NOT initialized, so script will be queued
+        // given
+        // webview is NOT initialized, so script will be queued
         val script = "invalid script"
         var actualResult: String? = "a non-null initial value"
         val onResultCallback = { result: String? -> actualResult = result }
         val jsException = Exception("JS error from queued script")
 
-        // Action 1: Call execute. Script is queued because webview is not ready.
+        // Call execute. Script is queued because webview is not ready.
         musicScriptEngine.execute(script, onResultCallback)
 
-        // given: Now, set up the mock for the failure that will happen when the queue is processed
+        // Now, set up the mock for the failure that will happen when the queue is processed
         every { webView.evaluateJavascript(any(), any()) } throws jsException
 
-        // when: webview becomes initialized, which triggers execution of the queued script
+        // when
+        // webview becomes initialized, which triggers execution of the queued script
         webViewClient.onPageFinished(webView, pageUrl)
 
-        // then: check that the callback was called with null as a result of the failure
+        // then
+        // check that the callback was called with null as a result of the failure
         assertNull(actualResult)
     }
 }

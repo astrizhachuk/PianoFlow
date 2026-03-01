@@ -6,25 +6,23 @@ import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
- * A script engine for music-related tasks, powered by a hidden WebView.
+ * Executes JavaScript for music analysis tasks using a hidden [WebView].
  *
- * This class abstracts the complexities of interacting with a [WebView], providing a straightforward
- * interface for executing JavaScript code. It manages a queue of pending scripts, ensuring that
- * they are executed only after the WebView has finished loading its initial page. This design
- * allows for a synchronous-style API for callers while handling the asynchronous nature of
- * WebView page loads internally.
+ * This engine provides a simplified interface for running JavaScript code by abstracting away the
+ * asynchronous nature of [WebView]. It maintains a queue for scripts, executing them only after
+ * the designated web page has fully loaded. This allows callers to use a synchronous-style API
+ * without managing the complexities of page load events.
  *
- * Encapsulating the [WebView] within this data-layer class offers several advantages:
- * - It decouples the presentation layer from the Android-specific [WebView] implementation.
- * - It enables repositories or other data sources to execute JavaScript without relying on UI
- *   callbacks or lifecycle events.
- * - It promotes a clean separation of concerns, keeping business logic (e.g., data processing
- *   via JS) distinct from UI rendering.
+ * By encapsulating the [WebView] within this data-layer class, the application benefits from:
+ * - Decoupling of the presentation layer from the Android-specific `WebView` implementation.
+ * - Enabling data-layer components (e.g., repositories) to execute JavaScript without
+ *   depending on UI lifecycle or callbacks.
+ * - A clear separation of concerns, isolating JavaScript-based business logic from the UI.
  *
- * @param webView The [WebView] instance to be used for executing JavaScript. This class will
- *   configure its [WebViewClient].
- * @param pageUrl The URL of the local or remote page that needs to be loaded into the [WebView]
- *   before scripts can be executed.
+ * @param webView The [WebView] instance to be used for script execution. This class takes
+ *   ownership of configuring its [WebViewClient].
+ * @param pageUrl The URL of the page to load into the [WebView]. Scripts will not be
+ *   executed until this page has finished loading.
  */
 class MusicScriptEngine(
     private val webView: WebView,
@@ -40,11 +38,9 @@ class MusicScriptEngine(
                 super.onPageFinished(view, url)
                 Timber.d("WebView initialization page loaded: %s", url)
                 isInitialized = true
-                // Process any pending scripts
                 processPendingScripts()
             }
         }
-        // Load the specified HTML page
         webView.loadUrl(pageUrl)
     }
 
