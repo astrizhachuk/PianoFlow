@@ -1,5 +1,6 @@
 package com.astrizhachuk.pianoflow.domain.usecase.analysis
 
+import com.astrizhachuk.pianoflow.domain.model.Note
 import com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository
 import io.mockk.every
 import io.mockk.justRun
@@ -15,27 +16,27 @@ class AnalyzeChordUseCaseTest {
     @Test
     fun `invoke should call repository to analyze chord`() {
         // Arrange
-        val notesJson = """{"treble":[],"bass":[]}"""
+        val notes = listOf(Note(60, "C4"))
         justRun { chordAnalysisRepository.analyzeChord(any()) }
 
         // Act
-        useCase(notesJson)
+        useCase(notes)
 
         // Assert
-        verify(exactly = 1) { chordAnalysisRepository.analyzeChord(notesJson) }
+        verify(exactly = 1) { chordAnalysisRepository.analyzeChord(notes) }
     }
 
     @Test
     fun `invoke should not throw exception when repository fails`() {
         // Arrange
-        val notesJson = "invalid_json"
+        val notes = listOf(Note(60, "C4"))
         val exception = RuntimeException("Failed to analyze")
         every { chordAnalysisRepository.analyzeChord(any()) } throws exception
 
         // Act
-        useCase(notesJson)
+        useCase(notes)
 
         // Assert
-        verify(exactly = 1) { chordAnalysisRepository.analyzeChord(notesJson) }
+        verify(exactly = 1) { chordAnalysisRepository.analyzeChord(notes) }
     }
 }

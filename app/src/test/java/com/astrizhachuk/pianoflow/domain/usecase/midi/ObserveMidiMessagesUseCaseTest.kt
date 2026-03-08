@@ -46,6 +46,10 @@ class ObserveMidiMessagesUseCaseTest {
         const val PITCH_E4 = 64
         const val PITCH_G4 = 67
         const val CHORD_WINDOW_MS = 50L
+        
+        val NOTE_C4 = Note(PITCH_C4, "C4")
+        val NOTE_E4 = Note(PITCH_E4, "E4")
+        val NOTE_G4 = Note(PITCH_G4, "G4")
     }
 
     private val midiRepository: MidiRepository = mockk()
@@ -54,7 +58,7 @@ class ObserveMidiMessagesUseCaseTest {
     @Test
     fun `invoke with single note returns single note`() = runTest {
         // Arrange
-        val note = Note(PITCH_C4)
+        val note = NOTE_C4
         coEvery { midiRepository.observeNotes() } returns flowOf(note)
 
         // Act & Assert
@@ -69,7 +73,7 @@ class ObserveMidiMessagesUseCaseTest {
         // Arrange
         val notesChannel = Channel<Note>(Channel.UNLIMITED)
         coEvery { midiRepository.observeNotes() } returns notesChannel.receiveAsFlow()
-        val chord = listOf(Note(PITCH_C4), Note(PITCH_E4), Note(PITCH_G4))
+        val chord = listOf(NOTE_C4, NOTE_E4, NOTE_G4)
 
         // Act & Assert
         useCase.invoke().test {
@@ -84,8 +88,8 @@ class ObserveMidiMessagesUseCaseTest {
         // Arrange
         val notesChannel = Channel<Note>(Channel.UNLIMITED)
         coEvery { midiRepository.observeNotes() } returns notesChannel.receiveAsFlow()
-        val chord = listOf(Note(PITCH_C4), Note(PITCH_E4))
-        val singleNote = Note(PITCH_G4)
+        val chord = listOf(NOTE_C4, NOTE_E4)
+        val singleNote = NOTE_G4
 
         // Act & Assert
         useCase.invoke().test {
@@ -108,9 +112,9 @@ class ObserveMidiMessagesUseCaseTest {
         // Arrange
         val notesChannel = Channel<Note>(Channel.UNLIMITED)
         coEvery { midiRepository.observeNotes() } returns notesChannel.receiveAsFlow()
-        val note1 = Note(PITCH_C4)
-        val note2 = Note(PITCH_E4)
-        val note3 = Note(PITCH_G4)
+        val note1 = NOTE_C4
+        val note2 = NOTE_E4
+        val note3 = NOTE_G4
         val chord = listOf(note1, note2, note3)
 
         // Act & Assert
@@ -134,9 +138,9 @@ class ObserveMidiMessagesUseCaseTest {
         // Arrange
         val notesChannel = Channel<Note>(Channel.UNLIMITED)
         coEvery { midiRepository.observeNotes() } returns notesChannel.receiveAsFlow()
-        val note1 = Note(PITCH_C4)
-        val note2 = Note(PITCH_E4)
-        val note3 = Note(PITCH_G4)
+        val note1 = NOTE_C4
+        val note2 = NOTE_E4
+        val note3 = NOTE_G4
 
         // Act & Assert
         useCase.invoke().test {
@@ -243,7 +247,7 @@ class ObserveMidiMessagesIntegrationTest {
         val capturedReceiver = receiverSlot.captured
 
         val noteOnMessage = byteArrayOf(NOTE_ON_CHANNEL_0, PITCH_C4.toByte(), VELOCITY_100.toByte())
-        val expectedNote = Note(pitch = PITCH_C4)
+        val expectedNote = Note(pitch = PITCH_C4, name = "C4")
 
         // Act & Assert
         useCase.invoke().test {

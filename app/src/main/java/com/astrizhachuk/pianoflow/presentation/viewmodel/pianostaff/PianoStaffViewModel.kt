@@ -4,9 +4,9 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.astrizhachuk.pianoflow.R
-import com.astrizhachuk.pianoflow.domain.usecase.midi.ObserveMidiMessagesUseCase
 import com.astrizhachuk.pianoflow.domain.usecase.analysis.AnalyzeChordUseCase
 import com.astrizhachuk.pianoflow.domain.usecase.analysis.ObserveChordAnalysisResultsUseCase
+import com.astrizhachuk.pianoflow.domain.usecase.midi.ObserveMidiMessagesUseCase
 import com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState
 import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.toVexflowJson
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,9 +15,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -48,30 +48,33 @@ class PianoStaffViewModel @Inject constructor(
     init {
         Timber.i("Initializing PianoStaffViewModel and starting to observe MIDI messages and chord analysis.")
 
-        // Combine MIDI messages and Chord Analysis results to form the final UI state
-        combine(
-            observeMidiMessagesUseCase(),
-            observeChordAnalysisResultsUseCase()
-        ) { notes, analysisResult ->
-            val notesJson = notes.toVexflowJson()
-            
-            // Trigger analysis if notes are present
-            if (notes.isNotEmpty()) {
-                analyzeChordUseCase(notesJson)
+        observeMidiMessagesUseCase()
+            .distinctUntilChanged()
+            .onEach { notes ->
+                // Триггерим анализ только когда изменились сами ноты.
+                // Это происходит до объединения с результатами анализа,
+                // поэтому обновление результата анализа не вызовет повторный цикл.
+                if (notes.isNotEmpty()) {
+                    analyzeChordUseCase(notes)
+                }
             }
+            .combine(observeChordAnalysisResultsUseCase()) { notes, analysisResult ->
+                val notesJson = notes.toVexflowJson()
+                
+                val displayChordName = when {
+                    analysisResult != null -> analysisResult
+                    notes.isNotEmpty() -> context.getString(R.string.chord_not_defined)
+                    else -> null
+                }
 
-            val displayChordName = when {
-                analysisResult != null -> analysisResult
-                notes.isNotEmpty() -> context.getString(R.string.chord_not_defined)
-                else -> null
-            }
-
-            _uiState.update { state ->
-                state.copy(
+                PianoStaffUiState(
                     notesJson = notesJson,
                     chordName = displayChordName
                 )
             }
-        }.launchIn(viewModelScope)
+            .onEach { newState ->
+                _uiState.value = newState
+            }
+            .launchIn(viewModelScope)
     }
 }

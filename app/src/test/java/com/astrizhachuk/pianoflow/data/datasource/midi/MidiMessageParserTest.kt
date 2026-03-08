@@ -1,4 +1,3 @@
-
 package com.astrizhachuk.pianoflow.data.datasource.midi
 
 import com.astrizhachuk.pianoflow.domain.model.Note
@@ -52,7 +51,7 @@ class MidiMessageParserTest {
 
         // Assert
         assertNotNull(result)
-        assertEquals(Note(pitch = PITCH_MIDDLE_C.toInt()), result)
+        assertEquals(Note(pitch = PITCH_MIDDLE_C.toInt(), name = "C4"), result)
     }
 
     @Test
@@ -119,8 +118,8 @@ class MidiMessageParserTest {
         val result15 = parser.parse(messageChannel15)
 
         // Assert
-        assertEquals(Note(pitch = PITCH_MIDDLE_C.toInt()), result1)
-        assertEquals(Note(pitch = PITCH_E4.toInt()), result15)
+        assertEquals(Note(pitch = PITCH_MIDDLE_C.toInt(), name = "C4"), result1)
+        assertEquals(Note(pitch = PITCH_E4.toInt(), name = "E4"), result15)
     }
 
     @Test
@@ -132,7 +131,7 @@ class MidiMessageParserTest {
         val result = parser.parse(message)
 
         // Assert
-        assertEquals(Note(pitch = PITCH_MAX.toInt()), result)
+        assertEquals(Note(pitch = PITCH_MAX.toInt(), name = "G9"), result)
     }
 
     @Test
@@ -144,7 +143,7 @@ class MidiMessageParserTest {
         val result = parser.parse(message)
 
         // Assert
-        assertEquals(Note(pitch = PITCH_MIN.toInt()), result)
+        assertEquals(Note(pitch = PITCH_MIN.toInt(), name = "C-1"), result)
     }
 
     @Test
@@ -161,6 +160,7 @@ class MidiMessageParserTest {
         // Assert
         assertNotNull(result)
         assertEquals(pitch.toInt(), result!!.pitch)
+        assertEquals("E5", result.name)
     }
 
     @Test
@@ -173,6 +173,6 @@ class MidiMessageParserTest {
 
         // Assert
         // The parser should only read the first valid message.
-        assertEquals(Note(pitch = PITCH_MIDDLE_C.toInt()), result)
+        assertEquals(Note(pitch = PITCH_MIDDLE_C.toInt(), name = "C4"), result)
     }
 }

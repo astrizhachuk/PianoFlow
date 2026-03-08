@@ -1,5 +1,6 @@
 package com.astrizhachuk.pianoflow.domain.usecase.analysis
 
+import com.astrizhachuk.pianoflow.domain.model.Note
 import com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository
 import timber.log.Timber
 import javax.inject.Inject
@@ -25,15 +26,14 @@ class AnalyzeChordUseCase @Inject constructor(
      * This is a fire-and-forget operation. The result of the analysis will be
      * emitted through the `ChordAnalysisRepository`'s StateFlow.
      *
-     * @param notesJson A JSON string representing the notes on the treble and bass clefs.
-     * It should contain "treble" and "bass" keys.
+     * @param notes A list of [Note] objects representing the notes to be analyzed.
      */
     operator fun invoke(
-        notesJson: String
+        notes: List<Note>
     ) {
         try {
             Timber.d("invoke: Starting chord analysis")
-            chordAnalysisRepository.analyzeChord(notesJson)
+            chordAnalysisRepository.analyzeChord(notes)
         } catch (e: Exception) {
             Timber.e(e, "invoke: Failed to analyze chord")
         }

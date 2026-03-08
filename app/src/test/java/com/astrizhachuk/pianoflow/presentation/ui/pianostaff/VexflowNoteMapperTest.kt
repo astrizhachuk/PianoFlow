@@ -19,7 +19,7 @@ class VexflowNoteMapperTest {
     @Test
     fun `toVexflowJson for middle C returns as primary on treble and ghost on bass`() {
         // Arrange
-        val notes = listOf(Note(pitch = 60)) // Middle C
+        val notes = listOf(Note(pitch = 60, name = "C4")) // Middle C
         // Act
         val json = notes.toVexflowJson()
         // Assert
@@ -30,7 +30,7 @@ class VexflowNoteMapperTest {
     @Test
     fun `toVexflowJson for a high note returns only on treble`() {
         // Arrange
-        val notes = listOf(Note(pitch = 84)) // C6
+        val notes = listOf(Note(pitch = 84, name = "C6")) // C6
         // Act
         val json = notes.toVexflowJson()
         // Assert
@@ -41,7 +41,7 @@ class VexflowNoteMapperTest {
     @Test
     fun `toVexflowJson for a low note returns only on bass`() {
         // Arrange
-        val notes = listOf(Note(pitch = 35)) // B1, below ghost range
+        val notes = listOf(Note(pitch = 35, name = "B1")) // B1, below ghost range
         // Act
         val json = notes.toVexflowJson()
         // Assert
@@ -52,7 +52,7 @@ class VexflowNoteMapperTest {
     @Test
     fun `toVexflowJson for a low note in ghost range returns as primary on bass and ghost on treble`() {
         // Arrange
-        val notes = listOf(Note(pitch = 59)) // B3
+        val notes = listOf(Note(pitch = 59, name = "B3")) // B3
         // Act
         val json = notes.toVexflowJson()
         // Assert
@@ -63,7 +63,11 @@ class VexflowNoteMapperTest {
     @Test
     fun `toVexflowJson for chord on treble staff returns correct json`() {
         // Arrange
-        val notes = listOf(Note(pitch = 72), Note(pitch = 76), Note(pitch = 79)) // C5, E5, G5
+        val notes = listOf(
+            Note(pitch = 72, name = "C5"),
+            Note(pitch = 76, name = "E5"),
+            Note(pitch = 79, name = "G5")
+        ) // C5, E5, G5
         // Act
         val json = notes.toVexflowJson()
         // Assert
@@ -75,7 +79,11 @@ class VexflowNoteMapperTest {
     @Test
     fun `toVexflowJson for chord on bass staff returns correct json`() {
         // Arrange
-        val notes = listOf(Note(pitch = 48), Note(pitch = 52), Note(pitch = 55)) // C3, E3, G3
+        val notes = listOf(
+            Note(pitch = 48, name = "C3"),
+            Note(pitch = 52, name = "E3"),
+            Note(pitch = 55, name = "G3")
+        ) // C3, E3, G3
         // Act
         val json = notes.toVexflowJson()
         // Assert
@@ -86,7 +94,10 @@ class VexflowNoteMapperTest {
     @Test
     fun `toVexflowJson for mixed chord returns notes on both staves`() {
         // Arrange
-        val notes = listOf(Note(pitch = 55), Note(pitch = 67)) // G3 (bass), G4 (treble)
+        val notes = listOf(
+            Note(pitch = 55, name = "G3"), // bass
+            Note(pitch = 67, name = "G4")  // treble
+        )
         // Act
         val json = notes.toVexflowJson()
         // Assert
@@ -99,9 +110,9 @@ class VexflowNoteMapperTest {
     fun `toVexflowJson with invalid pitch values should filter them out`() {
         // Arrange
         val notes = listOf(
-            Note(pitch = -1),
-            Note(pitch = 60),
-            Note(pitch = 128)
+            Note(pitch = -1, name = ""),
+            Note(pitch = 60, name = "C4"),
+            Note(pitch = 128, name = "")
         )
         // Act
         val json = notes.toVexflowJson()
@@ -114,8 +125,8 @@ class VexflowNoteMapperTest {
     fun `toVexflowJson with only invalid pitch values should return empty staves`() {
         // Arrange
         val notes = listOf(
-            Note(pitch = -1),
-            Note(pitch = 128)
+            Note(pitch = -1, name = ""),
+            Note(pitch = 128, name = "")
         )
         // Act
         val json = notes.toVexflowJson()
@@ -128,12 +139,12 @@ class VexflowNoteMapperTest {
         // Arrange
         val notes = listOf(
             // Bass notes: one just outside and one just inside the ghost range
-            Note(pitch = 35), // B1, below range -> Primary on bass, no ghost
-            Note(pitch = 36), // C2, bottom of range -> Primary on bass, ghost on treble
+            Note(pitch = 35, name = "B1"), // B1, below range -> Primary on bass, no ghost
+            Note(pitch = 36, name = "C2"), // C2, bottom of range -> Primary on bass, ghost on treble
 
             // Treble notes: one just inside and one just outside the ghost range
-            Note(pitch = 72), // C5, top of range -> Primary on treble, ghost on bass
-            Note(pitch = 73)  // C#5, above range -> Primary on treble, no ghost
+            Note(pitch = 72, name = "C5"), // C5, top of range -> Primary on treble, ghost on bass
+            Note(pitch = 73, name = "C#5")  // C#5, above range -> Primary on treble, no ghost
         )
 
         // Act

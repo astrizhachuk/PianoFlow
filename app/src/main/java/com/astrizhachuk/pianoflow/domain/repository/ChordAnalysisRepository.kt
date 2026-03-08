@@ -1,5 +1,6 @@
 package com.astrizhachuk.pianoflow.domain.repository
 
+import com.astrizhachuk.pianoflow.domain.model.Note
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -20,15 +21,14 @@ interface ChordAnalysisRepository {
     val chordAnalysisResult: StateFlow<String?>
 
     /**
-     * Analyzes a chord from a set of musical notes.
+     * Analyzes a set of musical notes to identify the corresponding chord.
      *
-     * This function triggers the chord analysis process. It is a "fire-and-forget"
-     * operation, meaning it does not return a value directly. Instead, the analysis
-     * result is asynchronously emitted through the [chordAnalysisResult] StateFlow.
+     * This function triggers the analysis process asynchronously. The result is not
+     * returned directly but is instead emitted through the [chordAnalysisResult] flow.
      *
-     * @param notesJson A JSON string representing the notes to be analyzed.
+     * @param notes A list of [Note] objects representing the notes to be analyzed.
      */
     fun analyzeChord(
-        notesJson: String
+        notes: List<Note>
     )
 }

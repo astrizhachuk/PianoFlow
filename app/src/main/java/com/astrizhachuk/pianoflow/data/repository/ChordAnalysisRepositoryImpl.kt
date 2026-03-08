@@ -3,6 +3,7 @@ package com.astrizhachuk.pianoflow.data.repository
 import android.os.Handler
 import android.os.Looper
 import com.astrizhachuk.pianoflow.data.datasource.analysis.MusicScriptEngine
+import com.astrizhachuk.pianoflow.domain.model.Note
 import com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository
 import com.astrizhachuk.pianoflow.domain.service.ChordAnalysisService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +17,7 @@ private const val JS_ANALYZE = "analyze"
  * Implementation of the ChordAnalysisRepository interface.
  *
  * This class orchestrates chord analysis using:
- * - ChordAnalysisService for business logic (parsing, processing)
+ * - ChordAnalysisService for business logic (processing result)
  * - MusicScriptEngine for JavaScript execution (no UI involvement)
  *
  * Results are emitted through StateFlow, eliminating callback chains.
@@ -32,29 +33,29 @@ class ChordAnalysisRepositoryImpl @Inject constructor(
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /**
-     * Analyzes a chord from a JSON string containing notes.
+     * Analyzes a chord from a list of [Note] objects.
      *
      * No UI callbacks needed - JavaScript execution is handled internally.
      * Results are emitted through [chordAnalysisResult] StateFlow.
      *
-     * @param notesJson A JSON string with "treble" and "bass" keys containing notes.
+     * @param notes A list of [Note] objects to be analyzed.
      */
     override fun analyzeChord(
-        notesJson: String
+        notes: List<Note>
     ) {
         try {
-            Timber.d("Starting chord analysis with notesJson: %s", notesJson)
-
-            // Parse notes using Domain service
-            val notes = chordAnalysisService.parseNotesFromJson(notesJson)
+            Timber.d("Starting chord analysis with ${notes.size} notes")
 
             if (notes.isEmpty()) {
                 _chordAnalysisResult.value = null
                 return
             }
 
+            // Extract unique note names for analysis (e.g., ["C4", "E4", "G4"])
+            val noteNames = notes.map { it.name }.distinct().sorted()
+
             // Build JavaScript command (unified analysis)
-            val script = buildAnalysisScript(notes)
+            val script = buildAnalysisScript(noteNames)
             
             // Execute JavaScript using Data layer executor (no UI involvement)
             javaScriptExecutor.execute(script) { rawResult ->

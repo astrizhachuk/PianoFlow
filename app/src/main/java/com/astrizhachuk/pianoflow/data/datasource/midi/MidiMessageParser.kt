@@ -32,7 +32,10 @@ class MidiMessageParser {
                 // Consider the note "on" only if the velocity is greater than 0
                 // (velocity 0 is often used as Note Off)
                 if (velocity > 0) {
-                    return Note(pitch = pitch)
+                    return Note(
+                        pitch = pitch,
+                        name = Note.pitchToName(pitch)
+                    )
                 }
             }
         }
