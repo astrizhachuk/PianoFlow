@@ -6,6 +6,7 @@ import com.astrizhachuk.pianoflow.data.datasource.analysis.MusicScriptEngine
 import com.astrizhachuk.pianoflow.domain.model.Note
 import com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository
 import com.astrizhachuk.pianoflow.domain.service.ChordAnalysisService
+import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import timber.log.Timber
@@ -24,7 +25,8 @@ private const val JS_ANALYZE = "analyze"
  */
 class ChordAnalysisRepositoryImpl @Inject constructor(
     private val chordAnalysisService: ChordAnalysisService,
-    private val javaScriptExecutor: MusicScriptEngine
+    private val javaScriptExecutor: MusicScriptEngine,
+    private val gson: Gson
 ) : ChordAnalysisRepository {
 
     private val _chordAnalysisResult = MutableStateFlow<String?>(null)
@@ -51,10 +53,7 @@ class ChordAnalysisRepositoryImpl @Inject constructor(
                 return
             }
 
-            // Extract unique note names for analysis (e.g., ["C4", "E4", "G4"])
             val noteNames = notes.map { it.name }.distinct().sorted()
-
-            // Build JavaScript command (unified analysis)
             val script = buildAnalysisScript(noteNames)
             
             // Execute JavaScript using Data layer executor (no UI involvement)
@@ -74,13 +73,12 @@ class ChordAnalysisRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Builds the JavaScript code for chord analysis.
+     * Builds the JavaScript code for chord analysis using Gson for safe array formatting.
      *
-     * @param notes List of note names (e.g., ["C4", "E4", "G4"] or ["F#3"])
+     * @param notes List of note names (e.g., ["C4", "E4", "F#4"])
      * @return JavaScript code string to execute
      */
     private fun buildAnalysisScript(notes: List<String>): String {
-        val notesJsArray = notes.joinToString(prefix = "['", separator = "','", postfix = "']")
-        return "$JS_ANALYZE($notesJsArray)"
+        return "$JS_ANALYZE(${gson.toJson(notes)})"
     }
 }

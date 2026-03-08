@@ -11,6 +11,7 @@ import com.astrizhachuk.pianoflow.data.repository.MidiRepositoryImpl
 import com.astrizhachuk.pianoflow.domain.mapper.midi.MidiDeviceMapper
 import com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository
 import com.astrizhachuk.pianoflow.domain.repository.MidiRepository
+import com.google.gson.Gson
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -101,5 +102,12 @@ abstract class DataModule {
         fun provideMidiMessageParser(): MidiMessageParser {
             return MidiMessageParser()
         }
+
+        /**
+         * Provides [Gson] as a singleton.
+         */
+        @Provides
+        @Singleton
+        fun provideGson(): Gson = Gson()
     }
 }
