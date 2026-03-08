@@ -3,6 +3,7 @@ package com.astrizhachuk.pianoflow.domain.service
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.util.Locale
 
 class ChordAnalysisServiceTest {
 
@@ -213,5 +214,52 @@ class ChordAnalysisServiceTest {
     fun `processChordAnalysisResult returns null for string null when isChord is false`() {
         val result = service.processChordAnalysisResult("\"null\"", isChord = false)
         assertNull(result)
+    }
+
+    @Test
+    fun `formatNoteForTonal coverage for empty note name part`() {
+        val json = "{\"treble\":[{\"keys\":[\"/4\"]}], \"bass\":[]}"
+        val result = service.parseNotesFromJson(json)
+        assertEquals(listOf("4"), result)
+    }
+
+    @Test
+    fun `formatNoteForTonal coverage for already uppercase note name`() {
+        val json = "{\"treble\":[{\"keys\":[\"C/4\"]}], \"bass\":[]}"
+        val result = service.parseNotesFromJson(json)
+        assertEquals(listOf("C4"), result)
+    }
+
+    @Test
+    fun `formatNoteForTonal coverage for more than two parts`() {
+        val json = "{\"treble\":[{\"keys\":[\"c/4/5\"]}], \"bass\":[]}"
+        val result = service.parseNotesFromJson(json)
+        assertEquals(listOf("c/4/5"), result)
+    }
+
+    @Test
+    fun `formatNoteForTonal coverage for non-alphabetic note name`() {
+        val json = "{\"treble\":[{\"keys\":[\"#/4\"]}], \"bass\":[]}"
+        val result = service.parseNotesFromJson(json)
+        assertEquals(listOf("#4"), result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult exhaustive coverage for takeIf branches`() {
+        // Case: it.isNotBlank() is true AND it != "null" is true
+        assertEquals("Am", service.processChordAnalysisResult("Am", false))
+        
+        // Case: it.isNotBlank() is true AND it != "null" is false
+        assertNull(service.processChordAnalysisResult("null", false))
+        assertNull(service.processChordAnalysisResult("\"null\"", false))
+        
+        // Case: it.isNotBlank() is false (short-circuits it != "null")
+        assertNull(service.processChordAnalysisResult("", false))
+        assertNull(service.processChordAnalysisResult(" ", false))
+        assertNull(service.processChordAnalysisResult("\"\"", false))
+        assertNull(service.processChordAnalysisResult("\" \"", false))
+        
+        // Case: rawResult is null (short-circuits takeIf entirely)
+        assertNull(service.processChordAnalysisResult(null, false))
     }
 }
