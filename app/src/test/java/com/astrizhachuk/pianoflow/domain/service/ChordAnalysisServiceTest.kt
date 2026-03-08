@@ -15,12 +15,23 @@ class ChordAnalysisServiceTest {
         assertEquals(emptyList<String>(), result)
     }
 
-    @Test
-    fun `parseNotesFromJson with invalid json returns empty list`() {
+    @Test(expected = com.google.gson.JsonSyntaxException::class)
+    fun `parseNotesFromJson with invalid json throws JsonSyntaxException`() {
         val json = "not a json"
-        // Gson might throw or return null depending on how it's called, 
-        // in our implementation it will return empty list due to catch or null handling
-        val result = try { service.parseNotesFromJson(json) } catch(e: Exception) { emptyList() }
+        service.parseNotesFromJson(json)
+    }
+
+    @Test
+    fun `parseNotesFromJson with literal null string triggers elvis operator and returns empty list`() {
+        val json = "null"
+        val result = service.parseNotesFromJson(json)
+        assertEquals(emptyList<String>(), result)
+    }
+
+    @Test
+    fun `parseNotesFromJson with missing fields in json returns empty list`() {
+        val json = "{\"random_field\": 123}"
+        val result = service.parseNotesFromJson(json)
         assertEquals(emptyList<String>(), result)
     }
 
@@ -53,6 +64,32 @@ class ChordAnalysisServiceTest {
         val result = service.parseNotesFromJson(json)
         val expected = listOf("C4", "D#5")
         assertEquals(expected, result)
+    }
+
+    @Test
+    fun `parseNotesFromJson with invalid note format returns note name as is`() {
+        val json = "{\"treble\":[{\"keys\":[\"C5\"]}], \"bass\":[]}"
+        val result = service.parseNotesFromJson(json)
+        assertEquals(listOf("C5"), result)
+    }
+
+    @Test
+    fun `parseNotesFromJson with full Vexflow-like JSON returns correct notes`() {
+        val json = """
+            {
+                "treble": [{"keys": ["c/5", "e/5"], "duration": "w"}],
+                "bass": [{"keys": ["c/4"], "duration": "w", "ghost": true}]
+            }
+        """.trimIndent()
+        val result = service.parseNotesFromJson(json)
+        assertEquals(listOf("C4", "C5", "E5"), result)
+    }
+
+    @Test
+    fun `formatNoteForTonal handles sharps and flats correctly`() {
+        val json = "{\"treble\":[{\"keys\":[\"f#/4\", \"bb/3\"]}], \"bass\":[]}"
+        val result = service.parseNotesFromJson(json)
+        assertEquals(listOf("Bb3", "F#4"), result)
     }
 
     @Test
@@ -143,5 +180,38 @@ class ChordAnalysisServiceTest {
         val rawResult = "\"M\""
         val result = service.processChordAnalysisResult(rawResult, isChord = true)
         assertEquals("", result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with valid single note returns note name`() {
+        val rawResult = "\"C4\""
+        val result = service.processChordAnalysisResult(rawResult, isChord = false)
+        assertEquals("C4", result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with empty string for a single note returns null`() {
+        val rawResult = ""
+        val result = service.processChordAnalysisResult(rawResult, isChord = false)
+        assertNull(result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult with blank string for a single note returns null`() {
+        val rawResult = " "
+        val result = service.processChordAnalysisResult(rawResult, isChord = false)
+        assertNull(result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult returns null when cleanedChord is null and isChord is false`() {
+        val result = service.processChordAnalysisResult(null, isChord = false)
+        assertNull(result)
+    }
+
+    @Test
+    fun `processChordAnalysisResult returns null for string null when isChord is false`() {
+        val result = service.processChordAnalysisResult("\"null\"", isChord = false)
+        assertNull(result)
     }
 }

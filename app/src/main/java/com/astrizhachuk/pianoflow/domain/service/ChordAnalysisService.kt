@@ -64,11 +64,11 @@ class ChordAnalysisService @Inject constructor() {
     }
 }
 
-internal data class NotesRoot(
+private data class NotesRoot(
     val treble: List<NoteElement> = emptyList(),
     val bass: List<NoteElement> = emptyList()
 )
 
-internal data class NoteElement(
+private data class NoteElement(
     val keys: List<String> = emptyList()
 )
