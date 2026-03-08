@@ -6,8 +6,10 @@ import com.astrizhachuk.pianoflow.data.datasource.analysis.MusicScriptEngine
 import com.astrizhachuk.pianoflow.data.datasource.midi.MidiDataSource
 import com.astrizhachuk.pianoflow.data.datasource.midi.MidiMessageParser
 import com.astrizhachuk.pianoflow.data.mapper.midi.MidiDeviceMapperImpl
+import com.astrizhachuk.pianoflow.data.repository.ChordAnalysisRepositoryImpl
 import com.astrizhachuk.pianoflow.data.repository.MidiRepositoryImpl
 import com.astrizhachuk.pianoflow.domain.mapper.midi.MidiDeviceMapper
+import com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository
 import com.astrizhachuk.pianoflow.domain.repository.MidiRepository
 import dagger.Binds
 import dagger.Module
@@ -23,6 +25,13 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class DataModule {
+    /**
+     * Binds the [MidiDeviceMapper] interface, defined in the domain layer,
+     * to its concrete implementation [MidiDeviceMapperImpl] from the data layer.
+     */
+    @Binds
+    @Suppress("unused")
+    abstract fun bindMidiDeviceMapper(impl: MidiDeviceMapperImpl): MidiDeviceMapper
 
     /**
      * Binds the [MidiRepository] interface, defined in the domain layer,
@@ -33,12 +42,13 @@ abstract class DataModule {
     abstract fun bindMidiRepository(impl: MidiRepositoryImpl): MidiRepository
 
     /**
-     * Binds the [MidiDeviceMapper] interface, defined in the domain layer,
-     * to its concrete implementation [MidiDeviceMapperImpl] from the data layer.
+     * Binds the [ChordAnalysisRepository] interface, defined in the domain layer,
+     * to its concrete implementation [ChordAnalysisRepositoryImpl] from the data layer.
      */
     @Binds
+    @Singleton
     @Suppress("unused")
-    abstract fun bindMidiDeviceMapper(impl: MidiDeviceMapperImpl): MidiDeviceMapper
+    abstract fun bindChordAnalysisRepository(impl: ChordAnalysisRepositoryImpl): ChordAnalysisRepository
 
     companion object {
         /**

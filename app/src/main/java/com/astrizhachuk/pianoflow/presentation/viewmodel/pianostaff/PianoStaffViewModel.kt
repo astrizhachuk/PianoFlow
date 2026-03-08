@@ -2,8 +2,9 @@ package com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.astrizhachuk.pianoflow.domain.model.Note
 import com.astrizhachuk.pianoflow.domain.usecase.midi.ObserveMidiMessagesUseCase
+import com.astrizhachuk.pianoflow.domain.usecase.analysis.AnalyzeChordUseCase
+import com.astrizhachuk.pianoflow.domain.usecase.analysis.ObserveChordAnalysisResultsUseCase
 import com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState
 import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.toVexflowJson
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,42 +19,50 @@ import javax.inject.Inject
 /**
  * ViewModel for the piano staff screen.
  *
- * This ViewModel is responsible for managing the UI state of the piano staff. It observes MIDI
- * messages, converts them into a format suitable for rendering on a musical staff (for example, VexFlow),
- * and updates the UI accordingly. It also handles the display of the currently detected chord name.
+ * This ViewModel manages the UI state by:
+ * 1. Observing MIDI messages and converting them to VexFlow JSON format
+ * 2. Triggering chord analysis when notes change
+ * 3. Automatically updated UI when Repository emits analysis results
  *
- * @param observeMidiMessagesUseCase The use case for observing incoming MIDI messages and converting
- * them into a list of [Note]s.
+ * @param observeMidiMessagesUseCase The use case for observing incoming MIDI messages
+ * @param analyzeChordUseCase The use case for triggering chord analysis
+ * @param observeChordAnalysisResultsUseCase The service-level use case for observing chord analysis results
  */
 @HiltViewModel
 class PianoStaffViewModel @Inject constructor(
-    private val observeMidiMessagesUseCase: ObserveMidiMessagesUseCase
+    private val observeMidiMessagesUseCase: ObserveMidiMessagesUseCase,
+    private val analyzeChordUseCase: AnalyzeChordUseCase,
+    private val observeChordAnalysisResultsUseCase: ObserveChordAnalysisResultsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PianoStaffUiState())
     val uiState: StateFlow<PianoStaffUiState> = _uiState.asStateFlow()
 
     init {
-        Timber.i("Initializing PianoStaffViewModel and starting to observe MIDI messages.")
+        Timber.i("Initializing PianoStaffViewModel and starting to observe MIDI messages and chord analysis.")
+
+        // Observe MIDI messages
         viewModelScope.launch {
             observeMidiMessagesUseCase().collect { notes ->
-                Timber.d("Received ${notes.size} notes, updating UI state.")
+                val notesJson = notes.toVexflowJson()
                 _uiState.update {
-                    it.copy(notesJson = notes.toVexflowJson())
+                    it.copy(notesJson = notesJson)
+                }
+
+                // Auto-trigger chord analysis when notes change
+                if (notes.isNotEmpty()) {
+                    analyzeChordUseCase(notesJson)
                 }
             }
         }
-    }
 
-    /**
-     * Updates the name of the chord displayed in the UI.
-     *
-     * This function is called to change the text representing the currently identified chord.
-     * It updates the `chordName` property within the `PianoStaffUiState`.
-     *
-     * @param name The new name of the chord as a [String].
-     */
-    fun updateChordName(name: String?) {
-        _uiState.update { it.copy(chordName = name) }
+        // Observe chord analysis results from repository
+        viewModelScope.launch {
+            observeChordAnalysisResultsUseCase().collect { result ->
+                _uiState.update { state ->
+                    state.copy(chordName = result)
+                }
+            }
+        }
     }
 }

@@ -8,10 +8,13 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
 /**
- * Use case that converts the connection state [ConnectionState] into a [UserMessage] for the user.
+ * A use case that creates a user-facing message based on the MIDI device's connection state.
  *
- * Encapsulates the business logic of determining which message text should be displayed
- * for each specific state of the MIDI device connection.
+ * This class translates a [ConnectionState] into a human-readable [UserMessage],
+ * encapsulating the logic for which text to display for each specific connection status
+ * (e.g., connected, disconnected, or error).
+ *
+ * @property context The application context, used to resolve string resources.
  */
 class ShowConnectionNotificationUseCase @Inject constructor(
     @ApplicationContext private val context: Context

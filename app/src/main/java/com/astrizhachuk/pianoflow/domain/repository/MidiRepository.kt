@@ -5,28 +5,33 @@ import com.astrizhachuk.pianoflow.domain.model.Note
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Репозиторий для управления MIDI-данными.
+ * Repository for managing MIDI data.
  *
- * Этот интерфейс определяет контракт для взаимодействия с MIDI-устройствами.
- * Он абстрагирует источник данных и предоставляет чистый API для наблюдения за состоянием
- * MIDI-соединения и входящими событиями нот.
+ * This interface defines the contract for interacting with MIDI devices.
+ * It abstracts the data source and provides a clean API for observing the state
+ * of the MIDI connection and incoming note events.
  */
 interface MidiRepository {
+
     /**
-     * Наблюдает за текущим состоянием подключения MIDI-устройства.
+     * Observes the current connection state of the MIDI device.
      *
-     * Эта функция возвращает [Flow], который выдает обновления [ConnectionState] всякий раз,
-     * когда изменяется статус подключения MIDI-устройства (например, подключение, подключено, отключено).
+     * This function returns a [Flow] that emits [ConnectionState] updates whenever
+     * the MIDI device's connection status changes (e.g., connecting, connected, disconnected).
      *
-     * @return [Flow] из [ConnectionState], представляющий статус MIDI-соединения.
+     * @return A [Flow] of [ConnectionState] representing the MIDI connection status.
      */
     fun observeConnectionState(): Flow<ConnectionState>
 
+
     /**
-     * Наблюдает за входящими событиями MIDI-нот.
+     * Observes incoming MIDI note events.
      *
-     * @return [Flow], который выдает объект [Note] каждый раз, когда от подключенного
-     * MIDI-устройства получается событие включения/выключения ноты.
+     * This function returns a [Flow] that emits a [Note] object each time
+     * a note-on or note-off event is received from a connected MIDI device.
+     * The flow will only be active when there is an active MIDI connection.
+     *
+     * @return A [Flow] of [Note] objects representing incoming MIDI note events.
      */
     fun observeNotes(): Flow<Note>
 }
