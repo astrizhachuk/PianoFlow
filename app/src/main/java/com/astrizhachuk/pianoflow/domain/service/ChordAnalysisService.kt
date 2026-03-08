@@ -6,7 +6,13 @@ import java.util.Locale
 import javax.inject.Inject
 
 /**
- * Domain service for parsing notes from JSON and processing chord analysis results.
+ * Domain service responsible for parsing musical notes from JSON data and processing 
+ * the results of chord analysis.
+ *
+ * This service acts as a bridge between the raw musical data and the domain 
+ * representation required for chord identification.
+ *
+ * Independent of Android Framework (Pure Kotlin).
  */
 class ChordAnalysisService @Inject constructor() {
 
@@ -14,7 +20,7 @@ class ChordAnalysisService @Inject constructor() {
      * Parses a JSON string containing notes and returns a list of formatted note names.
      *
      * @param notesJson A JSON string with structure: {"treble":[{"keys":["c/5"]}], "bass":[{"keys":["e/3"]}]}
-     * @return List of unique note names formatted for Tonal (e.g., ["C5", "E3"])
+     * @return List of unique note names (e.g., ["C5", "E3"])
      */
     fun parseNotesFromJson(notesJson: String): List<String> {
         val notesType = object : TypeToken<NotesRoot>() {}.type
@@ -34,14 +40,10 @@ class ChordAnalysisService @Inject constructor() {
      * Processes the raw result from JavaScript chord analysis into a clean chord name.
      *
      * @param rawChord Raw string returned from JavaScript execution
-     * @param isChord Flag indicating if multiple notes were analyzed
-     * @param chordNotDefined String to return if chord is not identified
-     * @return Standardized chord name, or null for single notes/failed analysis
+     * @return Standardized chord name (e.g., "Am", "C"), or null if not defined
      */
     fun processChordAnalysisResult(
-        rawChord: String?,
-        isChord: Boolean,
-        chordNotDefined: String = "Chord not defined"
+        rawChord: String?
     ): String? {
         val cleanedChord = rawChord
             ?.removeSurrounding("\"")
@@ -49,9 +51,7 @@ class ChordAnalysisService @Inject constructor() {
 
         return when {
             cleanedChord?.endsWith("M") == true -> cleanedChord.removeSuffix("M")
-            cleanedChord != null -> cleanedChord
-            isChord -> chordNotDefined
-            else -> null
+            else -> cleanedChord
         }
     }
 

@@ -12,45 +12,42 @@
     // Store the last result so we can access it
     window.lastAnalysisResult = null;
 
-    function simplifyNote(note) {
-        console.log("JS: Received note for simplification: " + note);
-        if (typeof Tonal === 'undefined' || !note) {
-            console.error("JS: Tonal.js not loaded or no note provided.");
-            window.lastAnalysisResult = null;
-            return null;
-        }
-        try {
-            const result = Tonal.Note.simplify(note);
-            console.log("JS: Single note simplified to: " + result);
-            window.lastAnalysisResult = result;
-            return result;
-        } catch(e) {
-            console.error("JS: Note simplification failed: ", e);
-            window.lastAnalysisResult = null;
-            return null;
-        }
-    }
+    /**
+     * Unified analysis function for notes and chords.
+     * If one note is provided, it simplifies it.
+     * If multiple notes are provided, it detects the chord.
+     *
+     * @param {string[]} notes - Array of note names (e.g., ["C4", "E4", "G4"] or ["F#3"])
+     */
+    function analyze(notes) {
+        console.log("JS: Received notes for analysis: " + JSON.stringify(notes));
 
-    function detectChord(notes) {
-        console.log("JS: Received notes for chord detection: " + JSON.stringify(notes));
         if (typeof Tonal === 'undefined' || !notes || notes.length === 0) {
             console.error("JS: Tonal.js not loaded or no notes provided.");
             window.lastAnalysisResult = null;
             return null;
         }
+
         try {
-            const detectedChords = Tonal.Chord.detect(notes);
             let result = null;
-            if (detectedChords.length > 0) {
-                result = detectedChords[0];
-                console.log("JS: Detected chord: " + result);
+            if (notes.length === 1) {
+                // Single note simplification
+                result = Tonal.Note.simplify(notes[0]);
+                console.log("JS: Single note simplified to: " + result);
             } else {
-                console.log("JS: No chord detected for notes: " + JSON.stringify(notes));
+                // Chord detection
+                const detectedChords = Tonal.Chord.detect(notes);
+                if (detectedChords.length > 0) {
+                    result = detectedChords[0];
+                    console.log("JS: Detected chord: " + result);
+                } else {
+                    console.log("JS: No chord detected for notes: " + JSON.stringify(notes));
+                }
             }
             window.lastAnalysisResult = result;
             return result;
         } catch(e) {
-            console.error("JS: Chord detection failed: ", e);
+            console.error("JS: Analysis failed: ", e);
             window.lastAnalysisResult = null;
             return null;
         }

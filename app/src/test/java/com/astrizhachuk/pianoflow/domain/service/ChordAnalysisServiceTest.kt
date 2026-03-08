@@ -3,7 +3,6 @@ package com.astrizhachuk.pianoflow.domain.service
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
-import java.util.Locale
 
 class ChordAnalysisServiceTest {
 
@@ -96,170 +95,56 @@ class ChordAnalysisServiceTest {
     @Test
     fun `processChordAnalysisResult with major chord suffix M returns chord name without it`() {
         val rawResult = "\"CM\""
-        val result = service.processChordAnalysisResult(rawResult, isChord = true)
+        val result = service.processChordAnalysisResult(rawResult)
         assertEquals("C", result)
     }
 
     @Test
     fun `processChordAnalysisResult with minor chord returns correct chord name`() {
         val rawResult = "\"Am\""
-        val result = service.processChordAnalysisResult(rawResult, isChord = true)
+        val result = service.processChordAnalysisResult(rawResult)
         assertEquals("Am", result)
     }
 
     @Test
-    fun `processChordAnalysisResult with null result for a chord returns chordNotDefined`() {
+    fun `processChordAnalysisResult with null result returns null`() {
         val rawResult = null
-        val chordNotDefined = "N/A"
-        val result = service.processChordAnalysisResult(rawResult, isChord = true, chordNotDefined = chordNotDefined)
-        assertEquals(chordNotDefined, result)
-    }
-
-    @Test
-    fun `processChordAnalysisResult with null result for a single note returns null`() {
-        val rawResult = null
-        val result = service.processChordAnalysisResult(rawResult, isChord = false)
+        val result = service.processChordAnalysisResult(rawResult)
         assertNull(result)
     }
 
     @Test
-    fun `processChordAnalysisResult with string null for a chord returns chordNotDefined`() {
+    fun `processChordAnalysisResult with string null returns null`() {
         val rawResult = "\"null\""
-        val chordNotDefined = "N/A"
-        val result = service.processChordAnalysisResult(rawResult, isChord = true, chordNotDefined = chordNotDefined)
-        assertEquals(chordNotDefined, result)
+        val result = service.processChordAnalysisResult(rawResult)
+        assertNull(result)
     }
 
     @Test
-    fun `processChordAnalysisResult with unquoted null string for a chord returns chordNotDefined`() {
-        val rawResult = "null"
-        val chordNotDefined = "N/A"
-        val result = service.processChordAnalysisResult(rawResult, isChord = true, chordNotDefined = chordNotDefined)
-        assertEquals(chordNotDefined, result)
-    }
-
-    @Test
-    fun `processChordAnalysisResult with empty string for a chord returns chordNotDefined`() {
+    fun `processChordAnalysisResult with empty string returns null`() {
         val rawResult = "\"\""
-        val chordNotDefined = "N/A"
-        val result = service.processChordAnalysisResult(rawResult, isChord = true, chordNotDefined = chordNotDefined)
-        assertEquals(chordNotDefined, result)
-    }
-
-    @Test
-    fun `processChordAnalysisResult with blank string for a chord returns chordNotDefined`() {
-        val rawResult = "\" \""
-        val chordNotDefined = "N/A"
-        val result = service.processChordAnalysisResult(rawResult, isChord = true, chordNotDefined = chordNotDefined)
-        assertEquals(chordNotDefined, result)
+        val result = service.processChordAnalysisResult(rawResult)
+        assertNull(result)
     }
 
     @Test
     fun `processChordAnalysisResult with no surrounding quotes returns correct chord name`() {
         val rawResult = "Am"
-        val result = service.processChordAnalysisResult(rawResult, isChord = true)
+        val result = service.processChordAnalysisResult(rawResult)
         assertEquals("Am", result)
-    }
-
-    @Test
-    fun `processChordAnalysisResult with whitespace result for a chord returns chordNotDefined`() {
-        val rawResult = " "
-        val chordNotDefined = "N/A"
-        val result = service.processChordAnalysisResult(rawResult, isChord = true, chordNotDefined = chordNotDefined)
-        assertEquals(chordNotDefined, result)
-    }
-
-    @Test
-    fun `processChordAnalysisResult with unquoted null string for a single note returns null`() {
-        val rawResult = "null"
-        val result = service.processChordAnalysisResult(rawResult, isChord = false)
-        assertNull(result)
-    }
-
-    @Test
-    fun `processChordAnalysisResult with only M suffix returns empty string`() {
-        val rawResult = "\"M\""
-        val result = service.processChordAnalysisResult(rawResult, isChord = true)
-        assertEquals("", result)
     }
 
     @Test
     fun `processChordAnalysisResult with valid single note returns note name`() {
         val rawResult = "\"C4\""
-        val result = service.processChordAnalysisResult(rawResult, isChord = false)
+        val result = service.processChordAnalysisResult(rawResult)
         assertEquals("C4", result)
     }
 
     @Test
-    fun `processChordAnalysisResult with empty string for a single note returns null`() {
-        val rawResult = ""
-        val result = service.processChordAnalysisResult(rawResult, isChord = false)
-        assertNull(result)
-    }
-
-    @Test
-    fun `processChordAnalysisResult with blank string for a single note returns null`() {
-        val rawResult = " "
-        val result = service.processChordAnalysisResult(rawResult, isChord = false)
-        assertNull(result)
-    }
-
-    @Test
-    fun `processChordAnalysisResult returns null when cleanedChord is null and isChord is false`() {
-        val result = service.processChordAnalysisResult(null, isChord = false)
-        assertNull(result)
-    }
-
-    @Test
-    fun `processChordAnalysisResult returns null for string null when isChord is false`() {
-        val result = service.processChordAnalysisResult("\"null\"", isChord = false)
-        assertNull(result)
-    }
-
-    @Test
-    fun `formatNoteForTonal coverage for empty note name part`() {
-        val json = "{\"treble\":[{\"keys\":[\"/4\"]}], \"bass\":[]}"
-        val result = service.parseNotesFromJson(json)
-        assertEquals(listOf("4"), result)
-    }
-
-    @Test
-    fun `formatNoteForTonal coverage for already uppercase note name`() {
-        val json = "{\"treble\":[{\"keys\":[\"C/4\"]}], \"bass\":[]}"
-        val result = service.parseNotesFromJson(json)
-        assertEquals(listOf("C4"), result)
-    }
-
-    @Test
-    fun `formatNoteForTonal coverage for more than two parts`() {
-        val json = "{\"treble\":[{\"keys\":[\"c/4/5\"]}], \"bass\":[]}"
-        val result = service.parseNotesFromJson(json)
-        assertEquals(listOf("c/4/5"), result)
-    }
-
-    @Test
-    fun `formatNoteForTonal coverage for non-alphabetic note name`() {
-        val json = "{\"treble\":[{\"keys\":[\"#/4\"]}], \"bass\":[]}"
-        val result = service.parseNotesFromJson(json)
-        assertEquals(listOf("#4"), result)
-    }
-
-    @Test
-    fun `processChordAnalysisResult exhaustive coverage for takeIf branches`() {
-        // Case: it.isNotBlank() is true AND it != "null" is true
-        assertEquals("Am", service.processChordAnalysisResult("Am", false))
-        
-        // Case: it.isNotBlank() is true AND it != "null" is false
-        assertNull(service.processChordAnalysisResult("null", false))
-        assertNull(service.processChordAnalysisResult("\"null\"", false))
-        
-        // Case: it.isNotBlank() is false (short-circuits it != "null")
-        assertNull(service.processChordAnalysisResult("", false))
-        assertNull(service.processChordAnalysisResult(" ", false))
-        assertNull(service.processChordAnalysisResult("\"\"", false))
-        assertNull(service.processChordAnalysisResult("\" \"", false))
-        
-        // Case: rawResult is null (short-circuits takeIf entirely)
-        assertNull(service.processChordAnalysisResult(null, false))
+    fun `processChordAnalysisResult returns null when result is blank`() {
+        assertNull(service.processChordAnalysisResult(null))
+        assertNull(service.processChordAnalysisResult("\"null\""))
+        assertNull(service.processChordAnalysisResult(" "))
     }
 }

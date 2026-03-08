@@ -10,8 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import timber.log.Timber
 import javax.inject.Inject
 
-private const val JS_SIMPLIFY_NOTE = "simplifyNote"
-private const val JS_DETECT_CHORD = "detectChord"
+private const val JS_ANALYZE = "analyze"
 
 /**
  * Implementation of the ChordAnalysisRepository interface.
@@ -48,23 +47,19 @@ class ChordAnalysisRepositoryImpl @Inject constructor(
 
             // Parse notes using Domain service
             val notes = chordAnalysisService.parseNotesFromJson(notesJson)
-            val isChord = notes.size > 1
 
             if (notes.isEmpty()) {
                 _chordAnalysisResult.value = null
                 return
             }
 
-            // Build JavaScript command
-            val script = buildAnalysisScript(notes, isChord)
+            // Build JavaScript command (unified analysis)
+            val script = buildAnalysisScript(notes)
             
             // Execute JavaScript using Data layer executor (no UI involvement)
             javaScriptExecutor.execute(script) { rawResult ->
                 // Process result using Domain service
-                val finalResult = chordAnalysisService.processChordAnalysisResult(
-                    rawResult,
-                    isChord
-                )
+                val finalResult = chordAnalysisService.processChordAnalysisResult(rawResult)
                 
                 // Post to main thread to ensure StateFlow update is processed on UI thread
                 mainHandler.post {
@@ -81,15 +76,10 @@ class ChordAnalysisRepositoryImpl @Inject constructor(
      * Builds the JavaScript code for chord analysis.
      *
      * @param notes List of note names (e.g., ["C4", "E4", "G4"] or ["F#3"])
-     * @param isChord Boolean indicating if multiple notes form a chord
      * @return JavaScript code string to execute
      */
-    private fun buildAnalysisScript(notes: List<String>, isChord: Boolean): String {
-        return if (isChord) {
-            val notesJsArray = notes.joinToString(prefix = "['", separator = "','", postfix = "']")
-            "$JS_DETECT_CHORD($notesJsArray)"
-        } else {
-            "$JS_SIMPLIFY_NOTE('${notes.first()}')"
-        }
+    private fun buildAnalysisScript(notes: List<String>): String {
+        val notesJsArray = notes.joinToString(prefix = "['", separator = "','", postfix = "']")
+        return "$JS_ANALYZE($notesJsArray)"
     }
 }
