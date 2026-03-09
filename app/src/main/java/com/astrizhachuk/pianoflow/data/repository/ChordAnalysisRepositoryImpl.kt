@@ -9,19 +9,27 @@ import com.astrizhachuk.pianoflow.domain.service.ChordAnalysisService
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
 import javax.inject.Inject
 
 private const val JS_ANALYZE = "analyze"
 
 /**
- * Implementation of the ChordAnalysisRepository interface.
+ * Implementation of the [ChordAnalysisRepository] interface.
  *
- * This class orchestrates chord analysis using:
- * - ChordAnalysisService for business logic (processing result)
- * - MusicScriptEngine for JavaScript execution (no UI involvement)
+ * This class coordinates the chord analysis process by leveraging the [MusicScriptEngine]
+ * for JavaScript-based computation and the [ChordAnalysisService] for post-processing
+ * and business logic.
  *
- * Results are emitted through StateFlow, eliminating callback chains.
+ * Key features:
+ * - Executes analysis logic in a JavaScript environment via [javaScriptExecutor].
+ * - Decouples analysis execution from the UI using [StateFlow] for result observation.
+ * - Handles thread synchronization to ensure results are emitted on the main thread.
+ *
+ * @property chordAnalysisService Service for processing raw analysis results into domain-specific data.
+ * @property javaScriptExecutor Engine responsible for executing the underlying JavaScript analysis logic.
+ * @property gson JSON library used to format parameters for script execution.
  */
 class ChordAnalysisRepositoryImpl @Inject constructor(
     private val chordAnalysisService: ChordAnalysisService,
@@ -30,7 +38,7 @@ class ChordAnalysisRepositoryImpl @Inject constructor(
 ) : ChordAnalysisRepository {
 
     private val _chordAnalysisResult = MutableStateFlow<String?>(null)
-    override val chordAnalysisResult: StateFlow<String?> = _chordAnalysisResult
+    override val chordAnalysisResult: StateFlow<String?> = _chordAnalysisResult.asStateFlow()
     
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -46,7 +54,7 @@ class ChordAnalysisRepositoryImpl @Inject constructor(
         notes: List<Note>
     ) {
         try {
-            Timber.d("Starting chord analysis with ${notes.size} notes")
+            Timber.d("analyzeChord: Initializing analysis with ${notes.size} notes")
 
             if (notes.isEmpty()) {
                 _chordAnalysisResult.value = null
@@ -55,28 +63,27 @@ class ChordAnalysisRepositoryImpl @Inject constructor(
 
             val noteNames = notes.map { it.name }.distinct().sorted()
             val script = buildAnalysisScript(noteNames)
-            
-            // Execute JavaScript using Data layer executor (no UI involvement)
+
             javaScriptExecutor.execute(script) { rawResult ->
-                // Process result using Domain service
                 val finalResult = chordAnalysisService.processChordAnalysisResult(rawResult)
-                
-                // Post to main thread to ensure StateFlow update is processed on UI thread
                 mainHandler.post {
                     _chordAnalysisResult.value = finalResult
                 }
             }
         } catch (e: Exception) {
-            Timber.tag("ChordAnalysis").e(e, "Failed to analyze chord")
+            Timber.e(e, "analyzeChord: Failed to analyze chord")
             _chordAnalysisResult.value = null
         }
     }
 
     /**
-     * Builds the JavaScript code for chord analysis using Gson for safe array formatting.
+     * Builds the JavaScript snippet required to execute the chord analysis in the script engine.
      *
-     * @param notes List of note names (e.g., ["C4", "E4", "F#4"])
-     * @return JavaScript code string to execute
+     * Uses [Gson] to safely serialize the list of note names into a JSON array,
+     * ensuring compatibility with the JavaScript `analyze` function signature.
+     *
+     * @param notes A list of note names (e.g., ["C4", "E4", "G#4"]) to be passed to the script.
+     * @return A string containing the JavaScript function call with serialized arguments.
      */
     private fun buildAnalysisScript(notes: List<String>): String {
         return "$JS_ANALYZE(${gson.toJson(notes)})"
