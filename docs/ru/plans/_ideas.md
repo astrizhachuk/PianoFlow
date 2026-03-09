@@ -555,3 +555,33 @@ fun PianoScreen(viewModel: PianoViewModel) {
     *   *Описывает использование блока `trace {}`, который был добавлен в код.*
 *   **Обзор CPU Profiler**: [https://developer.android.com/studio/profile/cpu-profiler](https://developer.android.com/studio/profile/cpu-profiler)
     *   *Общая информация об инструменте.*
+
+
+Чего не хватает согласно стратегии:
+1.
+UI-тесты для основного функционала (Piano Staff):
+◦
+В стратегии указано: "UI correctness: Checking that the UI correctly reacts to state changes coming from the ViewModel".
+◦
+Отсутствует: androidTest для PianoStaff. Нужно проверить, что при получении нот через ViewModel они корректно отображаются на нотном стане.
+2.
+Интеграционные UI-тесты анализа аккордов:
+◦
+Есть unit-тесты логики анализа, но нет тестов, подтверждающих, что результат анализа (название аккорда) появляется на экране пользователя.
+3.
+End-to-End сценарии (User Flows):
+◦
+Стратегия предполагает проверку цепочек действий: "connected the device -> a notification appeared on the screen".
+◦
+Не хватает: Теста, который симулирует поток MIDI-сообщений (через Fake) и проверяет обновление всей цепочки: MidiDataSource -> Repository -> UseCase -> ViewModel -> UI (PianoStaff + Chord Name).
+4.
+Реализация вспомогательных классов для тестов:
+◦
+В документе упоминается VirtualMidiDeviceHelper для эмуляции на уровне системы. Сейчас в MidiConnectionUITest используется FakeMidiRepository, что проще, но менее "глубоко", чем описано в стратегии для полной эмуляции.
+Рекомендации по доработке:
+1.
+Создать PianoStaffUITest.kt в androidTest, чтобы проверить визуализацию нот.
+2.
+Добавить комплексный тест в MidiConnectionUITest или новый файл, который проверит отображение названия аккорда при "нажатии" клавиш на фейковом устройстве.
+3.
+Проверить наличие FakeMidiDataSource (как указано в примере стратегии) для более гибкого тестирования инструментальных сценариев без замены целого репозитория.

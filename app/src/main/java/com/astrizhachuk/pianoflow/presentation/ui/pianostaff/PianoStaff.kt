@@ -1,11 +1,9 @@
-
 package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 
-import android.annotation.SuppressLint
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -17,71 +15,66 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
+import com.astrizhachuk.pianoflow.data.datasource.analysis.MusicScriptEngine
+import timber.log.Timber
 
 /**
- * A composable that renders a musical staff.
+ * A Composable that displays a piano staff with musical notes.
  *
- * This component utilizes an [AndroidView] to embed a [WebView]. The `WebView`
- * loads a local HTML file (`vexflow.html`) which leverages the VexFlow.js library
- * to visualize musical notes. The notes to be rendered are passed into the `WebView`
- * as a JSON string.
+ * This component utilizes an embedded `WebView` to render a musical staff via the VexFlow
+ * JavaScript library. It loads a local HTML file (`vexflow.html` from assets) and then
+ * executes a JavaScript function (`drawGrandStaff`) to draw the specified notes.
  *
- * Communication with the JavaScript in the `WebView` is handled via `evaluateJavascript`.
- * The composable also tracks its own size to adjust the staff's orientation
- * (portrait or landscape) for optimal rendering.
+ * The staff automatically redraws whenever the notes, orientation, or component size change,
+ * ensuring it adapts to different screen configurations. This composable is designed for
+ * display purposes only and does not contain any music theory or note analysis logic.
  *
- * @param notesJson A JSON string containing the notes to be drawn. It is expected
- *                  to have a structure like `{ "treble": [...], "bass": [...] }`.
- * @param modifier The modifier to be applied to the underlying [AndroidView].
+ * @param notesJson A JSON string representing the notes to be displayed. The string should
+ *   contain `treble` and `bass` keys, each with an array of notes for the respective clef.
+ * @param isPortrait A boolean indicating the orientation. `true` for portrait mode, `false` for
+ *   landscape. This affects how the staff is rendered.
+ * @param modifier The modifier to be applied to the `PianoStaff` container.
  */
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun PianoStaff(
+    modifier: Modifier = Modifier,
     notesJson: String,
-    modifier: Modifier = Modifier
+    isPortrait: Boolean
 ) {
     val context = LocalContext.current
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    var isPageLoaded by remember { mutableStateOf(false) }
 
     val webView = remember {
         WebView(context).apply {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             settings.javaScriptEnabled = true
-            webChromeClient = WebChromeClient()
+            setBackgroundColor(0)
+            webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                    Timber.tag("WebView").d(consoleMessage.message())
+                    return true
+                }
+            }
         }
     }
 
+    val executor = remember {
+        MusicScriptEngine(
+            webView = webView,
+            pageUrl = "file:///android_asset/vexflow.html"
+        )
+    }
+
     AndroidView(
-        factory = {
-            webView.apply {
-                webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView?, url: String?) {
-                        isPageLoaded = true
-                    }
-                }
-                loadUrl("file:///android_asset/vexflow.html")
-            }
-        },
+        factory = { webView },
         modifier = modifier.onSizeChanged { viewSize = it }
     )
 
-    LaunchedEffect(notesJson, viewSize, isPageLoaded) {
-        if (!isPageLoaded || viewSize == IntSize.Zero) return@LaunchedEffect
+    // Update display when notes, orientation, or size changes.
+    LaunchedEffect(notesJson, isPortrait, viewSize) {
+        if (viewSize == IntSize.Zero) return@LaunchedEffect
 
-        val orientation = if (viewSize.width > viewSize.height) "landscape" else "portrait"
-        val script = """
-            try {
-                const svg = document.querySelector('svg');
-                if (svg && svg.parentElement) {
-                    svg.parentElement.innerHTML = '';
-                }
-                const data = JSON.parse('$notesJson');
-                drawGrandStaff(data.treble, data.bass, '$orientation');
-            } catch (e) {
-                console.error('Error executing script: ', e);
-            }
-        """
-        webView.evaluateJavascript(script, null)
+        val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, $isPortrait);"
+        executor.execute(drawScript) { /* No result needed */ }
     }
 }

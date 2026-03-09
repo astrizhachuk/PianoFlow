@@ -12,14 +12,22 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * Use case for observing incoming MIDI messages.
+ * Observes incoming MIDI note messages and groups them into chords based on temporal proximity.
  *
- * It receives a stream of individual notes from the [MidiRepository] and groups them into lists (chords).
- * The grouping is based on temporal proximity: notes that arrive within a short
- * period of time are considered part of the same chord.
+ * This use case subscribes to the stream of individual MIDI [Note] events from the
+ * [MidiRepository]. It collects notes that arrive within a short time window ([CHORD_WINDOW_MS])
+ * and emits them as a single list, representing a chord.
  *
- * Each new emission from this use case represents a complete set of notes (a chord)
- * that should be displayed on the screen, replacing the previous one.
+ * The logic is designed to handle both single notes and chords played with slight timing
+ * variations (arpeggiation). Each time a note arrives, a timer is reset. If more notes arrive
+ * before the timer expires, they are added to the current chord. When the timer finally
+ * expires, the collected list of notes is emitted. A new note arriving after a previous
+ * emission will start a new chord.
+ *
+ * Each emission from the resulting Flow represents a complete musical event (a single note or a chord)
+ * that should be displayed, replacing any previously displayed notes.
+ *
+ * @see MidiRepository.observeNotes
  */
 class ObserveMidiMessagesUseCase @Inject constructor(
     private val midiRepository: MidiRepository

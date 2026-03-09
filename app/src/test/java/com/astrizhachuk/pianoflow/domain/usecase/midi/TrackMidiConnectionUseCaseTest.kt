@@ -19,16 +19,16 @@ class TrackMidiConnectionUseCaseTest {
 
     @Test
     fun `invoke calls observeConnectionState and returns flow`() = runTest {
-        // Given
+        // Arrange
         val mockDevice = MidiDevice(id = 1, name = "Test Device", product = "Test Product", manufacturer = "Test Manufacturer")
         val expectedState = ConnectionState.Connected(mockDevice)
         val expectedFlow = flowOf(expectedState)
         every { midiRepository.observeConnectionState() } returns expectedFlow
 
-        // When
+        // Act
         val resultFlow = useCase()
 
-        // Then
+        // Assert
         resultFlow.test {
             assertEquals(expectedState, awaitItem())
             awaitComplete()

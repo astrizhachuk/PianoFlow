@@ -9,6 +9,8 @@ import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.data.di.DataModule
 import com.astrizhachuk.pianoflow.domain.model.ConnectionState
 import com.astrizhachuk.pianoflow.domain.model.MidiDevice
+import com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository
+import com.astrizhachuk.pianoflow.domain.repository.FakeChordAnalysisRepository
 import com.astrizhachuk.pianoflow.domain.repository.FakeMidiRepository
 import com.astrizhachuk.pianoflow.domain.repository.MidiRepository
 import com.astrizhachuk.pianoflow.presentation.ui.main.MainActivity
@@ -31,9 +33,13 @@ class MidiConnectionUITest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     private val fakeMidiRepository = FakeMidiRepository()
+    private val fakeChordAnalysisRepository = FakeChordAnalysisRepository()
 
     @BindValue
     val midiRepository: MidiRepository = fakeMidiRepository
+
+    @BindValue
+    val chordAnalysisRepository: ChordAnalysisRepository = fakeChordAnalysisRepository
 
     private lateinit var context: Context
 

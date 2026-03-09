@@ -67,7 +67,7 @@ class MidiRepositoryImplTest {
     @Test
     fun `observeNotes should proxy call to data source`() = runTest {
         // Arrange
-        val expectedNote = Note(60)
+        val expectedNote = Note(60, "C4")
         val notesFlow = MutableSharedFlow<Note>(replay = 1)
         notesFlow.tryEmit(expectedNote)
         every { midiDataSource.notes } returns notesFlow
