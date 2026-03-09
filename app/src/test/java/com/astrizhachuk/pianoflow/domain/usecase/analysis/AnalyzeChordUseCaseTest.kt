@@ -3,40 +3,52 @@ package com.astrizhachuk.pianoflow.domain.usecase.analysis
 import com.astrizhachuk.pianoflow.domain.model.Note
 import com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository
 import io.mockk.every
-import io.mockk.justRun
-import io.mockk.mockk
+import io.mockk.impl.annotations.MockK
+import io.mockk.junit4.MockKRule
 import io.mockk.verify
+import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 class AnalyzeChordUseCaseTest {
 
-    private val chordAnalysisRepository: ChordAnalysisRepository = mockk()
-    private val useCase = AnalyzeChordUseCase(chordAnalysisRepository)
+    @get:Rule
+    val mockkRule = MockKRule(this)
 
-    @Test
-    fun `invoke should call repository to analyze chord`() {
-        // Arrange
-        val notes = listOf(Note(60, "C4"))
-        justRun { chordAnalysisRepository.analyzeChord(any()) }
+    @MockK
+    private lateinit var repository: ChordAnalysisRepository
 
-        // Act
-        useCase(notes)
+    private lateinit var useCase: AnalyzeChordUseCase
 
-        // Assert
-        verify(exactly = 1) { chordAnalysisRepository.analyzeChord(notes) }
+    @Before
+    fun setup() {
+        useCase = AnalyzeChordUseCase(repository)
     }
 
     @Test
-    fun `invoke should not throw exception when repository fails`() {
+    fun `invoke should delegate call to repository`() {
         // Arrange
-        val notes = listOf(Note(60, "C4"))
-        val exception = RuntimeException("Failed to analyze")
-        every { chordAnalysisRepository.analyzeChord(any()) } throws exception
+        val notes = listOf(Note(60, "C4"), Note(64, "E4"))
+        every { repository.analyzeChord(notes) } returns Unit
 
         // Act
         useCase(notes)
 
         // Assert
-        verify(exactly = 1) { chordAnalysisRepository.analyzeChord(notes) }
+        verify { repository.analyzeChord(notes) }
+    }
+
+    @Test
+    fun `invoke when repository throws exception should not crash`() {
+        // Arrange
+        val notes = listOf(Note(60, "C4"))
+        every { repository.analyzeChord(notes) } throws RuntimeException("Repository error")
+
+        // Act
+        useCase(notes)
+
+        // Assert
+        verify { repository.analyzeChord(notes) }
+        // If no exception is re-thrown, the test passes
     }
 }
