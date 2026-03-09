@@ -4,7 +4,10 @@
 
 ### 1.1. Цель доработки
 
-Реализовать функционал для приема, обработки и визуализации MIDI-сообщений (нот), поступающих от подключенной MIDI-клавиатуры. Основная задача — отображать сыгранные пользователем ноты и аккорды на нотном стане в реальном времени.
+Реализовать функционал для приема, обработки, анализа и визуализации MIDI-сообщений (нот), поступающих от подключенной MIDI-клавиатуры. Основные задачи:
+- Отображать сыгранные пользователем ноты и аккорды на нотном стане в реальном времени.
+- Анализировать распознанные аккорды и отображать их названия (например, "C Major", "Am", "G7").
+- Правильно обрабатывать одиночные ноты (не отображать их как неопознанные аккорды).
 
 ### 1.2. Базовые документы
 
@@ -16,90 +19,252 @@
 
 ### 2.1. Компоненты
 
-Система обработки MIDI-сообщений интегрирована в существующую архитектуру, расширяя функционал `Data` и `Domain` слоев и добавляя новые компоненты в `Presentation` слой.
+Система обработки MIDI-сообщений интегрирована в существующую архитектуру, расширяя функционал `Data` и `Domain` слоев и добавляя новые компоненты в `Presentation` слой. Включает модули для анализа аккордов с использованием JavaScript-библиотеки [Tonal](https://github.com/tonaljs/tonal).
 
 **Data Layer**
 - **`MidiDataSource`:** Расширен для обработки входящих MIDI-сообщений. После успешного открытия устройства (`MidiManager.openDevice`), он подключает `MidiReceiver` к **выходному порту** устройства (`MidiOutputPort`) для приема данных.
 - **`MidiMessageReceiver`:** Внутренняя реализация `android.media.midi.MidiReceiver`, ответственная за прием сырых MIDI-данных (`byte[]`).
-- **`MidiMessageParser`:** Компонент, который получает сырые данные от `MidiMessageReceiver`, парсит их и преобразует в доменную модель `Note`. Игнорирует все сообщения, кроме `Note On`.
+- **`MidiMessageParser`:** Компонент, который получает сырые данные от `MidiMessageReceiver`, парсит их и преобразует в доменную модель `Note`. Игнорирует все сообщения, кроме `Note On` (с velocity > 0).
 - **`MidiRepositoryImpl`:** Реализация репозитория, которая предоставляет поток входящих нот.
+- **`MusicScriptEngine`:** Компонент для изоляции логики выполнения JavaScript-кода через WebView. Обеспечивает безопасное и изолированное выполнение скриптов Tonal.js для анализа аккордов.
+- **`ChordAnalysisRepositoryImpl`:** Реализация репозитория анализа аккордов. Использует `MusicScriptEngine` для выполнения JavaScript-кода и `ChordAnalysisService` для постобработки результатов. Предоставляет `StateFlow<String?>` с результатами анализа.
 
 **Domain Layer**
-- **`Note`:** Доменная модель, представляющая одну ноту (высота тона).
-- **`MidiRepository`:** Интерфейс дополнен методом для наблюдения за входящими нотами (`Flow<Note>`).
-- **`ObserveMidiMessagesUseCase`:** `Use Case`, который получает поток одиночных нот и преобразует его в `Flow<List<Note>>`, группируя быстрые последовательные нажатия в один аккорд.
+- **`Note`:** Доменная модель ноты (MIDI-номер и музыкальное имя, например "C4").
+- **`MidiRepository`:** Интерфейс для получения потока нот.
+- **`ObserveMidiMessagesUseCase`:** Группирует одиночные ноты в аккорды (списки) через `channelFlow` с задержкой 50 мс.
+- **`ChordAnalysisRepository`:** Интерфейс с методами `analyzeChord()` и `chordAnalysisResult`.
+- **`AnalyzeChordUseCase`:** Use case для запуска асинхронного анализа аккорда (fire-and-forget).
+- **`ObserveChordAnalysisResultsUseCase`:** Use case для подписки на результаты анализа.
+- **`ChordAnalysisService`:** Доменный сервис для обработки сырых строковых результатов из JavaScript (очистка от кавычек, нормализация имен).
 
 **Presentation Layer**
-- **`PianoStaffViewModel`:** Новая `ViewModel` для экрана с нотным станом. Она получает `Flow` нот из `ObserveMidiMessagesUseCase` и преобразует его в состояние для UI.
-- **`PianoStaffScreen`:** `Composable`-экран, который отображает сыгранные ноты на нотном стане.
-- **`MainActivity`**: Основная `Activity` приложения. Использует `setContent` для отображения `Composable`-иерархии, построенной на `Scaffold`, который управляет структурой экрана и содержит `SnackbarHost` для показа уведомлений.
+- **`PianoStaffViewModel`:** Управляет состоянием UI. Объединяет (`combine`) поток нот и результаты анализа. При изменении состава нот инициирует новый анализ.
+- **`PianoStaffUiState`:** Состояние UI:
+  - `notesJson: String` - JSON-представление нот для визуализации через VexFlow.
+  - `chordName: String?` - название распознанного аккорда или локализованная строка "Не определен".
+- **`PianoStaffScreen`:** Composable-экран, который отображает сыгранные ноты на нотном стане и название аккорда.
+
+#### 2.1.1. C4 Level 3 Overview: Обзор подсистем
 
 ```plantuml
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title C4 - Level 3: Компоненты системы обработки MIDI-сообщений
+title C4 - Level 3 Overview: Обзор подсистем обработки MIDI-сообщений
+
+System_Ext(midi_device, "MIDI Keyboard", "Физическое устройство")
+System_Ext(webview_js, "WebView + Tonal.js", "JavaScript анализ аккордов")
+
+Container_Boundary(presentation, "Presentation Layer") {
+    Component(vm, "PianoStaffViewModel", "ViewModel", "Управляет ноты + аккорды")
+    Component(screen, "PianoStaffScreen", "Composable", "Отображает ноты и названия")
+}
+
+Container_Boundary(domain, "Domain Layer") {
+    Container_Boundary(midi_subsystem, "MIDI Subsystem") {
+        Component(observe_midi, "ObserveMidiMessagesUseCase", "Use Case", "")
+        Component(midi_repo, "MidiRepository", "Interface", "")
+    }
+    
+    Container_Boundary(chord_subsystem, "Chord Analysis Subsystem") {
+        Component(analyze_chord, "AnalyzeChordUseCase", "Use Case", "")
+        Component(observe_chord, "ObserveChordAnalysisResultsUseCase", "Use Case", "")
+        Component(chord_repo, "ChordAnalysisRepository", "Interface", "")
+    }
+}
+
+Container_Boundary(data, "Data Layer") {
+    Container_Boundary(midi_impl, "MIDI Implementation") {
+        Component(midi_repo_impl, "MidiRepositoryImpl", "Impl", "")
+        Component(ds, "MidiDataSource", "Data Source", "")
+    }
+    
+    Container_Boundary(chord_impl, "Chord Analysis Implementation") {
+        Component(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Impl", "")
+        Component(js_engine, "MusicScriptEngine", "JS Engine", "")
+    }
+}
+
+' Связи
+Rel(midi_device, ds, "MIDI сообщения")
+Rel(chord_repo_impl, js_engine, "Использует для анализа")
+Rel(js_engine, webview_js, "Выполняет JS")
+
+Rel(vm, observe_midi, "observeNotes()")
+Rel(vm, analyze_chord, "analyzeChord()")
+Rel(vm, observe_chord, "observeChordAnalysisResults()")
+
+Rel(observe_midi, midi_repo, "observeNotes()")
+Rel(analyze_chord, chord_repo, "analyzeChord()")
+Rel(observe_chord, chord_repo, "observeChordAnalysisResults()")
+
+Rel(midi_repo_impl, midi_repo, "@Binds")
+Rel(chord_repo_impl, chord_repo, "@Binds")
+
+Rel(vm, screen, "Обновляет UiState")
+
+@enduml
+```
+
+#### 2.1.2. C4 Level 3a: Компоненты MIDI подсистемы
+
+```plantuml
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title C4 - Level 3a: Компоненты MIDI подсистемы
 
 System_Ext(midi_device, "MIDI Keyboard", "Физическое устройство")
 System_Ext(android_sdk, "Android SDK", "MidiReceiver, MidiOutputPort")
 
 Container_Boundary(presentation, "Presentation Layer") {
-    Component(activity, "MainActivity", "Activity", "Отображает Composable UI с помощью Scaffold.")
-    Component(vm, "PianoStaffViewModel", "ViewModel", "Управляет состоянием UI, получая ноты и формируя PianoStaffUiState.")
-    Component(screen, "PianoStaffScreen", "Composable", "Экран, который отображает нотный стан, получая состояние от ViewModel.")
-    Component(staff, "PianoStaff", "Composable", "Компонент для непосредственной отрисовки нотного стана.")
+    Component(vm, "PianoStaffViewModel", "ViewModel", "Обновляет notesJson")
 }
 
 Container_Boundary(domain, "Domain Layer") {
-    Component(observe_uc, "ObserveMidiMessagesUseCase", "Use Case", "Группирует ноты в аккорды.")
-    Component(repo, "MidiRepository", "Interface", "Контракт для получения MIDI-данных.")
-    Component(note, "Note", "Data Class", "Доменная модель ноты.")
+    Component(observe_midi_uc, "ObserveMidiMessagesUseCase", "Use Case", "Группирует ноты в аккорды")
+    Component(midi_repo, "MidiRepository", "Interface", "Контракт для MIDI-данных")
+    Component(note, "Note", "Model", "Доменная модель ноты")
 }
 
 Container_Boundary(data, "Data Layer") {
-    Component(repo_impl, "MidiRepositoryImpl", "Implementation", "Реализация репозитория.")
-    Component(ds, "MidiDataSource", "Data Source", "Получает сообщения через MidiReceiver.")
-    Component(parser, "MidiMessageParser", "Parser", "Парсит сырые MIDI-сообщения.")
-    Component(receiver, "MidiMessageReceiver", "Receiver", "Реализация android.media.midi.MidiReceiver.")
+    Component(midi_repo_impl, "MidiRepositoryImpl", "Repository Impl", "Управляет потоком нот")
+    Component(ds, "MidiDataSource", "Data Source", "Преобразует MIDI в ноты")
+    Component(parser, "MidiMessageParser", "Parser", "Парсит сырые MIDI-данные")
+    Component(receiver, "MidiMessageReceiver", "Receiver", "android.media.midi.MidiReceiver")
 }
 
-' Связи
-Rel(activity, screen, "Отображает")
-Rel(screen, staff, "Использует")
-Rel(screen, vm, "Наблюдает за", "PianoStaffUiState")
-Rel(vm, observe_uc, "Вызывает")
-Rel(observe_uc, repo, "Вызывает observeNotes()")
+' Связи Presentation-Domain
+Rel(vm, observe_midi_uc, "observeNotes()")
 
-Rel(repo_impl, repo, "@Binds")
-Rel(repo_impl, ds, "Зависит от")
+' Связи Domain-Domain
+Rel(observe_midi_uc, midi_repo, "observeNotes()")
+Rel(observe_midi_uc, note, "Flow<List<Note>>")
 
+' Bindings
+Rel(midi_repo_impl, midi_repo, "@Binds")
+
+' Связи Data Layer
+Rel(midi_repo_impl, ds, "Использует")
 Rel(ds, parser, "Использует")
-Rel(ds, receiver, "Создает и подключает")
-Rel(receiver, android_sdk, "Реализует")
-Rel(receiver, parser, "Передает данные в")
-
-Rel(midi_device, ds, "Отправляет MIDI-сообщения", "USB/Bluetooth")
-
-Rel(observe_uc, note, "Возвращает Flow<List<Note>>")
+Rel(ds, receiver, "Создает")
 Rel(parser, note, "Создает")
+Rel(receiver, android_sdk, "Реализует")
+
+' Внешние системы
+Rel(midi_device, ds, "Отправляет MIDI сообщения")
+
+@enduml
+```
+
+#### 2.1.3. C4 Level 3b: Компоненты подсистемы анализа аккордов
+
+```plantuml
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title C4 - Level 3b: Компоненты подсистемы анализа аккордов
+
+System_Ext(webview_js, "WebView + Tonal.js", "JavaScript анализ аккордов")
+
+Container_Boundary(presentation, "Presentation Layer") {
+    Component(vm, "PianoStaffViewModel", "ViewModel", "Вызывает анализ и получает результаты")
+}
+
+Container_Boundary(domain, "Domain Layer") {
+    Component(analyze_chord_uc, "AnalyzeChordUseCase", "Use Case", "Fire-and-forget анализ")
+    Component(observe_chord_uc, "ObserveChordAnalysisResultsUseCase", "Use Case", "Подписка на результаты")
+    Component(chord_repo, "ChordAnalysisRepository", "Interface", "Контракт анализа аккордов")
+    Component(chord_service, "ChordAnalysisService", "Domain Service", "Бизнес-логика обработки строк")
+}
+
+Container_Boundary(data, "Data Layer") {
+    Component(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Repository Impl", "Управляет анализом и StateFlow")
+    Component(js_executor, "MusicScriptEngine", "JS Executor", "Выполняет Tonal.js код")
+}
+
+' Связи Presentation-Domain
+Rel(vm, analyze_chord_uc, "analyzeChord()")
+Rel(vm, observe_chord_uc, "observeChordAnalysisResults()")
+
+' Связи Use Cases-Repository
+Rel(analyze_chord_uc, chord_repo, "analyzeChord()")
+Rel(observe_chord_uc, chord_repo, "observeChordAnalysisResults()")
+
+' Bindings
+Rel(chord_repo_impl, chord_repo, "@Binds")
+
+' Связи Data Layer
+Rel(chord_repo_impl, chord_service, "Использует")
+Rel(chord_repo_impl, js_executor, "Использует для JS")
+
+' Внешние системы
+Rel(js_executor, webview_js, "Выполняет анализ")
 
 @enduml
 ```
 
 ### 2.2. API и Модели данных
 
+В этом разделе представлены программные интерфейсы и модели данных, распределенные по слоям архитектуры.
+
 **Domain Layer:**
 
 ```kotlin
 // com.astrizhachuk.pianoflow.domain.model.Note.kt
+/**
+ * Доменная модель ноты.
+ */
 data class Note(
-    val pitch: Int // MIDI номер ноты (0-127)
+    val pitch: Int,   // MIDI номер ноты (0-127)
+    val name: String  // Музыкальное имя ноты (например, "C4")
 )
 
 // com.astrizhachuk.pianoflow.domain.repository.MidiRepository.kt
+/**
+ * Интерфейс репозитория для работы с MIDI.
+ */
 interface MidiRepository {
     fun observeConnectionState(): Flow<ConnectionState>
-    fun observeNotes(): Flow<Note> // Возвращает поток одиночных нот
+    fun observeNotes(): Flow<Note>
+}
+
+// com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository.kt
+/**
+ * Интерфейс репозитория для анализа аккордов.
+ */
+interface ChordAnalysisRepository {
+    val chordAnalysisResult: StateFlow<String?>
+    fun analyzeChord(notes: List<Note>)
+}
+
+// com.astrizhachuk.pianoflow.domain.service.ChordAnalysisService.kt
+/**
+ * Доменный сервис для обработки строковых результатов анализа.
+ */
+class ChordAnalysisService {
+    fun processChordAnalysisResult(rawChord: String?): String?
+}
+```
+
+**Data Layer:**
+
+```kotlin
+// com.astrizhachuk.pianoflow.data.datasource.midi.MidiMessageParser.kt
+/**
+ * Парсер сырых MIDI сообщений.
+ */
+class MidiMessageParser {
+    fun parse(data: ByteArray): Note?
+}
+
+// com.astrizhachuk.pianoflow.data.datasource.analysis.MusicScriptEngine.kt
+/**
+ * Движок для выполнения JavaScript кода.
+ */
+class MusicScriptEngine {
+    fun execute(script: String, callback: (String?) -> Unit)
 }
 ```
 
@@ -107,99 +272,56 @@ interface MidiRepository {
 
 ```kotlin
 // com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState.kt
+/**
+ * Состояние UI для экрана с нотным станом.
+ */
 data class PianoStaffUiState(
-    val notesJson: String = "{"treble":[], "bass":[]}"
+    val notesJson: String = "{\"treble\":[], \"bass\":[]}",
+    val chordName: String? = null
 )
-
-// com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffViewModel.kt
-@HiltViewModel
-class PianoStaffViewModel @Inject constructor(
-    private val observeMidiMessagesUseCase: ObserveMidiMessagesUseCase
-) : ViewModel() {
-
-    private val _uiState = MutableStateFlow(PianoStaffUiState())
-    val uiState: StateFlow<PianoStaffUiState> = _uiState.asStateFlow()
-
-    init {
-        viewModelScope.launch {
-            observeMidiMessagesUseCase().collect { notes ->
-                _uiState.update {
-                    it.copy(notesJson = notes.toVexflowJson())
-                }
-            }
-        }
-    }
-}
-```
-
-**PianoStaffScreen** — это `Composable`-функция, которая получает `PianoStaffViewModel` через Hilt, подписывается на изменения `uiState` и передает данные в `PianoStaff` для отрисовки.
-
-```kotlin
-// com.astrizhachuk.pianoflow.presentation.ui.pianostaff.PianoStaffScreen.kt
-@Composable
-fun PianoStaffScreen(
-    modifier: Modifier = Modifier,
-    viewModel: PianoStaffViewModel = hiltViewModel()
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        PianoStaff(notesJson = uiState.notesJson)
-    }
-}
 ```
 
 ### 2.3. Расширение зависимостей
 
-`MidiMessageParser` был добавлен в граф зависимостей Hilt и внедрен в `MidiDataSource`.
-
-```kotlin
-// com.astrizhachuk.pianoflow.data.di.DataModule.kt
-// ...
-companion object {
-    @Provides
-    @Singleton
-    fun provideMidiDataSource(
-        @ApplicationContext context: Context,
-        midiDeviceMapper: MidiDeviceMapper,
-        midiMessageParser: MidiMessageParser // Добавлена зависимость
-    ): MidiDataSource {
-        return MidiDataSource(context, midiDeviceMapper, midiMessageParser)
-    }
-
-    @Provides
-    @Singleton
-    fun provideMidiMessageParser(): MidiMessageParser {
-        return MidiMessageParser()
-    }
-}
-```
+Система использует Hilt для управления зависимостями.
 
 ```plantuml
 @startuml
-title Внедрение зависимости MidiMessageParser через Hilt
+title Граф зависимостей системы обработки MIDI (Hilt)
 
 class MidiMessageParser <<@Singleton>>
+class MusicScriptEngine <<@Singleton>>
+class ChordAnalysisService <<@Singleton>>
 class MidiDataSource <<@Singleton>>
+class MidiRepositoryImpl
+class ChordAnalysisRepositoryImpl <<@Singleton>>
+interface MidiRepository
+interface ChordAnalysisRepository
+interface MidiDeviceMapper
+class MidiDeviceMapperImpl
+class Gson <<@Singleton>>
+class WebView <<@Singleton>>
 
-abstract class DataModule <<Hilt Module>> {
-  +provideMidiMessageParser(): MidiMessageParser
-  +provideMidiDataSource(...,
-  midiMessageParser: MidiMessageParser): MidiDataSource
-}
+' Репозитории и их реализации (Binds)
+MidiRepositoryImpl ..|> MidiRepository : @Binds
+ChordAnalysisRepositoryImpl ..|> ChordAnalysisRepository : @Binds
+MidiDeviceMapperImpl ..|> MidiDeviceMapper : @Binds
 
-note right of DataModule::provideMidiMessageParser
-  Этот метод сообщает Hilt,
-  как создавать MidiMessageParser.
+' Зависимости репозиториев
+MidiRepositoryImpl --> MidiDataSource : inject
+ChordAnalysisRepositoryImpl --> MusicScriptEngine : inject
+ChordAnalysisRepositoryImpl --> ChordAnalysisService : inject
+ChordAnalysisRepositoryImpl --> Gson : inject
+
+' Источники данных и движки
+MidiDataSource --> MidiMessageParser : inject
+MidiDataSource --> MidiDeviceMapper : inject
+MusicScriptEngine --> WebView : inject
+
+note right of ChordAnalysisRepositoryImpl
+  Репозиторий координирует
+  анализ через JS движок
 end note
-
-' Зависимости
-DataModule::provideMidiMessageParser ..> MidiMessageParser : <<@Provides>>
-DataModule::provideMidiDataSource ..> MidiDataSource : <<@Provides>>
-MidiDataSource --> MidiMessageParser : <<inject>>
 
 @enduml
 ```
@@ -208,7 +330,7 @@ MidiDataSource --> MidiMessageParser : <<inject>>
 
 ### 3.1. Принцип работы
 
-1.  **Подключение `Receiver`'а**:
+1.  **Подключение Receiver'а**:
     *   После того как `MidiDataSource` успешно открывает соединение с MIDI-устройством, он находит первый доступный **выходной порт** (`MidiOutputPort`) устройства.
     *   `MidiDataSource` вызывает `outputPort.connect(midiMessageReceiver)`, чтобы начать получать MIDI-данные.
 
@@ -244,14 +366,14 @@ deactivate DS
 2.  **Прием и парсинг сообщений**:
     *   Когда пользователь нажимает клавишу, MIDI-клавиатура отправляет сообщение. `MidiMessageReceiver.onSend()` вызывается с сырыми данными (`byte[]`).
     *   `MidiMessageReceiver` немедленно передает эти данные в `MidiMessageParser`.
-    *   `MidiMessageParser` анализирует байты. Если это `Note On`, он извлекает номер ноты и создает объект `Note`, который передает обратно в `MidiDataSource`.
+    *   `MidiMessageParser` анализирует байты. Если это `Note On`, он извлекает номер ноты и создает объект `Note` (включая его музыкальное имя через `pitchToName`), который передает обратно в `MidiDataSource`.
     *   `MidiDataSource` отправляет полученную `Note` в `SharedFlow`.
 
 ```plantuml
 @startuml
 title Диаграмма последовательности: Внутренняя работа midiMessageReceiver
 
-participant "Android MIDI System" as MidiSystem
+participant "Android MIDI System" as SDK
 box "MidiDataSource" #LightGray
     participant "midiMessageReceiver" as Receiver
     participant "midiMessageParser" as Parser
@@ -259,7 +381,7 @@ box "MidiDataSource" #LightGray
 end box
 participant "Timber" as Logger
 
-MidiSystem -> Receiver : onSend(msg, offset, count, ...)
+SDK -> Receiver : onSend(msg, offset, count, ...)
 activate Receiver
 
 Receiver -> Receiver : relevantData = msg.copyOfRange(...)
@@ -288,56 +410,62 @@ deactivate Receiver
 
 3.  **Группировка и передача нот**:
     *   `MidiRepositoryImpl` через `observeNotes()` проксирует `Flow<Note>` из `MidiDataSource`.
-    *   `ObserveMidiMessagesUseCase` подписывается на этот поток. Он использует операторы `Kotlin Flow` (например, `channelFlow` с `delay`) для группировки нот, пришедших в течение короткого промежутка времени (`50 мс`), в один список `List<Note>` (аккорд).
+    *   `ObserveMidiMessagesUseCase` подписывается на этот поток. Он использует операторы `Kotlin Flow` (внутри `channelFlow` с `launch` и `delay`) для группировки нот, пришедших в течение короткого промежутка времени (`50 мс`), в один список `List<Note>` (аккорд). Каждый новый `Note` сбрасывает таймер, позволяя собрать аккорды, сыгранные не идеально одновременно (арпеджиато).
 
-4.  **Отображение на UI**:
-    *   `PianoStaffViewModel` подписывается на `Flow<List<Note>>` от `ObserveMidiMessagesUseCase`.
-    *   `PianoStaffViewModel` преобразует список нот в JSON-строку с помощью `toVexflowJson()` и обновляет свой `StateFlow<PianoStaffUiState>`, который содержит JSON-строку `notesJson`.
-    *   `PianoStaffScreen`, подписанный на `uiState`, получает эту JSON-строку и передает ее в `Composable`-компонент `PianoStaff` для финальной отрисовки.
+4.  **Анализ аккордов**:
+    *   `PianoStaffViewModel` наблюдает за `ObserveMidiMessagesUseCase`. При поступлении нового списка нот:
+        1. Инициирует анализ через `AnalyzeChordUseCase(notes)`. Это операция типа "fire-and-forget".
+        2. `AnalyzeChordUseCase` вызывает `ChordAnalysisRepository.analyzeChord(notes)`.
+        3. Репозиторий подготавливает JS-скрипт и выполняет его через `MusicScriptEngine` (WebView + Tonal.js).
+        4. Результат очищается через `ChordAnalysisService` и сохраняется в `StateFlow` репозитория.
+    *   Параллельно `PianoStaffViewModel` объединяет (`combine`) поток нот и поток результатов анализа из `ObserveChordAnalysisResultsUseCase`.
+
+5.  **Отображение на UI**:
+    *   Результат объединения формирует `PianoStaffUiState`.
+    *   Если аккорд распознан, `chordName` содержит название. Если ноты есть, но анализ пуст — отображается "Не определен".
+    *   `PianoStaffScreen` получает `uiState` и передает `notesJson` в компонент `PianoStaff`.
 
 ```plantuml
 @startuml
-title Диаграмма последовательности: Обработка Note On
+title Диаграмма последовательности: Обработка Note On с анализом аккордов
 
 actor Пользователь as User
-participant "MIDI-клавиатура" as Keyboard
-box "Приложение PianoFlow"
-  participant "MidiDataSource" as DS
-  participant "ObserveMidiMessagesUseCase" as UC
-  participant "PianoStaffViewModel" as VM
-  participant "PianoStaffScreen" as Screen
-  participant "PianoStaff" as Staff
-end box
+participant "MidiDataSource" as DS
+participant "ObserveMidiMessagesUseCase" as UC
+participant "PianoStaffViewModel" as VM
+participant "AnalyzeChordUseCase" as AnalyzeUC
+participant "ChordAnalysisRepository" as Repo
+participant "MusicScriptEngine" as JS
+participant "PianoStaffScreen" as Screen
 
-User -> Keyboard : Нажимает клавишу(и)
-Keyboard -> DS : Отправляет MIDI-сообщение
-activate DS
-
-note right of DS
-  Прием и парсинг сообщения.
-  Подробности см. в диаграмме
-  "Внутренняя работа midiMessageReceiver".
-end note
-
-DS -> UC : Отправляет новую ноту в Flow<Note>
-deactivate DS
-activate UC
-
-note right of UC: Группирует ноты в список (аккорд)
-UC -> VM : Отправляет Flow<List<Note>>
-deactivate UC
+User -> DS : Нажимает клавиши
+DS -> UC : Flow<Note>
+UC -> UC : Группировка (50ms)
+UC -> VM : Flow<List<Note>>
 activate VM
 
-VM -> VM : Преобразует списки нот в JSON
-VM -> VM : Обновляет uiState
-VM -> Screen : Передает новое состояние (UiState с JSON)
+VM -> AnalyzeUC : invoke(notes)
+activate AnalyzeUC
+AnalyzeUC -> Repo : analyzeChord(notes)
+activate Repo
+Repo -> JS : execute("analyze(...)")
+activate JS
+JS -->> Repo : rawResult
+deactivate JS
+Repo -> Repo : update StateFlow
+Repo -->> AnalyzeUC
+deactivate Repo
+AnalyzeUC -->> VM
+deactivate AnalyzeUC
+
+note right of VM: combine() подхватывает новое значение\nиз ObserveChordAnalysisResultsUseCase
+
+VM -> VM : Обновляет uiState (notesJson + chordName)
+VM -> Screen : Передает новое состояние
 deactivate VM
 activate Screen
 
-Screen -> Staff : Передает JSON с нотами
-activate Staff
-Staff -> User : Отображает ноты на нотном стане
-deactivate Staff
+Screen -> User : Отображает ноты + название аккорда
 deactivate Screen
 
 @enduml
@@ -350,19 +478,17 @@ deactivate Screen
 **Ключевые компоненты:**
 
 - **`PianoStaff` Composable:** Оборачивает `AndroidView`, в котором создается и настраивается `WebView`. Этот компонент отвечает за управление жизненным циклом `WebView` и его перерисовку.
-- **`VexflowNoteMapper.kt`**: Содержит логику преобразования `List<Note>` в конечный JSON-объект. Эта логика включает разделение нот по нотоносцам и создание "фантомных" нот для удобочитаемости.
-- **`vexflow.html`:** HTML-файл, расположенный в `app/src/main/assets/`. Он содержит базовую разметку, стили и основной JavaScript-код для работы с VexFlow.
-- **`vexflow.js`:** Сама библиотека VexFlow (версия [4.2.2](https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js)), также расположенная в `assets`.
+- **`MusicScriptEngine`:** Используется внутри компонента для управления выполнением JS-кода и загрузки HTML-ресурса.
+- **`VexflowNoteMapper.kt`**: Содержит логику преобразования `List<Note>` в конечный JSON-объект.
+- **`vexflow.html`:** HTML-файл в `assets`, содержащий логику вызова функций `VexFlow` (версия [4.2.2](https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js), также расположенная в `assets`).
 
 **Процесс работы:**
 
-1.  **Инициализация `WebView`:** `PianoStaff` создает и запоминает (`remember`) экземпляр `WebView`. Устанавливается `WebViewClient`, который отслеживает окончание загрузки страницы.
-2.  **Загрузка страницы:** `WebView` загружает `vexflow.html`. Когда загрузка завершена, `onPageFinished` обновляет флаг состояния `isPageLoaded`.
-3.  **Отслеживание размера:** Модификатор `onSizeChanged` отслеживает изменения размера `Composable`-компонента и обновляет состояние `viewSize`.
-4.  **Передача данных и отрисовка:** `LaunchedEffect` следит за изменением любого из трех состояний: `notesJson`, `viewSize` или `isPageLoaded`. Когда все условия выполнены (страница загружена, размер известен, и пришли новые ноты), `LaunchedEffect` выполняет следующие действия:
-    *   Определяет ориентацию (`landscape` или `portrait`) на основе размеров `viewSize`.
-    *   Формирует и выполняет JavaScript-код, который сначала очищает предыдущий SVG-элемент, а затем вызывает функцию `drawGrandStaff` с данными о нотах и ориентации.
-5.  **Формат JSON:** Данные передаются в виде единого JSON-объекта, который содержит отдельные массивы для скрипичного и басового ключей.
+1.  **Инициализация**: `PianoStaff` создает экземпляр `WebView` и инициализирует `MusicScriptEngine`, который загружает `vexflow.html`.
+2.  **Отслеживание размера**: Модификатор `onSizeChanged` обновляет состояние `viewSize`. Это необходимо для того, чтобы VexFlow знал доступную область отрисовки.
+3.  **Триггер отрисовки**: `LaunchedEffect` следит за изменениями `notesJson`, `isPortrait` (входной параметр ориентации) и `viewSize`.
+4.  **Выполнение отрисовки**: Когда `viewSize` становится отличным от нуля, формируется JavaScript-вызов функции `drawGrandStaff`. Вызов передается в `MusicScriptEngine`, который выполняет его в контексте `WebView`.
+5.  **Формат JSON**: Данные передаются в виде единого JSON-объекта, который содержит отдельные массивы для скрипичного и басового ключей.
     ```json
     {
       "treble": [{"keys":["c/5"], "duration":"w"}, {"keys":["g/4"], "duration":"w", "ghost":true}],
@@ -372,8 +498,6 @@ deactivate Screen
 
 **Диаграмма состояний жизненного цикла `PianoStaff`**
 
-Эта диаграмма показывает, как `PianoStaff` управляет своим состоянием для корректной отрисовки.
-
 ```plantuml
 @startuml
 title Диаграмма состояний PianoStaff
@@ -382,42 +506,27 @@ title Диаграмма состояний PianoStaff
 
 state Initializing
 Initializing : Создается WebView
-Initializing : isPageLoaded = false
+Initializing : Создается MusicScriptEngine
 Initializing : viewSize = IntSize.Zero
 
-Initializing --> LoadingPage : webView.loadUrl(...)
+Initializing --> WaitingForMeasurement : MusicScriptEngine загружает vexflow.html
 
-state LoadingPage
-LoadingPage : Ожидание onPageFinished
+state WaitingForMeasurement
+WaitingForMeasurement : Ожидание измерения размера (onSizeChanged)
 
-LoadingPage --> WaitingForSize : onPageFinished()
-note on link
-  isPageLoaded = true
-end note
-
-state WaitingForSize
-WaitingForSize : Страница загружена (isPageLoaded = true),\nно размер компонента еще не определен (viewSize = IntSize.Zero)
-
-WaitingForSize --> ReadyToDraw : onSizeChanged(size) [size != IntSize.Zero]
+WaitingForMeasurement --> Ready : viewSize > 0
 note on link
   viewSize обновлен
 end note
 
-state ReadyToDraw
-ReadyToDraw : isPageLoaded = true
-ReadyToDraw : viewSize известен
+state Ready
+Ready : Компонент готов к отрисовке
 
 state Drawing
-Drawing : Выполняется evaluateJavascript(...)
+Drawing : executor.execute(drawScript)
 
-ReadyToDraw --> Drawing : notesJson изменился
-Drawing --> ReadyToDraw : Отрисовка завершена
-
-ReadyToDraw --> Drawing : viewSize изменился
-note on link
-  Перерисовка с новым размером
-end note
-
+Ready --> Drawing : notesJson, isPortrait или viewSize изменились
+Drawing --> Ready : JS-код отправлен на выполнение
 @enduml
 ```
 
@@ -433,13 +542,12 @@ box "Presentation Layer (Kotlin/Compose)" #LightBlue
     participant "PianoStaff" as StaffComposable
 end box
 
-box "WebView (Java/Android)" #LightGreen
+box "Infrastructure" #LightGreen
+    participant "MusicScriptEngine" as Engine
     participant "WebView" as WebView
-    participant "WebViewClient" as WebViewClient
 end box
 
-box "VexFlow (HTML/JavaScript)" #LightYellow
-    participant "vexflow.html" as HtmlPage
+box "VexFlow (JS)" #LightYellow
     participant "drawGrandStaff()" as DrawJsFunc
 end box
 
@@ -448,41 +556,27 @@ end box
 Screen -> StaffComposable : Начальная композиция
 activate StaffComposable
 
-note over StaffComposable, WebView: WebView и WebViewClient создаются\nи живут все время жизни компонента.
-
-StaffComposable -> WebView : create() & remember()
-StaffComposable -> WebViewClient : webViewClient = ...
-StaffComposable -> WebView : loadUrl(".../vexflow.html")
-
-note right of WebView: Загрузка HTML происходит асинхронно
-
-... через некоторое время ...
-
-HtmlPage -> WebViewClient : onPageFinished()
-activate WebViewClient
-WebViewClient -> StaffComposable : isPageLoaded = true
-deactivate WebViewClient
+StaffComposable -> WebView : create()
+StaffComposable -> Engine : create(webView, "vexflow.html")
+Engine -> WebView : loadUrl(...)
 
 deactivate StaffComposable
 
 == Обновление нот ==
 
-VM -> Screen : Обновляет UiState (с новым notesJson)
+VM -> Screen : Обновляет UiState (notesJson)
 activate Screen
 
-Screen -> StaffComposable : Рекомпозиция (передает новый notesJson)
+Screen -> StaffComposable : Рекомпозиция (новые параметры)
 activate StaffComposable
 
-StaffComposable -> StaffComposable : Запускается LaunchedEffect
-StaffComposable -> WebView : evaluateJavascript("drawGrandStaff(...)")
+StaffComposable -> StaffComposable : LaunchedEffect триггерится
+StaffComposable -> Engine : execute("drawGrandStaff(...)")
 
-note right of WebView: Выполнение JS также асинхронно
+note right of Engine: Движок гарантирует выполнение\nпосле загрузки страницы
 
-... JS выполняется внутри WebView ...
-WebView -> HtmlPage : Вызывает JS-функцию
-activate HtmlPage
-HtmlPage -> DrawJsFunc : drawGrandStaff(...)
-deactivate HtmlPage
+Engine -> WebView : evaluateJavascript(...)
+WebView -> DrawJsFunc : Вызов отрисовки
 
 deactivate StaffComposable
 deactivate Screen
@@ -492,6 +586,7 @@ deactivate Screen
 
 ## 4. Критерии приемки
 
+### Отображение нот
 - При нажатии одной клавиши на MIDI-клавиатуре соответствующая нота немедленно отображается на нотном стане.
 - При одновременном нажатии нескольких клавиш (аккорд) все соответствующие ноты отображаются на нотном стане.
 - Каждое новое событие нажатия (`Note On`) приводит к полной очистке экрана перед отображением новых нот.
@@ -500,7 +595,16 @@ deactivate Screen
 - Функционал стабильно работает при быстром и многократном нажатии клавиш, приложение не падает и не зависает.
 - При повороте экрана нотный стан корректно перерисовывается с учетом новой ориентации.
 
+### Анализ и отображение аккордов
+- Для каждого распознанного аккорда (2+ ноты) на экране отображается его название (например, "C Major", "Am", "G7sus4").
+- Для одиночных нот НЕ отображается никакого названия аккорда (поле остается пустым).
+- Если несколько нот не образуют известный аккорд, отображается текст "Не определен" (или согласно локализации).
+- Анализ аккордов выполняется в отдельном потоке и не блокирует UI поток.
+- Результаты анализа обновляются в `StateFlow` и безопасны для одновременного доступа из разных потоков (thread-safe).
+- Система использует Tonal.js для анализа аккордов, что обеспечивает точное распознавание стандартных музыкальных аккордов.
+
 ## См. также
 
-- [См. документ о Kotlin Flow](../tech/KOTLIN_FLOW.md)
-- [См. документ о MIDI API в Android](../tech/MIDI.md)
+- [Архитектурные принципы](../plans/ARCHITECTURE_PRINCIPLES.md)
+- [Документ о Kotlin Flow](../tech/KOTLIN_FLOW.md)
+- [Документ о MIDI API в Android](../tech/MIDI.md)
