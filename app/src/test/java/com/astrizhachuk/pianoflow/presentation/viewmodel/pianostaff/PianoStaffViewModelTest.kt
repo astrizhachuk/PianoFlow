@@ -123,25 +123,37 @@ class PianoStaffViewModelTest {
     }
 
     @Test
-    fun `when analysis result is updated, uiState reflects the chord name`() = runTest {
+    fun `should update UI state sequentially when notes arrive and then analysis completes`() = runTest {
         // Arrange
         initViewModel()
         val notes = listOf(Note(60, "C4"), Note(64, "E4"), Note(67, "G4"))
+        val expectedJson = "mock_chord_json"
         val analysisResult = "C Major"
         
-        every { notes.toVexflowJson() } returns "json"
+        every { notes.toVexflowJson() } returns expectedJson
+        chordAnalysisFlow.value = null
 
         viewModel.uiState.test {
             awaitItem() // Skip initial
 
-            // Act
+            // Act Case 1: New notes arrive, analysis is still old/null
             midiMessagesFlow.emit(notes)
-            awaitItem() // Skip update from notes
             
-            chordAnalysisFlow.value = analysisResult
+            val interimState = awaitItem()
+            assertEquals("JSON should update immediately", expectedJson, interimState.notesJson)
+            assertEquals(
+                "While analysis is not ready, should show 'Not defined'", 
+                undefinedChordString, 
+                interimState.chordName
+            )
+            verify { analyzeChordUseCase(notes) }
 
-            // Assert
-            assertEquals(analysisResult, awaitItem().chordName)
+            // Act Case 2: Analysis result arrives for the same notes
+            chordAnalysisFlow.value = analysisResult
+            
+            val finalState = awaitItem()
+            assertEquals("JSON should remain the same", expectedJson, finalState.notesJson)
+            assertEquals("Chord name should update to analysis result", analysisResult, finalState.chordName)
         }
     }
 
