@@ -17,45 +17,8 @@
 <div id="staff"></div>
 
 <script src="./vexflow.js"></script>
-<script src="./tonal.min.js"></script>
 
 <script>
-    function simplifyNote(note) {
-        console.log("JS: Received note for simplification: " + note);
-        if (typeof Tonal === 'undefined' || !note) {
-            console.error("JS: Tonal.js not loaded or no note provided.");
-            return null;
-        }
-        try {
-            const result = Tonal.Note.simplify(note);
-            console.log("JS: Single note simplified to: " + result);
-            return result;
-        } catch(e) {
-            console.error("JS: Note simplification failed: ", e);
-            return null;
-        }
-    }
-
-    function detectChord(notes) {
-        console.log("JS: Received notes for chord detection: " + JSON.stringify(notes));
-        if (typeof Tonal === 'undefined' || !notes || notes.length === 0) {
-            console.error("JS: Tonal.js not loaded or no notes provided.");
-            return null;
-        }
-        try {
-            const detectedChords = Tonal.Chord.detect(notes);
-            if (detectedChords.length > 0) {
-                const result = detectedChords[0];
-                console.log("JS: Detected chord: " + result);
-                return result;
-            }
-            return null;
-        } catch(e) {
-            console.error("JS: Chord detection failed: ", e);
-            return null;
-        }
-    }
-
     function drawGrandStaff(trebleNotesData, bassNotesData, isPortrait) {
         const div = document.getElementById("staff");
         if (!div) return;
