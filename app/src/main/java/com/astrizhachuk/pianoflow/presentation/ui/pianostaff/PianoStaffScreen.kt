@@ -13,9 +13,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.astrizhachuk.pianoflow.R
+import com.astrizhachuk.pianoflow.presentation.ui.theme.AppTheme
 import com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffViewModel
 
 /**
@@ -41,11 +44,36 @@ fun PianoStaffScreen(
     viewModel: PianoStaffViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    PianoStaffContent(
+        chordName = uiState.chordName,
+        notesJson = uiState.notesJson,
+        modifier = modifier
+    )
+}
+
+/**
+ * The stateless content of the Piano Staff screen that renders the musical staff and chord name.
+ *
+ * This composable handles the responsive layout logic:
+ * - In **portrait** mode, it stacks the chord name vertically above the [PianoStaff].
+ * - In **landscape** mode, it places the [PianoStaff] on the left and the chord name on the right.
+ *
+ * @param chordName The name of the analyzed chord to display, or null if no chord is identified.
+ * @param notesJson A JSON string representation of the musical notes to be rendered on the staff.
+ * @param modifier The [Modifier] to be applied to the layout container.
+ */
+@Composable
+fun PianoStaffContent(
+    chordName: String?,
+    notesJson: String,
+    modifier: Modifier = Modifier
+) {
     val configuration = LocalConfiguration.current
     val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
 
-    val chordName: @Composable () -> Unit = {
-        uiState.chordName?.let { name ->
+    val chordNameText: @Composable () -> Unit = {
+        chordName?.let { name ->
             Text(
                 text = name,
                 style = MaterialTheme.typography.headlineMedium
@@ -56,7 +84,7 @@ fun PianoStaffScreen(
     val pianoStaff: @Composable (Modifier) -> Unit = { staffModifier ->
         PianoStaff(
             modifier = staffModifier,
-            notesJson = uiState.notesJson,
+            notesJson = notesJson,
             isPortrait = isPortrait
         )
     }
@@ -65,21 +93,45 @@ fun PianoStaffScreen(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = dimensionResource(R.dimen.padding_medium)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            chordName()
+            chordNameText()
             pianoStaff(Modifier.fillMaxWidth())
         }
     } else {
         Row(
             modifier = modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = dimensionResource(R.dimen.padding_medium)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             pianoStaff(Modifier.fillMaxWidth(0.5f))
-            chordName()
+            chordNameText()
         }
+    }
+}
+
+@Preview
+@Composable
+fun PianoStaffContentPortraitPreview() {
+    AppTheme(darkTheme = false) {
+        PianoStaffContent(
+            chordName = "C Major",
+            notesJson = "{\"treble\":[{\"keys\":[\"c/4\", \"e/4\", \"g/4\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/3\"], \"duration\":\"w\"}]}",
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Preview(device = "spec:width=1280dp,height=800dp,orientation=landscape")
+@Composable
+fun PianoStaffContentLandscapePreview() {
+    AppTheme(darkTheme = true) {
+        PianoStaffContent(
+            chordName = "C Major",
+            notesJson = "{\"treble\":[{\"keys\":[\"c/4\", \"e/4\", \"g/4\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/3\"], \"duration\":\"w\"}]}",
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
