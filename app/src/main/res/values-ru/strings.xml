@@ -7,4 +7,5 @@
     <string name="midi_device_disconnected">MIDI-устройство отключено</string>
     <string name="midi_device_connected">MIDI-устройство подключено: %1$s</string>
     <string name="chord_not_defined">Аккорд не определен</string>
+    <string name="chord_label">АККОРД</string>
 </resources>
