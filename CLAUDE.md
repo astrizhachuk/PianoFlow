@@ -64,3 +64,21 @@ Use **Timber** for all logging (never `Log.*` directly):
 ## Localization
 
 All user-visible strings must be in both `values/strings.xml` (English) and `values-ru/strings.xml` (Russian). Keep them in sync.
+
+## Documentation
+
+Documentation is maintained in two languages under `docs/`:
+
+```
+docs/
+  en/   ← English (source of truth)
+  ru/   ← Russian (translation)
+```
+
+Subdirectories mirror each other: `plans/`, `specs/`, `tech/`, `uc/`.
+
+**Rules:**
+- English is the single source of truth. Make all content decisions in `docs/en/` first.
+- After any change to an English document, update the corresponding Russian document in `docs/ru/` to keep them in sync.
+- When adding a new document, create both language versions simultaneously.
+- If only the Russian document exists for some topic, treat it as a draft — create the English version before merging.
