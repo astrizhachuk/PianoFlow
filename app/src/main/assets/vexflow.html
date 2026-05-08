@@ -19,7 +19,7 @@
 <script src="./vexflow.js"></script>
 
 <script>
-    function drawGrandStaff(trebleNotesData, bassNotesData, isPortrait) {
+    function drawGrandStaff(trebleNotesData, bassNotesData, isPortrait, isDarkTheme) {
         const div = document.getElementById("staff");
         if (!div) return;
         div.innerHTML = '';
@@ -34,10 +34,14 @@
 
         if (typeof Vex === 'undefined' || typeof Vex.Flow === 'undefined') return;
 
+        const color = isDarkTheme ? 'white' : 'black';
+
         try {
             const renderer = new Vex.Flow.Renderer(div, Vex.Flow.Renderer.Backends.SVG);
             renderer.resize(width, height);
             const context = renderer.getContext();
+            context.setFillStyle(color);
+            context.setStrokeStyle(color);
 
             let settings;
             if (isPortrait) {

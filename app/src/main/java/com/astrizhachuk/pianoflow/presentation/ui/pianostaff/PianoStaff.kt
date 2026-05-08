@@ -45,7 +45,8 @@ import timber.log.Timber
 fun PianoStaff(
     modifier: Modifier = Modifier,
     notesJson: String,
-    isPortrait: Boolean
+    isPortrait: Boolean,
+    isDarkTheme: Boolean
 ) {
     if (LocalInspectionMode.current) {
         Box(
@@ -90,11 +91,11 @@ fun PianoStaff(
         modifier = modifier.onSizeChanged { viewSize = it }
     )
 
-    // Update display when notes, orientation, or size changes.
-    LaunchedEffect(notesJson, isPortrait, viewSize) {
+    // Update display when notes, orientation, size, or theme changes.
+    LaunchedEffect(notesJson, isPortrait, viewSize, isDarkTheme) {
         if (viewSize == IntSize.Zero) return@LaunchedEffect
 
-        val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, $isPortrait);"
+        val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, $isPortrait, $isDarkTheme);"
         executor.execute(drawScript) { /* No result needed */ }
     }
 }

@@ -1,6 +1,7 @@
 package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 
 import android.content.res.Configuration
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -71,6 +72,7 @@ fun PianoStaffContent(
 ) {
     val configuration = LocalConfiguration.current
     val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+    val isDarkTheme = isSystemInDarkTheme()
 
     val chordNameText: @Composable () -> Unit = {
         chordName?.let { name ->
@@ -85,7 +87,8 @@ fun PianoStaffContent(
         PianoStaff(
             modifier = staffModifier,
             notesJson = notesJson,
-            isPortrait = isPortrait
+            isPortrait = isPortrait,
+            isDarkTheme = isDarkTheme
         )
     }
 
