@@ -39,6 +39,8 @@ import timber.log.Timber
  *   contain `treble` and `bass` keys, each with an array of notes for the respective clef.
  * @param isPortrait A boolean indicating the orientation. `true` for portrait mode, `false` for
  *   landscape. This affects how the staff is rendered.
+ * @param isDarkScheme A boolean indicating the active color scheme. `true` for dark scheme, `false`
+ *   for light. This controls the rendering colors of the staff and notes.
  * @param modifier The modifier to be applied to the `PianoStaff` container.
  */
 @Composable
@@ -46,7 +48,7 @@ fun PianoStaff(
     modifier: Modifier = Modifier,
     notesJson: String,
     isPortrait: Boolean,
-    isDarkTheme: Boolean
+    isDarkScheme: Boolean
 ) {
     if (LocalInspectionMode.current) {
         Box(
@@ -92,10 +94,10 @@ fun PianoStaff(
     )
 
     // Update display when notes, orientation, size, or theme changes.
-    LaunchedEffect(notesJson, isPortrait, viewSize, isDarkTheme) {
+    LaunchedEffect(notesJson, isPortrait, viewSize, isDarkScheme) {
         if (viewSize == IntSize.Zero) return@LaunchedEffect
 
-        val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, $isPortrait, $isDarkTheme);"
+        val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, $isPortrait, $isDarkScheme);"
         executor.execute(drawScript) { /* No result needed */ }
     }
 }

@@ -72,7 +72,7 @@ fun PianoStaffContent(
 ) {
     val configuration = LocalConfiguration.current
     val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkScheme = isSystemInDarkTheme()
 
     val chordNameText: @Composable () -> Unit = {
         chordName?.let { name ->
@@ -88,7 +88,7 @@ fun PianoStaffContent(
             modifier = staffModifier,
             notesJson = notesJson,
             isPortrait = isPortrait,
-            isDarkTheme = isDarkTheme
+            isDarkScheme = isDarkScheme
         )
     }
 
