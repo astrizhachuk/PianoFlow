@@ -21,7 +21,7 @@ PianoFlow serves as a **trainer and a system for verifying piano performance** o
 ## Technical Specifications
 
 - **Platform:** Android
-- **Minimum SDK:** 23 (Android 6.0 Marshmallow)
+- **Minimum SDK:** 26 (Android 8.0 Oreo)
 - **Development Language:** Kotlin
 - **MIDI API:** Utilizes the Android MIDI API for device communication.
 

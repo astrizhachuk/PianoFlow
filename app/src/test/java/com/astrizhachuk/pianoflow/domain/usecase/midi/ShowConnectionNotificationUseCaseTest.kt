@@ -100,7 +100,7 @@ class ShowConnectionNotificationUseCaseTest {
 }
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [23, Build.VERSION_CODES.TIRAMISU])
+@Config(sdk = [26, Build.VERSION_CODES.TIRAMISU])
 class ShowConnectionNotificationUseCaseIntegrationTest {
 
     private val context: Context = RuntimeEnvironment.getApplication()

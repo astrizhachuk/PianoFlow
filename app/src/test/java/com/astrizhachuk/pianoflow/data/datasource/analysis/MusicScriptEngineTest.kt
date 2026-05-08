@@ -23,7 +23,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [23, Build.VERSION_CODES.TIRAMISU])
+@Config(sdk = [26, Build.VERSION_CODES.TIRAMISU])
 class MusicScriptEngineTest {
 
     @get:Rule

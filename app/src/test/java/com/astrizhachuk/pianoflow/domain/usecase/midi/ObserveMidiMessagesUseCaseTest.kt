@@ -167,7 +167,7 @@ class ObserveMidiMessagesUseCaseTest {
 }
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [23, Build.VERSION_CODES.TIRAMISU])
+@Config(sdk = [26, Build.VERSION_CODES.TIRAMISU])
 class ObserveMidiMessagesIntegrationTest {
 
     private companion object {
