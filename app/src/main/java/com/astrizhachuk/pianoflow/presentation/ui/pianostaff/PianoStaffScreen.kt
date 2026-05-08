@@ -179,7 +179,7 @@ private fun ChordCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = chordName ?: "—",
+                    text = chordName ?: stringResource(R.string.chord_placeholder),
                     style = MaterialTheme.typography.displaySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     textAlign = TextAlign.Center,

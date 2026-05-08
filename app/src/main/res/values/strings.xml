@@ -6,6 +6,7 @@
     <string name="midi_unknown_device">Unknown Device</string>
     <string name="midi_device_disconnected">MIDI device disconnected</string>
     <string name="midi_device_connected">MIDI device connected: %1$s</string>
-    <string name="chord_not_defined">Chord not defined</string>
+    <string name="chord_not_defined">?</string>
+    <string name="chord_placeholder">—</string>
     <string name="chord_label">CHORD</string>
 </resources>
