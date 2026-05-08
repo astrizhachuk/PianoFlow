@@ -9,15 +9,22 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.lifecycleScope
+import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.presentation.model.UserMessage
 import com.astrizhachuk.pianoflow.presentation.service.UserNotifier
 import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.PianoStaffScreen
@@ -53,6 +60,7 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
+                        topBar = { PianoFlowTopBar() },
                         snackbarHost = { SnackbarHost(snackbarHostState) }
                     ) { innerPadding ->
                         Box(
@@ -69,26 +77,32 @@ class MainActivity : AppCompatActivity() {
                             )
                         }
                     }
-                    }
+                }
             }
         }
     }
 
-    /**
-     * Starts observing the MIDI connection state by launching a coroutine in the [lifecycleScope]
-     * to collect updates from the [MidiConnectionViewModel.connectionState] flow.
-     */
     private fun observeConnectionState() {
         viewModel.connectionState.launchIn(lifecycleScope)
     }
 
-    /**
-     * Observes a stream of user messages and displays them as snackbars.
-     *
-     * This composable uses [LaunchedEffect] to collect emissions from the [messages] flow
-     * and updates the [snackbarHostState] to show UI notifications.
-     *
-     */
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    private fun PianoFlowTopBar() {
+        CenterAlignedTopAppBar(
+            title = {
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        )
+    }
+
     @Composable
     private fun ObserveNotifications(
         messages: Flow<UserMessage>,
