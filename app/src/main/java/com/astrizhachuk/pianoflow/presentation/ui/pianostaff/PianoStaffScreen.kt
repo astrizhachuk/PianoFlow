@@ -86,6 +86,7 @@ fun PianoStaffContent(
     val configuration = LocalConfiguration.current
     val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
     val isDarkScheme = isSystemInDarkTheme()
+    val needsScale = configuration.smallestScreenWidthDp < 600
     val horizontalPadding = dimensionResource(R.dimen.padding_medium)
     val verticalPadding = dimensionResource(R.dimen.padding_medium)
 
@@ -102,7 +103,8 @@ fun PianoStaffContent(
                     .fillMaxWidth(),
                 notesJson = notesJson,
                 isPortrait = true,
-                isDarkScheme = isDarkScheme
+                isDarkScheme = isDarkScheme,
+                needsScale = needsScale
             )
             ChordCard(
                 chordName = chordName,
@@ -125,7 +127,8 @@ fun PianoStaffContent(
                     .fillMaxHeight(),
                 notesJson = notesJson,
                 isPortrait = false,
-                isDarkScheme = isDarkScheme
+                isDarkScheme = isDarkScheme,
+                needsScale = needsScale
             )
             ChordCard(
                 chordName = chordName,

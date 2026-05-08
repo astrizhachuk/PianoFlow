@@ -41,6 +41,8 @@ import timber.log.Timber
  *   landscape. This affects how the staff is rendered.
  * @param isDarkScheme A boolean indicating the active color scheme. `true` for dark scheme, `false`
  *   for light. This controls the rendering colors of the staff and notes.
+ * @param needsScale A boolean indicating whether the staff should use a reduced scale. `true` on
+ *   compact screens (phones) to fit the grand staff within a smaller landscape viewport.
  * @param modifier The modifier to be applied to the `PianoStaff` container.
  */
 @Composable
@@ -48,7 +50,8 @@ fun PianoStaff(
     modifier: Modifier = Modifier,
     notesJson: String,
     isPortrait: Boolean,
-    isDarkScheme: Boolean
+    isDarkScheme: Boolean,
+    needsScale: Boolean = false
 ) {
     if (LocalInspectionMode.current) {
         Box(
@@ -93,11 +96,11 @@ fun PianoStaff(
         modifier = modifier.onSizeChanged { viewSize = it }
     )
 
-    // Update display when notes, orientation, size, or theme changes.
-    LaunchedEffect(notesJson, isPortrait, viewSize, isDarkScheme) {
+    // Update display when notes, orientation, size, theme, or scale flag changes.
+    LaunchedEffect(notesJson, isPortrait, viewSize, isDarkScheme, needsScale) {
         if (viewSize == IntSize.Zero) return@LaunchedEffect
 
-        val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, $isPortrait, $isDarkScheme);"
+        val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, $isPortrait, $isDarkScheme, $needsScale);"
         executor.execute(drawScript) { /* No result needed */ }
     }
 }

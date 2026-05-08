@@ -19,7 +19,7 @@
 <script src="./vexflow.js"></script>
 
 <script>
-    function drawGrandStaff(trebleNotesData, bassNotesData, isPortrait, isDarkScheme) {
+    function drawGrandStaff(trebleNotesData, bassNotesData, isPortrait, isDarkScheme, needsScale) {
         const div = document.getElementById("staff");
         if (!div) return;
         div.innerHTML = '';
@@ -47,7 +47,9 @@
             let settings;
             if (isPortrait) {
                 settings = { scale: 1.0, trebleY: 80, bassY: 260 };
-            } else { // landscape
+            } else if (needsScale) { // landscape, compact screen (phone)
+                settings = { scale: 0.55, trebleY: 80, bassY: 260 };
+            } else { // landscape, large screen (tablet)
                 settings = { scale: 0.75, trebleY: 80, bassY: 260 };
             }
 
