@@ -26,7 +26,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -151,7 +150,9 @@ private fun ChordCard(
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer
         ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.elevatedCardElevation(
+            defaultElevation = dimensionResource(R.dimen.elevation_card_default)
+        )
     ) {
         val contentModifier = if (fillHeight) {
             Modifier
@@ -177,7 +178,7 @@ private fun ChordCard(
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.55f),
                     letterSpacing = 4.sp
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(dimensionResource(R.dimen.spacing_chord_label)))
                 Text(
                     text = chordName ?: stringResource(R.string.chord_placeholder),
                     style = MaterialTheme.typography.displaySmall,

@@ -2,4 +2,6 @@
 <resources>
     <dimen name="padding_small">8dp</dimen>
     <dimen name="padding_medium">16dp</dimen>
+    <dimen name="elevation_card_default">4dp</dimen>
+    <dimen name="spacing_chord_label">8dp</dimen>
 </resources>
