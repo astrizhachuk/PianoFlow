@@ -237,7 +237,25 @@ This principle is applied to all layers to achieve maximum consistency.
 
 **Application**: Managing dependencies in all layers using Hilt.
 
-## 6. General package structure
+## 6. UI/UX Design System
+
+### 6.1. Material Design 3
+
+The application follows the **[Material Design 3](https://m3.material.io/)** guidelines as the single UI/UX standard for all visual components and interaction patterns.
+
+**Key principles adopted from M3**:
+- **Color system**: dynamic color roles (`Primary`, `Secondary`, `Tertiary`, `Surface`, `Error`, and their `On*`/`Container` variants). All colors are defined via `MaterialTheme.colorScheme` — hardcoded color values in composables are prohibited.
+- **Typography**: the M3 type scale (`displayLarge` → `labelSmall`). All text styles come from `MaterialTheme.typography`.
+- **Shape**: the M3 shape system (`extraSmall` → `extraLarge`). Corner radii are taken from `MaterialTheme.shapes`.
+- **Components**: prefer M3 Compose components (`Button`, `Card`, `TopAppBar`, `NavigationBar`, `Scaffold`, etc.) over custom implementations where M3 provides an equivalent.
+- **Theming**: the app theme is defined in the `presentation` layer and injected at the root composable. Dynamic color (Android 12+) support is opt-in; a static fallback palette is always provided.
+
+**References**:
+- Material Design 3 specification: [m3.material.io](https://m3.material.io/)
+- Jetpack Compose Material 3: [developer.android.com/jetpack/compose/designsystems/material3](https://developer.android.com/jetpack/compose/designsystems/material3)
+- Material Theme Builder (color palette tool): [material-foundation.github.io/material-theme-builder](https://material-foundation.github.io/material-theme-builder)
+
+## 7. General package structure
 
 The final package structure, following the described principle:
 
@@ -269,9 +287,9 @@ com.astrizhachuk.pianoflow/
     └── repository/            # Repository implementations
 ```
 
-## 7. Dependency rules
+## 8. Dependency rules
 
-### 7.1. Basic rules
+### 8.1. Basic rules
 
 1. **Domain does not depend on Presentation and Data**.
 2. **Presentation depends on Domain**.
@@ -279,7 +297,7 @@ com.astrizhachuk.pianoflow/
 4. **Presentation does not depend directly on Data**.
 5. All operations in the Data and Domain layers are **Main-safe**.
 
-### 7.2. Direction of dependencies
+### 8.2. Direction of dependencies
 
 ```
 Presentation → Domain ← Data
@@ -319,11 +337,11 @@ end note
 @enduml
 ```
 
-## 8. Build Optimization (R8/ProGuard)
+## 9. Build Optimization (R8/ProGuard)
 
 To reduce the size of the application, improve performance, and protect the code from reverse engineering, the **R8** tool is used, which is included in the Android Gradle Plugin.
 
-### 8.1. Configuration principles
+### 9.1. Configuration principles
 
 1.  **Release build**:
     -   Minimization is always enabled (`isMinifyEnabled = true`). This activates three processes:
@@ -334,7 +352,7 @@ To reduce the size of the application, improve performance, and protect the code
 2.  **Debug build**:
     -   Minimization is disabled (`isMinifyEnabled = false`) to speed up the build and preserve the possibility of full debugging (method names, class names, and line numbers are saved).
 
-### 8.2. ProGuard rule files
+### 9.2. ProGuard rule files
 
 Some code used through reflection (for example, when serializing data, by DI frameworks) may be mistakenly removed by R8. To avoid this, rule files (`proguard-rules.pro`) are used.
 
@@ -351,11 +369,11 @@ Some code used through reflection (for example, when serializing data, by DI fra
 }
 ```
 
-## 9. Logging system
+## 10. Logging system
 
 A standardized logging system is used to collect and analyze information about the application's operation.
 
-### 9.1. Tool: Timber
+### 10.1. Tool: Timber
 
 **Timber** is used as the main logging library.
 **Advantages**:
@@ -363,7 +381,7 @@ A standardized logging system is used to collect and analyze information about t
 -   Automatically adds the tag of the class from which the log was called.
 -   Allows you to easily configure different behavior for `debug` and `release` builds.
 
-### 9.2. Logging principles
+### 10.2. Logging principles
 
 1.  **Initialization**: In the `PianoFlowApplication` class, "trees are planted" for Timber.
     -   In a `debug` build, `Timber.DebugTree()` is used, which outputs logs to Logcat.
@@ -406,11 +424,11 @@ A standardized logging system is used to collect and analyze information about t
         -   **Example**: `catch (e: IOException) { Timber.e(e, "Failed to read MIDI data from source.") }`
         -   **Rule**: A `Throwable` object must always be passed. In `release` builds, these logs should be sent to a crash reporting system.
 
-## 10. Extracting the core as a separate library
+## 11. Extracting the core as a separate library
 
 The architecture is designed with the principle of **independence of the core from the client**, which makes it possible to use the Domain layer in various contexts (Android, Desktop, Web).
 
-### 10.1. Structure for multi-platform use
+### 11.1. Structure for multi-platform use
 
 The package hierarchy principle is preserved within each module.
 
@@ -430,7 +448,7 @@ pianoflow-android/           # Android application
     └── data/
 ```
 
-### 10.2. Adapters for different platforms
+### 11.2. Adapters for different platforms
 
 Each platform implements its own adapters (`data` layer) for working with MIDI, implementing the interfaces from the `domain` layer.
 
@@ -441,7 +459,7 @@ Each platform implements its own adapters (`data` layer) for working with MIDI, 
 | **Web** | Web MIDI API | `WebMidiRepositoryImpl` |
 
 
-### 10.3. C4 Scheme: Context and Containers
+### 11.3. C4 Scheme: Context and Containers
 
 #### C4 Level 1: System Context
 
@@ -561,9 +579,9 @@ Rel_Up(webAdapter, repoInterfaces, "Implements")
 @enduml
 ```
 
-## 11. String resources and localization
+## 12. String resources and localization
 
-### 11.1. Principles of working with strings
+### 12.1. Principles of working with strings
 
 1.  **All strings in resources**: All text that the user sees must be moved to string resource files (`res/values/strings.xml`). Hardcoding strings in code (`.kt` files) or in layouts (`.xml` files) is strictly prohibited.
     -   **Correct**: `android:text="@string/app_name"`
@@ -572,7 +590,7 @@ Rel_Up(webAdapter, repoInterfaces, "Implements")
 2.  **Uniformity of naming**: The names of string resources should be predictable and reflect their purpose. `snake_case` is used.
     -   **Example**: `connection_state_connected`, `error_message_midi_not_supported`.
 
-### 11.2. Localization support
+### 12.2. Localization support
 
 The application must support at least two localizations:
 

@@ -17,46 +17,9 @@
 <div id="staff"></div>
 
 <script src="./vexflow.js"></script>
-<script src="./tonal.min.js"></script>
 
 <script>
-    function simplifyNote(note) {
-        console.log("JS: Received note for simplification: " + note);
-        if (typeof Tonal === 'undefined' || !note) {
-            console.error("JS: Tonal.js not loaded or no note provided.");
-            return null;
-        }
-        try {
-            const result = Tonal.Note.simplify(note);
-            console.log("JS: Single note simplified to: " + result);
-            return result;
-        } catch(e) {
-            console.error("JS: Note simplification failed: ", e);
-            return null;
-        }
-    }
-
-    function detectChord(notes) {
-        console.log("JS: Received notes for chord detection: " + JSON.stringify(notes));
-        if (typeof Tonal === 'undefined' || !notes || notes.length === 0) {
-            console.error("JS: Tonal.js not loaded or no notes provided.");
-            return null;
-        }
-        try {
-            const detectedChords = Tonal.Chord.detect(notes);
-            if (detectedChords.length > 0) {
-                const result = detectedChords[0];
-                console.log("JS: Detected chord: " + result);
-                return result;
-            }
-            return null;
-        } catch(e) {
-            console.error("JS: Chord detection failed: ", e);
-            return null;
-        }
-    }
-
-    function drawGrandStaff(trebleNotesData, bassNotesData, isPortrait) {
+    function drawGrandStaff(trebleNotesData, bassNotesData, isPortrait, isDarkScheme, needsScale) {
         const div = document.getElementById("staff");
         if (!div) return;
         div.innerHTML = '';
@@ -71,16 +34,23 @@
 
         if (typeof Vex === 'undefined' || typeof Vex.Flow === 'undefined') return;
 
+        const color = isDarkScheme ? 'white' : 'black';
+        const ghostColor = isDarkScheme ? '#666666' : '#aaaaaa';
+
         try {
             const renderer = new Vex.Flow.Renderer(div, Vex.Flow.Renderer.Backends.SVG);
             renderer.resize(width, height);
             const context = renderer.getContext();
+            context.setFillStyle(color);
+            context.setStrokeStyle(color);
 
             let settings;
             if (isPortrait) {
                 settings = { scale: 1.0, trebleY: 80, bassY: 260 };
-            } else { // landscape
-                settings = { scale: 0.75, trebleY: 80, bassY: 260 };
+            } else if (needsScale) { // landscape, compact screen (phone)
+                settings = { scale: 0.55, trebleY: 80, bassY: 260 };
+            } else { // default
+                settings = { scale: 1.0, trebleY: 80, bassY: 260 };
             }
 
             context.scale(settings.scale, settings.scale);
@@ -95,32 +65,32 @@
             new Vex.Flow.StaveConnector(trebleStave, bassStave).setType(Vex.Flow.StaveConnector.type.BRACE).setContext(context).draw();
             new Vex.Flow.StaveConnector(trebleStave, bassStave).setType(Vex.Flow.StaveConnector.type.SINGLE_LEFT).setContext(context).draw();
 
-            drawVoices(context, trebleStave, trebleNotesData);
-            drawVoices(context, bassStave, bassNotesData);
+            drawVoices(context, trebleStave, trebleNotesData, ghostColor);
+            drawVoices(context, bassStave, bassNotesData, ghostColor);
 
         } catch (e) {
             console.error("VexFlow rendering error: ", e);
         }
     }
 
-    function drawVoices(context, stave, notesData) {
+    function drawVoices(context, stave, notesData, ghostColor) {
         if (!notesData || notesData.length === 0) return;
         const normalNotes = notesData.filter(d => !d.ghost);
         const ghostNotes = notesData.filter(d => d.ghost);
         const voices = [];
-        if (normalNotes.length > 0) voices.push(createVoice(normalNotes, stave.getClef(), false));
-        if (ghostNotes.length > 0) voices.push(createVoice(ghostNotes, stave.getClef(), true));
+        if (normalNotes.length > 0) voices.push(createVoice(normalNotes, stave.getClef(), false, ghostColor));
+        if (ghostNotes.length > 0) voices.push(createVoice(ghostNotes, stave.getClef(), true, ghostColor));
         if (voices.length > 0) {
             new Vex.Flow.Formatter().joinVoices(voices).format(voices, stave.getWidth() - 50);
             voices.forEach(v => v.draw(context, stave));
         }
     }
 
-    function createVoice(notesData, clef, isGhost) {
+    function createVoice(notesData, clef, isGhost, ghostColor) {
         const notes = notesData.map(noteData => {
             noteData.clef = clef;
             const staveNote = new Vex.Flow.StaveNote(noteData);
-            if (isGhost) staveNote.setStyle({ fillStyle: "grey", strokeStyle: "grey" });
+            if (isGhost) staveNote.setStyle({ fillStyle: ghostColor, strokeStyle: ghostColor });
             return staveNote;
         });
         const voice = new Vex.Flow.Voice({ num_beats: 4, beat_value: 4 });

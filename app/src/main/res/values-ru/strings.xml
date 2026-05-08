@@ -6,5 +6,7 @@
     <string name="midi_unknown_device">Неизвестное устройство</string>
     <string name="midi_device_disconnected">MIDI-устройство отключено</string>
     <string name="midi_device_connected">MIDI-устройство подключено: %1$s</string>
-    <string name="chord_not_defined">Аккорд не определен</string>
+    <string name="chord_not_defined">?</string>
+    <string name="chord_placeholder">—</string>
+    <string name="note_chord_label">НОТА / АККОРД</string>
 </resources>

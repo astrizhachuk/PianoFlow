@@ -27,7 +27,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [23, Build.VERSION_CODES.TIRAMISU])
+@Config(sdk = [26, Build.VERSION_CODES.TIRAMISU])
 class ChordAnalysisRepositoryImplTest {
 
     @get:Rule

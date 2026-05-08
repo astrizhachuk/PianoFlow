@@ -81,7 +81,7 @@ class MidiRepositoryImplTest {
 }
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [23, Build.VERSION_CODES.TIRAMISU])
+@Config(sdk = [26, Build.VERSION_CODES.TIRAMISU])
 class MidiRepositoryImplIntegrationTest {
 
     @get:Rule

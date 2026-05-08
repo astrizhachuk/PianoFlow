@@ -6,23 +6,29 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.lifecycleScope
+import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.presentation.model.UserMessage
 import com.astrizhachuk.pianoflow.presentation.service.UserNotifier
 import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.PianoStaffScreen
+import com.astrizhachuk.pianoflow.presentation.ui.theme.AppTheme
 import com.astrizhachuk.pianoflow.presentation.viewmodel.midi.MidiConnectionViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.Flow
@@ -40,7 +46,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        //enableEdgeToEdge()
+        enableEdgeToEdge()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         observeConnectionState()
@@ -48,40 +54,55 @@ class MainActivity : AppCompatActivity() {
         setContent {
             val snackbarHostState = remember { SnackbarHostState() }
 
-            MaterialTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    snackbarHost = { SnackbarHost(snackbarHostState) }
-                ) { innerPadding ->
-                    Box(
-                        modifier = Modifier
-                            .padding(innerPadding)
-                            .fillMaxSize()
-                    ) {
-                        PianoStaffScreen(
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        ObserveNotifications(
-                            messages = userNotifier.messages,
-                            snackbarHostState = snackbarHostState
-                        )
+            AppTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        topBar = { PianoFlowTopBar() },
+                        snackbarHost = { SnackbarHost(snackbarHostState) }
+                    ) { innerPadding ->
+                        Box(
+                            modifier = Modifier
+                                .padding(innerPadding)
+                                .fillMaxSize()
+                        ) {
+                            PianoStaffScreen(
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            ObserveNotifications(
+                                messages = userNotifier.messages,
+                                snackbarHostState = snackbarHostState
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    /**
-     * Запускает отслеживание состояния MIDI-подключения.
-     */
     private fun observeConnectionState() {
         viewModel.connectionState.launchIn(lifecycleScope)
     }
 
-    /**
-     * Composable-функция, которая подписывается на UI-уведомления и отображает их в виде Snackbar.
-     * Логика подписки инкапсулирована внутри Jetpack Compose с помощью LaunchedEffect.
-     */
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    private fun PianoFlowTopBar() {
+        CenterAlignedTopAppBar(
+            title = {
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        )
+    }
+
     @Composable
     private fun ObserveNotifications(
         messages: Flow<UserMessage>,
