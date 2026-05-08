@@ -8,5 +8,5 @@
     <string name="midi_device_connected">MIDI device connected: %1$s</string>
     <string name="chord_not_defined">?</string>
     <string name="chord_placeholder">—</string>
-    <string name="chord_label">CHORD</string>
+    <string name="note_chord_label">NOTE / CHORD</string>
 </resources>

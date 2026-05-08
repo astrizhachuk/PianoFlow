@@ -176,7 +176,7 @@ private fun ChordCard(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = stringResource(R.string.chord_label),
+                    text = stringResource(R.string.note_chord_label),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.55f),
                     letterSpacing = 4.sp
