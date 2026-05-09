@@ -36,15 +36,14 @@ System_Boundary(piano_flow, "PianoFlow Application") {
     Container(chord_repo, "ChordAnalysisRepository", "Kotlin", "Abstraction for chord analysis")
     Container(midi_repo_impl, "MidiRepositoryImpl", "Kotlin", "Implementation of MIDI repository")
     Container(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Kotlin", "Implementation of chord analysis")
-    Container(webview_js, "WebView + Tonal.js", "JavaScript", "Performs JS analysis")
+    Container(chord_analyzer, "ChordAnalyzer", "Pure Kotlin", "Native chord detection engine")
 }
 
 Rel(user, midi_device, "Plays notes")
 Rel(midi_device, midi_repo_impl, "Sends MIDI messages")
 Rel(midi_repo_impl, midi_repo, "Implements")
 Rel(chord_repo_impl, chord_repo, "Implements")
-
-Rel(vm, webview_js, "Executes JS")
+Rel(chord_repo_impl, chord_analyzer, "Delegates analyze()")
 
 Rel(vm, observe_midi, "observeNotes()")
 Rel(vm, analyze_chord, "analyzeChord()")
@@ -121,8 +120,6 @@ Rel(midi_device, ds, "Sends MIDI messages")
 
 title C4 - Level 3b: Chord Analysis Subsystem Components
 
-System_Ext(webview_js, "WebView + Tonal.js", "JavaScript chord analysis")
-
 Container_Boundary(presentation, "Presentation Layer") {
     Component(vm, "PianoStaffViewModel", "ViewModel", "Invokes analysis and receives results")
 }
@@ -131,12 +128,11 @@ Container_Boundary(domain, "Domain Layer") {
     Component(analyze_chord_uc, "AnalyzeChordUseCase", "Use Case", "Fire-and-forget analysis")
     Component(observe_chord_uc, "ObserveChordAnalysisResultsUseCase", "Use Case", "Subscription to results")
     Component(chord_repo, "ChordAnalysisRepository", "Interface", "Chord analysis contract")
-    Component(chord_service, "ChordAnalysisService", "Domain Service", "Business logic for string processing")
+    Component(chord_analyzer, "ChordAnalyzer", "Domain Service", "Native engine: analyze(noteNames)")
 }
 
 Container_Boundary(data, "Data Layer") {
-    Component(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Repository Impl", "Manages analysis and StateFlow")
-    Component(js_executor, "MusicScriptEngine", "JS Executor", "Executes Tonal.js code")
+    Component(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Repository Impl", "Owns StateFlow, delegates to ChordAnalyzer")
 }
 
 ' Presentation-Domain Connections
@@ -151,14 +147,12 @@ Rel(observe_chord_uc, chord_repo, "observeChordAnalysisResults()")
 Rel(chord_repo_impl, chord_repo, "@Binds")
 
 ' Data Layer Connections
-Rel(chord_repo_impl, chord_service, "Uses")
-Rel(chord_repo_impl, js_executor, "Uses for JS")
-
-' External Systems
-Rel(js_executor, webview_js, "Executes analysis")
+Rel(chord_repo_impl, chord_analyzer, "Uses")
 
 @enduml
 ```
+
+> Internal structure of `ChordAnalyzer` (parser, chord type registry, models `Pitch` and `ChordType`) is documented in [Native Kotlin Chord Analysis](./CHORD_ANALYSIS.md).
 
 ### 2.2. API and Data Models
 
@@ -194,12 +188,13 @@ interface ChordAnalysisRepository {
     fun analyzeChord(notes: List<Note>)
 }
 
-// com.astrizhachuk.pianoflow.domain.service.ChordAnalysisService.kt
+// com.astrizhachuk.pianoflow.domain.service.analysis.ChordAnalyzer.kt
 /**
- * Domain service for processing string analysis results.
+ * Domain service for native chord and single-note analysis.
+ * Synchronous, main-safe, pure Kotlin.
  */
-class ChordAnalysisService {
-    fun processChordAnalysisResult(rawChord: String?): String?
+class ChordAnalyzer {
+    fun analyze(noteNames: List<String>): String?
 }
 ```
 
@@ -245,8 +240,7 @@ The system uses Hilt for dependency management.
 title MIDI Processing System Dependency Graph (Hilt)
 
 class MidiMessageParser <<@Singleton>>
-class MusicScriptEngine <<@Singleton>>
-class ChordAnalysisService <<@Singleton>>
+class ChordAnalyzer <<@Inject constructor>>
 class MidiDataSource <<@Singleton>>
 class MidiRepositoryImpl
 class ChordAnalysisRepositoryImpl <<@Singleton>>
@@ -254,8 +248,6 @@ interface MidiRepository
 interface ChordAnalysisRepository
 interface MidiDeviceMapper
 class MidiDeviceMapperImpl
-class Gson <<@Singleton>>
-class WebView <<@Singleton>>
 
 ' Repositories and their implementations (Binds)
 MidiRepositoryImpl ..|> MidiRepository : @Binds
@@ -264,18 +256,15 @@ MidiDeviceMapperImpl ..|> MidiDeviceMapper : @Binds
 
 ' Repository dependencies
 MidiRepositoryImpl --> MidiDataSource : inject
-ChordAnalysisRepositoryImpl --> MusicScriptEngine : inject
-ChordAnalysisRepositoryImpl --> ChordAnalysisService : inject
-ChordAnalysisRepositoryImpl --> Gson : inject
+ChordAnalysisRepositoryImpl --> ChordAnalyzer : inject
 
-' Data sources and engines
+' Data sources
 MidiDataSource --> MidiMessageParser : inject
 MidiDataSource --> MidiDeviceMapper : inject
-MusicScriptEngine --> WebView : inject
 
 note right of ChordAnalysisRepositoryImpl
-  Repository coordinates
-  analysis via JS engine
+  Repository delegates analysis to
+  the native ChordAnalyzer (pure Kotlin)
 end note
 
 @enduml
@@ -371,9 +360,10 @@ deactivate Receiver
     *   `PianoStaffViewModel` observes `ObserveMidiMessagesUseCase`. When a new list of notes arrives:
         1. Initiates analysis via `AnalyzeChordUseCase(notes)`. This is a fire-and-forget operation.
         2. `AnalyzeChordUseCase` calls `ChordAnalysisRepository.analyzeChord(notes)`.
-        3. The repository prepares a JS script and executes it via `MusicScriptEngine` (WebView + Tonal.js).
-        4. The result is cleaned via `ChordAnalysisService` and stored in the repository's `StateFlow`.
+        3. The repository deduplicates and sorts note names, then **synchronously** invokes `ChordAnalyzer.analyze(noteNames)`.
+        4. The result is written directly into the repository's `StateFlow<String?>` (no thread hop, no callbacks).
     *   In parallel, `PianoStaffViewModel` combines (`combine`) the note stream and the analysis result stream from `ObserveChordAnalysisResultsUseCase`.
+    *   See [Native Kotlin Chord Analysis](./CHORD_ANALYSIS.md) for the algorithm and the chord type registry.
 
 5.  **UI Display**:
     *   The combination result forms `PianoStaffUiState`.
@@ -390,7 +380,7 @@ participant "ObserveMidiMessagesUseCase" as UC
 participant "PianoStaffViewModel" as VM
 participant "AnalyzeChordUseCase" as AnalyzeUC
 participant "ChordAnalysisRepository" as Repo
-participant "MusicScriptEngine" as JS
+participant "ChordAnalyzer" as Analyzer
 participant "PianoStaffScreen" as Screen
 
 User -> DS : Presses keys
@@ -403,10 +393,10 @@ VM -> AnalyzeUC : invoke(notes)
 activate AnalyzeUC
 AnalyzeUC -> Repo : analyzeChord(notes)
 activate Repo
-Repo -> JS : execute("analyze(...)")
-activate JS
-JS -->> Repo : rawResult
-deactivate JS
+Repo -> Analyzer : analyze(noteNames)
+activate Analyzer
+Analyzer --> Repo : chord name (or null)
+deactivate Analyzer
 Repo -> Repo : update StateFlow
 Repo -->> AnalyzeUC
 deactivate Repo
@@ -554,9 +544,9 @@ deactivate Screen
 - For each recognized chord (2+ notes), its name is displayed on screen (e.g., "C Major", "Am", "G7sus4").
 - For single notes, NO chord name is displayed (the field remains empty).
 - If multiple notes do not form a known chord, the text "Not defined" is displayed (or according to localization).
-- Chord analysis is performed in a separate thread and does not block the UI thread.
+- Chord analysis is synchronous, sub-millisecond, and main-safe; no UI-thread blocking is observable.
 - Analysis results are updated in `StateFlow` and are safe for concurrent access from different threads.
-- The system uses Tonal.js for chord analysis, ensuring accurate recognition of standard musical chords.
+- The system uses a native Kotlin chord detection engine (see [Native Kotlin Chord Analysis](./CHORD_ANALYSIS.md)), ensuring accurate recognition of standard musical chords without any JavaScript runtime.
 
 ## See Also
 
