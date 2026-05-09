@@ -36,6 +36,7 @@ chore(deps): bump compose-bom to 2026.05.00
 - Fill out the PR template (Summary + Test plan).
 - Keep PRs focused — split unrelated changes.
 - Self-review the diff before requesting review.
+- **Issue and PR titles must be in English** (Conventional Commits style) — titles drive changelogs, search, and tooling.
 - Bilingual issue/PR descriptions (English first, `---`, then Russian) are appreciated but not required. Use English alone if you prefer — a translation may be added later.
 
 ## Code standards

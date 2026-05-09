@@ -93,9 +93,11 @@ Every PR that resolves an issue must include `Closes #N` or `Fixes #N` in the de
 
 ### Bilingual descriptions (MANDATORY for AI-authored content)
 
-When AI (Claude Code or any other agent) authors an issue or pull request description, the body MUST be bilingual: English first, then a horizontal rule (`---`), then a Russian version with the same structure and content. The PR title and the issue title remain in a single language (English by default, matching Conventional Commits style).
+When AI (Claude Code or any other agent) authors an issue or pull request description, the body MUST be bilingual: English first, then a horizontal rule (`---`), then a Russian version with the same structure and content.
 
-This rule is mandatory for AI; for human contributors a bilingual description is encouraged but not required (see `CONTRIBUTING.md`).
+Issue and PR **titles MUST always be written in English** (Conventional Commits style), regardless of the body language and regardless of who authors them. Titles drive changelogs, search, and tooling — they stay in a single working language.
+
+The bilingual-body rule is mandatory for AI; for human contributors a bilingual description is encouraged but not required (see `CONTRIBUTING.md`). The English-title rule applies to everyone.
 
 ### Minimal process
 
