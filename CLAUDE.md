@@ -65,6 +65,43 @@ Use **Timber** for all logging (never `Log.*` directly):
 
 All user-visible strings must be in both `values/strings.xml` (English) and `values-ru/strings.xml` (Russian). Keep them in sync.
 
+## Workflow: Issues and Pull Requests
+
+PianoFlow uses a **hybrid GitHub Flow**: an issue is created only when it adds value — to keep a useful changelog without bureaucratic ceremony.
+
+### Issue is REQUIRED for
+
+| Category | Reason |
+|----------|--------|
+| Bug | Reproduction history, environment, and steps must be preserved |
+| New feature / idea | Design and discussion happen before code, to avoid PR rewrites |
+| Architectural improvement | Decision is made before code — see `docs/en/plans/ARCHITECTURE_PRINCIPLES.md` |
+
+Suggested labels: `bug`, `enhancement`, `idea`, `architecture`.
+
+### Direct PR (no issue) for
+
+- Typos and formatting
+- Refactoring without behavior change
+- Dependency updates
+- Documentation edits (`docs/en` + `docs/ru`)
+- Obvious small fixes (≤30 lines, self-explanatory from the diff)
+
+### Linking issue and PR
+
+Every PR that resolves an issue must include `Closes #N` or `Fixes #N` in the description. GitHub closes the linked issue automatically on merge — this gives an "idea-to-code" trail without separate tracking.
+
+### Minimal process
+
+1. Idea or bug → issue (if it falls into the "required" table above)
+2. Branch: `feat/<short-desc>`, `fix/<short-desc>`, `docs/<short-desc>`, `refactor/<short-desc>`
+3. Commits — Conventional Commits
+4. PR via `gh pr create` with template (Summary + Test plan + `Closes #N`)
+5. Self-review → merge (squash for features, regular merge for integration PRs)
+6. Delete the branch
+
+**Rationale:** issue-first preserves traceability for meaningful changes; direct PRs keep technical hygiene fast. The hybrid avoids both extremes — full ceremony and lost decision history.
+
 ## Documentation
 
 Documentation is maintained in two languages under `docs/`:
