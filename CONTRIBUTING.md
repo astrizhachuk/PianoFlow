@@ -38,6 +38,7 @@ chore(deps): bump compose-bom to 2026.05.00
 - Self-review the diff before requesting review.
 - **Issue and PR titles must be in English** (Conventional Commits style) — titles drive changelogs, search, and tooling.
 - Bilingual issue/PR descriptions (English first, `---`, then Russian) are appreciated but not required. Use English alone if you prefer — a translation may be added later.
+- Labels live on issues, not PRs. Add labels to a PR only when there is no linked issue, or when automation requires them.
 
 ## Code standards
 
