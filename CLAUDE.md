@@ -87,6 +87,15 @@ Suggested labels: `bug`, `enhancement`, `idea`, `architecture`.
 - Documentation edits (`docs/en` + `docs/ru`)
 - Obvious small fixes (≤30 lines, self-explanatory from the diff)
 
+### Labels
+
+Apply labels to **issues**, not to PRs — the linked PR (`Closes #N`) inherits context from the issue, and the issue is the single source of truth for the "what". Add labels to a PR only when:
+
+- The PR has no linked issue (direct PR for typos, deps, docs, small fixes).
+- Automation depends on PR labels (Release Drafter, label-gated CI, etc.).
+
+This avoids manual synchronization between issue and PR labels.
+
 ### Linking issue and PR
 
 Every PR that resolves an issue must include `Closes #N` or `Fixes #N` in the description. GitHub closes the linked issue automatically on merge — this gives an "idea-to-code" trail without separate tracking.
