@@ -91,6 +91,12 @@ Suggested labels: `bug`, `enhancement`, `idea`, `architecture`.
 
 Every PR that resolves an issue must include `Closes #N` or `Fixes #N` in the description. GitHub closes the linked issue automatically on merge — this gives an "idea-to-code" trail without separate tracking.
 
+### Bilingual descriptions (MANDATORY for AI-authored content)
+
+When AI (Claude Code or any other agent) authors an issue or pull request description, the body MUST be bilingual: English first, then a horizontal rule (`---`), then a Russian version with the same structure and content. The PR title and the issue title remain in a single language (English by default, matching Conventional Commits style).
+
+This rule is mandatory for AI; for human contributors a bilingual description is encouraged but not required (see `CONTRIBUTING.md`).
+
 ### Minimal process
 
 1. Idea or bug → issue (if it falls into the "required" table above)
