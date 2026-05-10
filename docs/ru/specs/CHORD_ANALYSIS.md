@@ -2,25 +2,19 @@
 
 ## 1. Общая информация
 
-### 1.1. Цель доработки
+### 1.1. Назначение
 
-Заменить текущую JavaScript-реализацию анализа аккордов (Tonal.js, выполняемый внутри скрытого `WebView`) полностью платформо-независимой реализацией на чистом Kotlin, размещенной в Domain-слое.
+Подсистема анализа аккордов обеспечивает синхронное платформо-независимое распознавание аккордов и одиночных нот. Реализация — доменный сервис на чистом Kotlin без Android-зависимостей, пригодный для переиспользования на других платформах (см. `docs/ru/plans/ARCHITECTURE_PRINCIPLES.md` §11).
 
-Текущая реализация имеет следующие проблемы:
-- Data-слой жестко связан с Android (`WebView`, `WebViewClient`, `Handler`, `Looper`).
-- Каждый старт приложения требует асинхронной инициализации страницы и очереди отложенных скриптов.
-- Алгоритм невозможно переиспользовать вне Android (Windows, Web — см. `docs/ru/plans/ARCHITECTURE_PRINCIPLES.md` §11).
-- Бизнес-логику анализа нельзя протестировать без Robolectric или эмулятора.
-- Накладные расходы на сериализацию параметров в JSON и парсинг строкового результата на каждый вызов.
+Поведение:
 
-Новая реализация должна:
-1. Принимать список названий нот вида `["C4", "E4", "G4"]`.
-2. Для **двух и более** нот — возвращать строку имени аккорда (`"C"`, `"Am"`, `"G7"`, `"Em#5/C"` и т. п.) либо `null`, если совпадение не найдено.
-3. Для **одной** ноты — возвращать ее энгармонически упрощенное имя (например, `E#4 → F4`, `Cb4 → B3`, `Cx4 → D4`, `Ebb4 → D4`).
-4. Сохранять энгармоническое написание входных нот в имени аккорда (`Db` остается `Db`, не превращается в `C#`).
-5. Возвращать результат **синхронно** — без callback-ов и переходов через main-loop.
+1. Принимает список названий нот вида `["C4", "E4", "G4"]`.
+2. Для **двух и более** нот — возвращает строку имени аккорда (`"C"`, `"Am"`, `"G7"`, `"Em#5/C"` и т. п.) либо `null`, если совпадение не найдено.
+3. Для **одной** ноты — возвращает ее энгармонически упрощенное имя (например, `E#4 → F4`, `Cb4 → B3`, `Cx4 → D4`, `Ebb4 → D4`).
+4. Сохраняет энгармоническое написание входных нот в имени аккорда (`Db` остается `Db`, не превращается в `C#`).
+5. Возвращает результат **синхронно** — без callback-ов и переходов через main-loop.
 
-Публичный контракт `ChordAnalysisRepository` (реактивный `StateFlow<String?>`) сохраняется. Меняется только внутренняя реализация — JS-вызов заменяется на новый доменный сервис.
+Реактивный контракт `ChordAnalysisRepository.chordAnalysisResult: StateFlow<String?>` доставляет результат в Presentation-слой.
 
 ### 1.2. Базовые документы
 
@@ -32,7 +26,7 @@
 
 ### 2.1. Компоненты
 
-Подсистема анализа аккордов целиком переносится в Domain-слой как сервис на чистом Kotlin. В Data-слое остается только адаптер `ChordAnalysisRepositoryImpl`, удерживающий реактивное состояние и делегирующий анализ доменному сервису.
+Подсистема анализа аккордов располагается в Domain-слое как сервис на чистом Kotlin. В Data-слое находится только адаптер `ChordAnalysisRepositoryImpl`, удерживающий реактивное состояние и делегирующий анализ доменному сервису.
 
 **Domain Layer**
 - **`Pitch`** (`domain.model.music`): разобранная нота — буква, альтерация, октава (nullable), MIDI-номер (nullable), chroma. Чистая data-модель.
@@ -41,7 +35,7 @@
 - **`ChordAnalyzer`** (`domain.service.analysis`): публичный доменный сервис с единственной точкой входа `analyze(noteNames: List<String>): String?`. Внутри выполняет парсинг нот, извлечение pitch class-ов, поиск аккорда и форматирование вывода. При одной входной ноте выполняет энгармоническое упрощение.
 
 **Data Layer**
-- **`ChordAnalysisRepositoryImpl`**: существующий класс — переписывается его внутренняя часть. Сохраняется `MutableStateFlow<String?>` и публичный метод `analyzeChord(notes: List<Note>)`. Тело становится синхронным вызовом `ChordAnalyzer.analyze(...)` с прямой записью в `StateFlow`. Все ссылки на `MusicScriptEngine`, `Gson`, `Handler`, `Looper` удаляются.
+- **`ChordAnalysisRepositoryImpl`**: содержит `MutableStateFlow<String?>` и публичный метод `analyzeChord(notes: List<Note>)`. Дедуплицирует и сортирует имена нот, затем синхронно вызывает `ChordAnalyzer.analyze(...)` и записывает результат напрямую в `StateFlow`. Без многопоточности и платформенных зависимостей.
 
 #### 2.1.1. C4 Level 2: Контейнеры
 
@@ -165,18 +159,18 @@ class ChordAnalyzer @Inject constructor() {
     fun analyze(noteNames: List<String>): String?
 }
 
-// com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository.kt — БЕЗ ИЗМЕНЕНИЙ
+// com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository.kt
 interface ChordAnalysisRepository {
     val chordAnalysisResult: StateFlow<String?>
     fun analyzeChord(notes: List<Note>)
 }
 ```
 
-Интерфейс `ChordAnalysisRepository` и его потребители (`AnalyzeChordUseCase`, `ObserveChordAnalysisResultsUseCase`, `PianoStaffViewModel`) не затрагиваются.
+Интерфейс `ChordAnalysisRepository` — стабильная граница между подсистемой анализа аккордов и ее потребителями (`AnalyzeChordUseCase`, `ObserveChordAnalysisResultsUseCase`, `PianoStaffViewModel`).
 
 ### 2.3. Граф зависимостей
 
-После рефакторинга подсистема анализа аккордов использует Hilt и существенно проще, чем раньше.
+Подсистема анализа аккордов использует Hilt для внедрения зависимостей.
 
 ```plantuml
 @startuml
@@ -198,14 +192,11 @@ end note
 @enduml
 ```
 
-Из `DataModule` **удаляются** следующие провайдеры:
-- `provideWebView()`
-- `provideMusicScriptEngine()`
-- `provideGson()` (Gson больше нигде не используется)
+`ChordAnalyzer` помечен `@Inject constructor` и не имеет состояния. `ChordAnalysisRepositoryImpl` — `@Singleton`, держит `StateFlow` с результатом анализа. Подсистема не требует Hilt-провайдеров для `WebView`, `Gson` и других JS-рантаймов.
 
 ## 3. Алгоритм
 
-Алгоритм — прямой порт логики распознавания аккордов из Tonal.js v6 (`Tonal.Chord.detect` и `Tonal.Note.simplify`), с пост-обработкой вывода, встроенной в движок. Алгоритм состоит из чистой арифметики и поиска по таблицам — никаких внешних зависимостей не нужно.
+Алгоритм состоит из чистой арифметики и поиска по таблицам — без внешних зависимостей. Конвенции следуют Tonal.js v6 (`Tonal.Chord.detect` и `Tonal.Note.simplify`); поведение совместимо с этой библиотекой.
 
 ### 3.1. Парсинг названий нот
 
@@ -296,7 +287,7 @@ detect(["C4","D4","E4"])  →  []                 →  null
 
 #### Шаг 8 — Форматирование вывода
 
-Текущий продакшен-код пост-обрабатывает результат JS, срезая концевую `M` (так что мажор в основной позиции дает `"C"` вместо `"CM"`). Это поведение сохраняется в новом движке для обратной совместимости:
+Концевая `M` срезается, чтобы мажор в основной позиции отображался как `"C"`, а не `"CM"`:
 
 - Если кандидат заканчивается на `M` (с учетом регистра), убрать концевую `M`. Примеры: `"CM" → "C"`, `"DbM" → "Db"`.
 - Иначе оставить кандидата без изменений. Примеры: `"Am"`, `"G7"`, `"Em#5/C"`, `"CM/E"` (форма обращения сохраняет `M`, потому что она не в конце строки).
@@ -349,13 +340,13 @@ detect(["C4","D4","E4"])  →  []                 →  null
 | `["C#4", "Db4"]` (разные написания, одинаковый chroma) | первое написание побеждает (после сортировки в репозитории) → только один pitch class, аккорд не распознается → `null` |
 | `["C4", "D4", "E4"]` (нет совпадающего типа аккорда) | `null` |
 
-**Энгармоническая стабильность.** Таблица chroma → имя строится в порядке поступления входов. Репозиторий сортирует имена нот лексикографически до вызова анализатора, так что `["C#4", "Db4"]` детерминированно сводится к написанию, идущему первым по сортировке. Это совпадает с существующим JS-поведением.
+**Энгармоническая стабильность.** Таблица chroma → имя строится в порядке поступления входов. Репозиторий сортирует имена нот лексикографически до вызова анализатора, так что `["C#4", "Db4"]` детерминированно сводится к написанию, идущему первым по сортировке.
 
 **Логирование.** `ChordAnalyzer` — pure Kotlin и не зависит от Timber или какого-либо логгера. Диагностическое логирование остается в `ChordAnalysisRepositoryImpl` (Data-слой): `Timber.d` на входе, `Timber.e` на пойманных исключениях.
 
 **Исключения.** Ни парсер, ни реестр не бросают исключения. `analyze()` тотален: возвращает `null` при любом входе, который не удается классифицировать. `try/catch` в `ChordAnalysisRepositoryImpl` сохраняется как defense-in-depth.
 
-**Производительность.** Алгоритм работает за O(1) по размеру входа (12 ротаций, каждая — O(1) lookup в hash-индексе chroma). Худший случай — менее миллисекунды, что заменяет многомиллисекундный round-trip через JS.
+**Производительность.** Алгоритм работает за O(1) по размеру входа (12 ротаций, каждая — O(1) lookup в hash-индексе chroma). Худший случай — менее миллисекунды.
 
 ## 5. Жизненный цикл и взаимодействие
 
@@ -403,7 +394,7 @@ end note
 @enduml
 ```
 
-Последовательность полностью синхронна на потоке вызывающего `analyzeChord`. Нет ни `Handler.post`, ни callback-ов `evaluateJavascript`, ни асинхронной инициализации.
+Последовательность полностью синхронна на потоке вызывающего `analyzeChord`: без переключений потоков, без callback-ов, без асинхронной инициализации.
 
 ### 5.2. Внутренняя структура `ChordAnalyzer.analyze`
 
@@ -457,44 +448,11 @@ stop
 @enduml
 ```
 
-## 6. Миграция
-
-### 6.1. Удаляемые файлы
-
-- `app/src/main/java/com/astrizhachuk/pianoflow/data/datasource/analysis/MusicScriptEngine.kt`
-- `app/src/main/java/com/astrizhachuk/pianoflow/domain/service/ChordAnalysisService.kt`
-- `app/src/test/java/com/astrizhachuk/pianoflow/domain/service/ChordAnalysisServiceTest.kt`
-- `app/src/main/assets/tonal-analysis.html`
-- `app/src/main/assets/tonal.min.js`
-
-### 6.2. Добавляемые файлы
-
-- `app/src/main/java/com/astrizhachuk/pianoflow/domain/model/music/Pitch.kt`
-- `app/src/main/java/com/astrizhachuk/pianoflow/domain/model/music/ChordType.kt`
-- `app/src/main/java/com/astrizhachuk/pianoflow/domain/service/analysis/ChordTypeRegistry.kt`
-- `app/src/main/java/com/astrizhachuk/pianoflow/domain/service/analysis/ChordAnalyzer.kt`
-- `app/src/test/java/com/astrizhachuk/pianoflow/domain/model/music/PitchTest.kt`
-- `app/src/test/java/com/astrizhachuk/pianoflow/domain/service/analysis/ChordTypeRegistryTest.kt`
-- `app/src/test/java/com/astrizhachuk/pianoflow/domain/service/analysis/ChordAnalyzerTest.kt`
-
-### 6.3. Изменяемые файлы
-
-- `app/src/main/java/com/astrizhachuk/pianoflow/data/repository/ChordAnalysisRepositoryImpl.kt` — конструктор принимает только `ChordAnalyzer`; тело становится синхронным; убираются `Handler`, `Looper`, `Gson`, `MusicScriptEngine`.
-- `app/src/main/java/com/astrizhachuk/pianoflow/data/di/DataModule.kt` — удаляются `provideWebView()`, `provideMusicScriptEngine()`, `provideGson()`. Биндинг `bindChordAnalysisRepository` не меняется.
-- `app/src/test/java/com/astrizhachuk/pianoflow/data/repository/ChordAnalysisRepositoryImplTest.kt` — убирается `@RunWith(RobolectricTestRunner::class)`, убирается обвязка с `Looper.getMainLooper()`, мокается `ChordAnalyzer` вместо `MusicScriptEngine` + `ChordAnalysisService`.
-
-### 6.4. Не трогаем
-
-- `MusicScriptEngine` *не* удаляется, если используется `PianoStaff` для рендеринга через VexFlow. Команда реализации проверяет это во время выполнения. Привязанный к `PianoStaff` провайдер (если такой есть) сохраняется; удаляется только тот, что был привязан к анализу аккордов.
-- `app/src/main/assets/vexflow.html`, `app/src/main/assets/vexflow.js` — рендеринг нотного стана, вне области.
-- Интерфейс `ChordAnalysisRepository`, `AnalyzeChordUseCase`, `ObserveChordAnalysisResultsUseCase`.
-- `PianoStaffViewModel` и весь Presentation-слой.
-
-## 7. Критерии приемки
+## 6. Критерии приемки
 
 ### Функциональные
 
-- Для входов из существующих тестов репозитория значение, эмитированное в `chordAnalysisResult`, идентично значению, которое эмитировал прежний JS-пайплайн. Эталонные результаты:
+- Эталонные значения `chordAnalysisResult`:
   - `[C4, E4, G4]` → `"C"`
   - `[A4, C5, E5]` → `"Am"`
   - `[E4, G4, C5]` → `"Em#5/C"` (обращение До мажора)
@@ -507,10 +465,8 @@ stop
 
 ### Архитектурные
 
-- `app/src/main/java/com/astrizhachuk/pianoflow/domain/` не содержит ссылок на `android.*` и `androidx.*` (проверяется grep-ом).
-- `ChordAnalysisRepositoryImpl` не содержит ссылок на `WebView`, `Handler`, `Looper`, `MusicScriptEngine`, `Gson` и `tonal` (проверяется grep-ом).
-- `app/src/main/assets/` не содержит `tonal-analysis.html` и `tonal.min.js`.
-- Hilt-граф собирается без провайдеров `WebView` и `Gson` (если они не нужны где-то еще — вне области).
+- `app/src/main/java/com/astrizhachuk/pianoflow/domain/` не содержит ссылок на `android.*` и `androidx.*`.
+- `ChordAnalysisRepositoryImpl` не содержит ссылок на `WebView`, `Handler` и `Looper` (синхронно, без платформенной многопоточности).
 
 ### Тестирование
 
@@ -528,7 +484,7 @@ stop
 
 ### Ручной smoke-тест
 
-- Ревьюер запускает приложение на устройстве с подключенной MIDI-клавиатурой, играет минимум одно мажорное трезвучие, одно минорное трезвучие, одно обращение и одну одиночную ноту, и убеждается, что отображаемое имя аккорда соответствует строке таблицы выше.
+- Запустить приложение на устройстве с подключенной MIDI-клавиатурой, сыграть минимум одно мажорное трезвучие, одно минорное трезвучие, одно обращение и одну одиночную ноту; убедиться, что отображаемое имя аккорда соответствует строке таблицы выше.
 
 ## Приложение A: База типов аккордов (106 записей)
 

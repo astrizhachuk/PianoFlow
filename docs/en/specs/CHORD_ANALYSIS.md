@@ -2,25 +2,19 @@
 
 ## 1. General Information
 
-### 1.1. Purpose of the Enhancement
+### 1.1. Purpose
 
-Replace the current JavaScript-based chord analysis (Tonal.js running inside a hidden `WebView`) with a fully platform-independent implementation in pure Kotlin, located in the Domain layer.
+The chord analysis subsystem provides synchronous, platform-independent chord and single-note recognition. The implementation is a pure-Kotlin domain service with no Android dependencies, suitable for reuse on other platforms (see `docs/en/plans/ARCHITECTURE_PRINCIPLES.md` §11).
 
-The current implementation has the following problems:
-- The Data layer is tightly coupled to Android (`WebView`, `WebViewClient`, `Handler`, `Looper`).
-- Each application start requires asynchronous page initialization and a queue of pending scripts.
-- The algorithm cannot be reused outside Android (Windows, Web — see `docs/en/plans/ARCHITECTURE_PRINCIPLES.md` §11).
-- Analysis business logic cannot be tested without Robolectric or an emulator.
-- Per-call overhead from JSON serialization of arguments and string parsing of results.
+Behavior:
 
-The new implementation must:
-1. Accept a list of note names like `["C4", "E4", "G4"]`.
-2. For **two or more** notes — return a chord name string (`"C"`, `"Am"`, `"G7"`, `"Em#5/C"`, etc.) or `null` if no match is found.
-3. For a **single** note — return its enharmonically simplified name (e.g. `E#4 → F4`, `Cb4 → B3`, `Cx4 → D4`, `Ebb4 → D4`).
-4. Preserve the enharmonic spelling of input notes in the chord name (`Db` stays `Db`, does not become `C#`).
-5. Return the result **synchronously** — no callbacks, no main-loop hops.
+1. Accepts a list of note names like `["C4", "E4", "G4"]`.
+2. For **two or more** notes — returns a chord name string (`"C"`, `"Am"`, `"G7"`, `"Em#5/C"`, etc.) or `null` if no match is found.
+3. For a **single** note — returns its enharmonically simplified name (e.g. `E#4 → F4`, `Cb4 → B3`, `Cx4 → D4`, `Ebb4 → D4`).
+4. Preserves the enharmonic spelling of input notes in the chord name (`Db` stays `Db`, never becomes `C#`).
+5. Returns the result **synchronously** — no callbacks, no main-loop hops.
 
-The public contract of `ChordAnalysisRepository` (reactive `StateFlow<String?>`) is preserved. Only the internal implementation changes — the JS call is replaced by the new domain service.
+The reactive contract `ChordAnalysisRepository.chordAnalysisResult: StateFlow<String?>` carries the result to the Presentation layer.
 
 ### 1.2. Base Documents
 
@@ -32,7 +26,7 @@ The public contract of `ChordAnalysisRepository` (reactive `StateFlow<String?>`)
 
 ### 2.1. Components
 
-The chord analysis subsystem is moved entirely into the Domain layer as a pure-Kotlin service. The Data layer keeps only the `ChordAnalysisRepositoryImpl` adapter that holds the reactive state and delegates analysis to the domain service.
+The chord analysis subsystem lives in the Domain layer as a pure-Kotlin service. The Data layer hosts only the `ChordAnalysisRepositoryImpl` adapter, which holds the reactive state and delegates analysis to the domain service.
 
 **Domain Layer**
 - **`Pitch`** (`domain.model.music`): parsed note — letter, alteration, octave (nullable), MIDI number (nullable), chroma index. Pure data class.
@@ -41,7 +35,7 @@ The chord analysis subsystem is moved entirely into the Domain layer as a pure-K
 - **`ChordAnalyzer`** (`domain.service.analysis`): public domain service with the single entry point `analyze(noteNames: List<String>): String?`. Internally performs note parsing, pitch-class extraction, chord matching, and output formatting. Provides single-note enharmonic simplification when only one note is supplied.
 
 **Data Layer**
-- **`ChordAnalysisRepositoryImpl`**: the existing class — its internals are rewritten. It keeps the `MutableStateFlow<String?>` and the `analyzeChord(notes: List<Note>)` public method. The body becomes a synchronous call to `ChordAnalyzer.analyze(...)` followed by direct `StateFlow` update. All references to `MusicScriptEngine`, `Gson`, `Handler`, and `Looper` are removed.
+- **`ChordAnalysisRepositoryImpl`**: holds a `MutableStateFlow<String?>` and exposes `analyzeChord(notes: List<Note>)`. Deduplicates and sorts note names, then synchronously invokes `ChordAnalyzer.analyze(...)` and writes the result directly to the `StateFlow`. No threading or platform dependencies.
 
 #### 2.1.1. C4 Level 2: Containers
 
@@ -165,18 +159,18 @@ class ChordAnalyzer @Inject constructor() {
     fun analyze(noteNames: List<String>): String?
 }
 
-// com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository.kt — UNCHANGED
+// com.astrizhachuk.pianoflow.domain.repository.ChordAnalysisRepository.kt
 interface ChordAnalysisRepository {
     val chordAnalysisResult: StateFlow<String?>
     fun analyzeChord(notes: List<Note>)
 }
 ```
 
-The `ChordAnalysisRepository` interface and its consumers (`AnalyzeChordUseCase`, `ObserveChordAnalysisResultsUseCase`, `PianoStaffViewModel`) are untouched.
+The `ChordAnalysisRepository` interface is the stable boundary between the chord-analysis subsystem and its consumers (`AnalyzeChordUseCase`, `ObserveChordAnalysisResultsUseCase`, `PianoStaffViewModel`).
 
 ### 2.3. Dependency Graph
 
-The chord analysis subsystem after refactoring uses Hilt and is significantly simpler than before.
+The chord analysis subsystem uses Hilt for dependency injection.
 
 ```plantuml
 @startuml
@@ -198,14 +192,11 @@ end note
 @enduml
 ```
 
-The following bindings/providers are **removed** from `DataModule`:
-- `provideWebView()`
-- `provideMusicScriptEngine()`
-- `provideGson()` (Gson is no longer used anywhere)
+`ChordAnalyzer` is `@Inject constructor`-able and stateless. `ChordAnalysisRepositoryImpl` is `@Singleton` and holds the `StateFlow` for the analysis result. No Hilt providers for `WebView`, `Gson`, or any JS runtime are required by this subsystem.
 
 ## 3. Algorithm
 
-The algorithm is a direct Kotlin port of the chord-detection logic in Tonal.js v6 (`Tonal.Chord.detect` and `Tonal.Note.simplify`), with output post-processing folded into the engine. The algorithm is pure arithmetic and table lookups — no external dependencies required.
+The algorithm uses pure arithmetic and table lookups — no external dependencies. Conventions follow Tonal.js v6 (`Tonal.Chord.detect` and `Tonal.Note.simplify`); behavior is compatible with that library.
 
 ### 3.1. Note Name Parsing
 
@@ -296,7 +287,7 @@ detect(["C4","D4","E4"])  →  []                 →  null
 
 #### Step 8 — Output formatting
 
-The current production code post-processes the JS result by stripping a trailing `M` (so root-position major returns `"C"` instead of `"CM"`). This is preserved in the new engine for backward compatibility:
+A trailing `M` is stripped so that root-position major chords render as `"C"` rather than `"CM"`:
 
 - If the candidate ends with `M` (case-sensitive), strip the final `M`. Examples: `"CM" → "C"`, `"DbM" → "Db"`.
 - Otherwise leave the candidate unchanged. Examples: `"Am"`, `"G7"`, `"Em#5/C"`, `"CM/E"` (the inversion form keeps `M` because it is not at the end of the string).
@@ -349,13 +340,13 @@ Direct port of `Tonal.Note.simplify`:
 | `["C#4", "Db4"]` (different spellings, same chroma) | first spelling wins (after upstream sort) → only one pitch class, no chord detected → `null` |
 | `["C4", "D4", "E4"]` (no matching chord type) | `null` |
 
-**Enharmonic stability.** The chroma → name lookup is built in input order. The repository sorts note names lexicographically before calling the analyzer, so `["C#4", "Db4"]` is deterministically reduced to its sorted-first spelling. This matches the existing JS-based behavior.
+**Enharmonic stability.** The chroma → name lookup is built in input order. The repository sorts note names lexicographically before calling the analyzer, so `["C#4", "Db4"]` is deterministically reduced to its sorted-first spelling.
 
 **Logging.** `ChordAnalyzer` is pure Kotlin and does not depend on Timber or any logging facility. Diagnostic logging stays in `ChordAnalysisRepositoryImpl` (Data layer): `Timber.d` on entry, `Timber.e` on caught exceptions.
 
 **Exceptions.** Neither the parser nor the registry throws. `analyze()` is total: it returns `null` on any input that cannot be classified. The `try/catch` in `ChordAnalysisRepositoryImpl` is retained as defense-in-depth.
 
-**Performance.** The algorithm runs in O(1) with respect to input size (12 rotations, each an O(1) hash lookup in the chroma index). Worst-case latency is sub-millisecond, replacing the multi-millisecond JS round-trip.
+**Performance.** The algorithm runs in O(1) with respect to input size (12 rotations, each an O(1) hash lookup in the chroma index). Worst-case latency is sub-millisecond.
 
 ## 5. Lifecycle and Interaction
 
@@ -403,7 +394,7 @@ end note
 @enduml
 ```
 
-The sequence is fully synchronous on the calling thread of `analyzeChord`. There are no `Handler.post`, no `evaluateJavascript` callbacks, no asynchronous initialization gates.
+The sequence is fully synchronous on the calling thread of `analyzeChord`: no thread hops, no callbacks, no asynchronous initialization.
 
 ### 5.2. Internal Structure of `ChordAnalyzer.analyze`
 
@@ -457,44 +448,11 @@ stop
 @enduml
 ```
 
-## 6. Migration
-
-### 6.1. Files Removed
-
-- `app/src/main/java/com/astrizhachuk/pianoflow/data/datasource/analysis/MusicScriptEngine.kt`
-- `app/src/main/java/com/astrizhachuk/pianoflow/domain/service/ChordAnalysisService.kt`
-- `app/src/test/java/com/astrizhachuk/pianoflow/domain/service/ChordAnalysisServiceTest.kt`
-- `app/src/main/assets/tonal-analysis.html`
-- `app/src/main/assets/tonal.min.js`
-
-### 6.2. Files Added
-
-- `app/src/main/java/com/astrizhachuk/pianoflow/domain/model/music/Pitch.kt`
-- `app/src/main/java/com/astrizhachuk/pianoflow/domain/model/music/ChordType.kt`
-- `app/src/main/java/com/astrizhachuk/pianoflow/domain/service/analysis/ChordTypeRegistry.kt`
-- `app/src/main/java/com/astrizhachuk/pianoflow/domain/service/analysis/ChordAnalyzer.kt`
-- `app/src/test/java/com/astrizhachuk/pianoflow/domain/model/music/PitchTest.kt`
-- `app/src/test/java/com/astrizhachuk/pianoflow/domain/service/analysis/ChordTypeRegistryTest.kt`
-- `app/src/test/java/com/astrizhachuk/pianoflow/domain/service/analysis/ChordAnalyzerTest.kt`
-
-### 6.3. Files Modified
-
-- `app/src/main/java/com/astrizhachuk/pianoflow/data/repository/ChordAnalysisRepositoryImpl.kt` — constructor accepts only `ChordAnalyzer`; body becomes synchronous; removes `Handler`, `Looper`, `Gson`, `MusicScriptEngine`.
-- `app/src/main/java/com/astrizhachuk/pianoflow/data/di/DataModule.kt` — removes `provideWebView()`, `provideMusicScriptEngine()`, `provideGson()`. The binding `bindChordAnalysisRepository` is unchanged.
-- `app/src/test/java/com/astrizhachuk/pianoflow/data/repository/ChordAnalysisRepositoryImplTest.kt` — drops `@RunWith(RobolectricTestRunner::class)`, drops `Looper.getMainLooper()` plumbing, mocks `ChordAnalyzer` instead of `MusicScriptEngine` + `ChordAnalysisService`.
-
-### 6.4. Untouched
-
-- `MusicScriptEngine` is *not* removed if it is used by `PianoStaff` for VexFlow rendering. The implementation team verifies this during execution. The `PianoStaff`-bound provider (if any) is preserved; only the chord-analysis-bound provider is removed.
-- `app/src/main/assets/vexflow.html`, `app/src/main/assets/vexflow.js` — staff rendering, out of scope.
-- `ChordAnalysisRepository` interface, `AnalyzeChordUseCase`, `ObserveChordAnalysisResultsUseCase`.
-- `PianoStaffViewModel` and the entire Presentation layer.
-
-## 7. Acceptance Criteria
+## 6. Acceptance Criteria
 
 ### Functional
 
-- For inputs from existing repository tests, the value emitted to `chordAnalysisResult` is identical to the value emitted by the previous JS-based pipeline. Reference outputs:
+- Reference outputs of `chordAnalysisResult`:
   - `[C4, E4, G4]` → `"C"`
   - `[A4, C5, E5]` → `"Am"`
   - `[E4, G4, C5]` → `"Em#5/C"` (inversion of C major)
@@ -507,10 +465,8 @@ stop
 
 ### Architectural
 
-- `app/src/main/java/com/astrizhachuk/pianoflow/domain/` contains no references to `android.*` or `androidx.*` (verified by grep).
-- `ChordAnalysisRepositoryImpl` contains no references to `WebView`, `Handler`, `Looper`, `MusicScriptEngine`, `Gson`, or `tonal` (verified by grep).
-- `app/src/main/assets/` does not contain `tonal-analysis.html` or `tonal.min.js`.
-- Hilt graph builds without `WebView` or `Gson` providers (unless required elsewhere — out of scope).
+- `app/src/main/java/com/astrizhachuk/pianoflow/domain/` contains no references to `android.*` or `androidx.*`.
+- `ChordAnalysisRepositoryImpl` contains no references to `WebView`, `Handler`, or `Looper` (synchronous, no platform threading).
 
 ### Testing
 
@@ -528,7 +484,7 @@ stop
 
 ### Manual smoke test
 
-- Reviewer runs the app on a device with a connected MIDI keyboard, plays at least one major triad, one minor triad, one inversion, and one single note, and confirms the displayed chord name matches the corresponding row in the table above.
+- Run the app on a device with a connected MIDI keyboard, play at least one major triad, one minor triad, one inversion, and one single note; confirm the displayed chord name matches the corresponding row in the table above.
 
 ## Appendix A: Chord Type Database (106 entries)
 
