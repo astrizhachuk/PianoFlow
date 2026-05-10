@@ -484,7 +484,24 @@ stop
 
 ### Manual smoke test
 
-- Run the app on a device with a connected MIDI keyboard, play at least one major triad, one minor triad, one inversion, and one single note; confirm the displayed chord name matches the corresponding row in the table above.
+For routine testing, play these C-rooted chords on a connected MIDI keyboard and verify the displayed name:
+
+| Chord type | Notes (from C) | Expected display |
+|------------|----------------|------------------|
+| Major triad | C, E, G | `C` |
+| Minor triad | C, D#, G | `Cm` |
+| Diminished triad | C, D#, F# | `Cdim` |
+| Augmented triad | C, E, G# | `Caug` |
+| sus2 | C, D, G | `Csus2` |
+| sus4 | C, F, G | `Csus4` |
+| Dominant 7 | C, E, G, A# | `C7` |
+| Major 7 | C, E, G, B | `Cmaj7` |
+| Minor 7 | C, D#, G, A# | `Cm7` |
+| Half-diminished (m7b5) | C, D#, F#, A# | `Cm7b5` |
+
+For exhaustive coverage of all 106 chord types, see the **Notes from C** column in Appendix A.
+
+`MidiMessageParser` emits sharp note names (e.g., MIDI 63 → `D#4`), so play the `D#`/`Eb` key for any flat-third or flat-sixth interval — the same key produces the same MIDI number regardless of label. Single-note enharmonic simplification (3.3) is an internal feature of `ChordAnalyzer` and is not visible through the keyboard UI, since `MidiMessageParser` already emits canonical sharp names; verify this behavior via `ChordAnalyzerTest` instead.
 
 ## Appendix A: Chord Type Database (106 entries)
 
@@ -492,114 +509,116 @@ Source: `Tonal.ChordType.all()` v6, transcribed for the inline registry. Each ro
 
 The implementation is free to organize the table for readability (one constant list, grouped by quality, etc.) as long as all 106 entries are present and the indexed lookup returns every entry.
 
-| # | name | aliases | intervals | chroma | quality |
-|---|------|---------|-----------|--------|---------|
-| 1 | fifth | `5` | 1P 5P | `100000010000` | Unknown |
-| 2 | | `M7#5sus4` | 1P 4P 5A 7M | `100001001001` | Augmented |
-| 3 | | `7#5sus4` | 1P 4P 5A 7m | `100001001010` | Augmented |
-| 4 | suspended fourth | `sus4` `sus` | 1P 4P 5P | `100001010000` | Unknown |
-| 5 | | `M7sus4` | 1P 4P 5P 7M | `100001010001` | Unknown |
-| 6 | suspended fourth seventh | `7sus4` `7sus` | 1P 4P 5P 7m | `100001010010` | Unknown |
-| 7 | | `7no5` | 1P 3M 7m | `100010000010` | Major |
-| 8 | augmented | `aug` `+` `+5` `^#5` | 1P 3M 5A | `100010001000` | Augmented |
-| 9 | major seventh flat sixth | `M7b6` `^7b6` | 1P 3M 6m 7M | `100010001001` | Major |
-| 10 | augmented seventh | `maj7#5` `maj7+5` `+maj7` `^7#5` | 1P 3M 5A 7M | `100010001001` | Augmented |
-| 11 | | `7#5` `+7` `7+` `7aug` `aug7` | 1P 3M 5A 7m | `100010001010` | Augmented |
-| 12 | | `7b13` | 1P 3M 7m 13m | `100010001010` | Major |
-| 13 | major | `M` `^` `` `maj` | 1P 3M 5P | `100010010000` | Major |
-| 14 | major seventh | `maj7` `Δ` `ma7` `M7` `Maj7` `^7` | 1P 3M 5P 7M | `100010010001` | Major |
-| 15 | dominant seventh | `7` `dom` | 1P 3M 5P 7m | `100010010010` | Major |
-| 16 | sixth | `6` `add6` `add13` `M6` | 1P 3M 5P 6M | `100010010100` | Major |
-| 17 | | `7add6` `67` `7add13` | 1P 3M 5P 7m 13M | `100010010110` | Major |
-| 18 | | `7b6` | 1P 3M 5P 6m 7m | `100010011010` | Major |
-| 19 | | `Mb5` | 1P 3M 5d | `100010100000` | Major |
-| 20 | | `M7b5` | 1P 3M 5d 7M | `100010100001` | Major |
-| 21 | | `7b5` | 1P 3M 5d 7m | `100010100010` | Major |
-| 22 | major seventh sharp eleventh | `maj#4` `Δ#4` `Δ#11` `M7#11` `^7#11` `maj7#11` | 1P 3M 5P 7M 11A | `100010110001` | Major |
-| 23 | lydian dominant seventh | `7#11` `7#4` | 1P 3M 5P 7m 11A | `100010110010` | Major |
-| 24 | | `M6#11` `M6b5` `6#11` `6b5` | 1P 3M 5P 6M 11A | `100010110100` | Major |
-| 25 | | `7#11b13` `7b5b13` | 1P 3M 5P 7m 11A 13m | `100010111010` | Major |
-| 26 | minor augmented | `m#5` `-#5` `m+` | 1P 3m 5A | `100100001000` | Augmented |
-| 27 | | `mb6M7` | 1P 3m 6m 7M | `100100001001` | Minor |
-| 28 | | `m7#5` | 1P 3m 6m 7m | `100100001010` | Minor |
-| 29 | minor | `m` `min` `-` | 1P 3m 5P | `100100010000` | Minor |
-| 30 | minor/major seventh | `m/ma7` `m/maj7` `mM7` `mMaj7` `m/M7` `-Δ7` `mΔ` `-^7` `-maj7` | 1P 3m 5P 7M | `100100010001` | Minor |
-| 31 | minor seventh | `m7` `min7` `mi7` `-7` | 1P 3m 5P 7m | `100100010010` | Minor |
-| 32 | minor sixth | `m6` `-6` | 1P 3m 5P 6M | `100100010100` | Minor |
-| 33 | | `mMaj7b6` | 1P 3m 5P 6m 7M | `100100011001` | Minor |
-| 34 | diminished | `dim` `°` `o` | 1P 3m 5d | `100100100000` | Diminished |
-| 35 | | `oM7` | 1P 3m 5d 7M | `100100100001` | Diminished |
-| 36 | half-diminished | `m7b5` `ø` `-7b5` `h7` `h` | 1P 3m 5d 7m | `100100100010` | Diminished |
-| 37 | diminished seventh | `dim7` `°7` `o7` | 1P 3m 5d 7d | `100100100100` | Diminished |
-| 38 | | `o7M7` | 1P 3m 5d 6M 7M | `100100100101` | Diminished |
-| 39 | | `4` `quartal` | 1P 4P 7m 10m | `100101000010` | Unknown |
-| 40 | | `madd4` | 1P 3m 4P 5P | `100101010000` | Minor |
-| 41 | | `m7add11` `m7add4` | 1P 3m 5P 7m 11P | `100101010010` | Minor |
-| 42 | | `+add#9` | 1P 3M 5A 9A | `100110001000` | Augmented |
-| 43 | | `7#5#9` `7#9#5` `7alt` | 1P 3M 5A 7m 9A | `100110001010` | Augmented |
-| 44 | dominant sharp ninth | `7#9` | 1P 3M 5P 7m 9A | `100110010010` | Major |
-| 45 | | `13#9` | 1P 3M 5P 7m 9A 13M | `100110010110` | Major |
-| 46 | | `7#9b13` | 1P 3M 5P 7m 9A 13m | `100110011010` | Major |
-| 47 | | `maj7#9#11` | 1P 3M 5P 7M 9A 11A | `100110110001` | Major |
-| 48 | | `7#9#11` `7b5#9` `7#9b5` | 1P 3M 5P 7m 9A 11A | `100110110010` | Major |
-| 49 | | `13#9#11` | 1P 3M 5P 7m 9A 11A 13M | `100110110110` | Major |
-| 50 | | `7#9#11b13` | 1P 3M 5P 7m 9A 11A 13m | `100110111010` | Major |
-| 51 | suspended second | `sus2` | 1P 2M 5P | `101000010000` | Unknown |
-| 52 | | `M9#5sus4` | 1P 4P 5A 7M 9M | `101001001001` | Augmented |
-| 53 | | `sus24` `sus4add9` | 1P 2M 4P 5P | `101001010000` | Unknown |
-| 54 | | `M9sus4` | 1P 4P 5P 7M 9M | `101001010001` | Unknown |
-| 55 | eleventh | `11` | 1P 5P 7m 9M 11P | `101001010010` | Unknown |
-| 56 | | `9sus4` `9sus` | 1P 4P 5P 7m 9M | `101001010010` | Unknown |
-| 57 | | `13sus4` `13sus` | 1P 4P 5P 7m 9M 13M | `101001010110` | Unknown |
-| 58 | | `9no5` | 1P 3M 7m 9M | `101010000010` | Major |
-| 59 | | `13no5` | 1P 3M 7m 9M 13M | `101010000110` | Major |
-| 60 | | `M#5add9` `+add9` | 1P 3M 5A 9M | `101010001000` | Augmented |
-| 61 | | `maj9#5` `Maj9#5` | 1P 3M 5A 7M 9M | `101010001001` | Augmented |
-| 62 | | `9#5` `9+` | 1P 3M 5A 7m 9M | `101010001010` | Augmented |
-| 63 | | `9b13` | 1P 3M 7m 9M 13m | `101010001010` | Major |
-| 64 | | `Madd9` `2` `add9` `add2` | 1P 3M 5P 9M | `101010010000` | Major |
-| 65 | major ninth | `maj9` `Δ9` `^9` | 1P 3M 5P 7M 9M | `101010010001` | Major |
-| 66 | dominant ninth | `9` | 1P 3M 5P 7m 9M | `101010010010` | Major |
-| 67 | sixth added ninth | `6add9` `6/9` `69` `M69` | 1P 3M 5P 6M 9M | `101010010100` | Major |
-| 68 | major thirteenth | `maj13` `Maj13` `^13` | 1P 3M 5P 7M 9M 13M | `101010010101` | Major |
-| 69 | | `M7add13` | 1P 3M 5P 6M 7M 9M | `101010010101` | Major |
-| 70 | dominant thirteenth | `13` | 1P 3M 5P 7m 9M 13M | `101010010110` | Major |
-| 71 | | `M9b5` | 1P 3M 5d 7M 9M | `101010100001` | Major |
-| 72 | | `9b5` | 1P 3M 5d 7m 9M | `101010100010` | Major |
-| 73 | | `13b5` | 1P 3M 5d 6M 7m 9M | `101010100110` | Major |
-| 74 | | `9#5#11` | 1P 3M 5A 7m 9M 11A | `101010101010` | Augmented |
-| 75 | major sharp eleventh (lydian) | `maj9#11` `Δ9#11` `^9#11` | 1P 3M 5P 7M 9M 11A | `101010110001` | Major |
-| 76 | | `9#11` `9+4` `9#4` | 1P 3M 5P 7m 9M 11A | `101010110010` | Major |
-| 77 | | `69#11` | 1P 3M 5P 6M 9M 11A | `101010110100` | Major |
-| 78 | | `M13#11` `maj13#11` `M13+4` `M13#4` | 1P 3M 5P 7M 9M 11A 13M | `101010110101` | Major |
-| 79 | | `13#11` `13+4` `13#4` | 1P 3M 5P 7m 9M 11A 13M | `101010110110` | Major |
-| 80 | | `9#11b13` `9b5b13` | 1P 3M 5P 7m 9M 11A 13m | `101010111010` | Major |
-| 81 | | `m9#5` | 1P 3m 6m 7m 9M | `101100001010` | Minor |
-| 82 | | `madd9` | 1P 3m 5P 9M | `101100010000` | Minor |
-| 83 | minor/major ninth | `mM9` `mMaj9` `-^9` | 1P 3m 5P 7M 9M | `101100010001` | Minor |
-| 84 | minor ninth | `m9` `-9` | 1P 3m 5P 7m 9M | `101100010010` | Minor |
-| 85 | | `m69` `-69` | 1P 3m 5P 6M 9M | `101100010100` | Minor |
-| 86 | minor thirteenth | `m13` `-13` | 1P 3m 5P 7m 9M 13M | `101100010110` | Minor |
-| 87 | | `mMaj9b6` | 1P 3m 5P 6m 7M 9M | `101100011001` | Minor |
-| 88 | | `m9b5` | 1P 2M 3m 5d 7m | `101100100010` | Diminished |
-| 89 | | `m11A` | 1P 3m 5A 7m 9M 11P | `101101001010` | Augmented |
-| 90 | minor eleventh | `m11` `-11` | 1P 3m 5P 7m 9M 11P | `101101010010` | Minor |
-| 91 | suspended fourth flat ninth | `b9sus` `phryg` `7b9sus` `7b9sus4` | 1P 4P 5P 7m 9m | `110001010010` | Unknown |
-| 92 | | `11b9` | 1P 5P 7m 9m 11P | `110001010010` | Unknown |
-| 93 | | `7sus4b9b13` `7b9b13sus4` | 1P 4P 5P 7m 9m 13m | `110001011010` | Unknown |
-| 94 | altered | `alt7` | 1P 3M 7m 9m | `110010000010` | Major |
-| 95 | | `7#5b9` `7b9#5` | 1P 3M 5A 7m 9m | `110010001010` | Augmented |
-| 96 | | `Maddb9` | 1P 3M 5P 9m | `110010010000` | Major |
-| 97 | | `M7b9` | 1P 3M 5P 7M 9m | `110010010001` | Major |
-| 98 | dominant flat ninth | `7b9` | 1P 3M 5P 7m 9m | `110010010010` | Major |
-| 99 | | `13b9` | 1P 3M 5P 7m 9m 13M | `110010010110` | Major |
-| 100 | | `7b9b13` | 1P 3M 5P 7m 9m 13m | `110010011010` | Major |
-| 101 | | `7#5b9#11` | 1P 3M 5A 7m 9m 11A | `110010101010` | Augmented |
-| 102 | | `7b9#11` `7b5b9` `7b9b5` | 1P 3M 5P 7m 9m 11A | `110010110010` | Major |
-| 103 | | `13b9#11` | 1P 3M 5P 7m 9m 11A 13M | `110010110110` | Major |
-| 104 | | `7b9b13#11` `7b9#11b13` `7b5b9b13` | 1P 3M 5P 7m 9m 11A 13m | `110010111010` | Major |
-| 105 | | `mb6b9` | 1P 3m 6m 9m | `110100001000` | Minor |
-| 106 | | `7b9#9` | 1P 3M 5P 7m 9m 9A | `110110010010` | Major |
+The **Notes from C** column lists the concrete pitches of each chord rooted at C, using the sharp note names emitted by `MidiMessageParser` (so `D#` rather than `Eb`, `A#` rather than `Bb`, etc.). For interactive verification, play the listed keys; the displayed chord name is `C` + the first symbol from the `aliases` column, with a trailing capital `M` stripped (so the major-triad row displays `C` rather than `CM`). Collision rows return the first registered symbol — see the collision table below.
+
+| # | name | aliases | intervals | chroma | quality | Notes from C |
+|---|------|---------|-----------|--------|---------|--------------|
+| 1 | fifth | `5` | 1P 5P | `100000010000` | Unknown | C, G |
+| 2 | | `M7#5sus4` | 1P 4P 5A 7M | `100001001001` | Augmented | C, F, G#, B |
+| 3 | | `7#5sus4` | 1P 4P 5A 7m | `100001001010` | Augmented | C, F, G#, A# |
+| 4 | suspended fourth | `sus4` `sus` | 1P 4P 5P | `100001010000` | Unknown | C, F, G |
+| 5 | | `M7sus4` | 1P 4P 5P 7M | `100001010001` | Unknown | C, F, G, B |
+| 6 | suspended fourth seventh | `7sus4` `7sus` | 1P 4P 5P 7m | `100001010010` | Unknown | C, F, G, A# |
+| 7 | | `7no5` | 1P 3M 7m | `100010000010` | Major | C, E, A# |
+| 8 | augmented | `aug` `+` `+5` `^#5` | 1P 3M 5A | `100010001000` | Augmented | C, E, G# |
+| 9 | major seventh flat sixth | `M7b6` `^7b6` | 1P 3M 6m 7M | `100010001001` | Major | C, E, G#, B |
+| 10 | augmented seventh | `maj7#5` `maj7+5` `+maj7` `^7#5` | 1P 3M 5A 7M | `100010001001` | Augmented | C, E, G#, B |
+| 11 | | `7#5` `+7` `7+` `7aug` `aug7` | 1P 3M 5A 7m | `100010001010` | Augmented | C, E, G#, A# |
+| 12 | | `7b13` | 1P 3M 7m 13m | `100010001010` | Major | C, E, G#, A# |
+| 13 | major | `M` `^` `` `maj` | 1P 3M 5P | `100010010000` | Major | C, E, G |
+| 14 | major seventh | `maj7` `Δ` `ma7` `M7` `Maj7` `^7` | 1P 3M 5P 7M | `100010010001` | Major | C, E, G, B |
+| 15 | dominant seventh | `7` `dom` | 1P 3M 5P 7m | `100010010010` | Major | C, E, G, A# |
+| 16 | sixth | `6` `add6` `add13` `M6` | 1P 3M 5P 6M | `100010010100` | Major | C, E, G, A |
+| 17 | | `7add6` `67` `7add13` | 1P 3M 5P 7m 13M | `100010010110` | Major | C, E, G, A, A# |
+| 18 | | `7b6` | 1P 3M 5P 6m 7m | `100010011010` | Major | C, E, G, G#, A# |
+| 19 | | `Mb5` | 1P 3M 5d | `100010100000` | Major | C, E, F# |
+| 20 | | `M7b5` | 1P 3M 5d 7M | `100010100001` | Major | C, E, F#, B |
+| 21 | | `7b5` | 1P 3M 5d 7m | `100010100010` | Major | C, E, F#, A# |
+| 22 | major seventh sharp eleventh | `maj#4` `Δ#4` `Δ#11` `M7#11` `^7#11` `maj7#11` | 1P 3M 5P 7M 11A | `100010110001` | Major | C, E, F#, G, B |
+| 23 | lydian dominant seventh | `7#11` `7#4` | 1P 3M 5P 7m 11A | `100010110010` | Major | C, E, F#, G, A# |
+| 24 | | `M6#11` `M6b5` `6#11` `6b5` | 1P 3M 5P 6M 11A | `100010110100` | Major | C, E, F#, G, A |
+| 25 | | `7#11b13` `7b5b13` | 1P 3M 5P 7m 11A 13m | `100010111010` | Major | C, E, F#, G, G#, A# |
+| 26 | minor augmented | `m#5` `-#5` `m+` | 1P 3m 5A | `100100001000` | Augmented | C, D#, G# |
+| 27 | | `mb6M7` | 1P 3m 6m 7M | `100100001001` | Minor | C, D#, G#, B |
+| 28 | | `m7#5` | 1P 3m 6m 7m | `100100001010` | Minor | C, D#, G#, A# |
+| 29 | minor | `m` `min` `-` | 1P 3m 5P | `100100010000` | Minor | C, D#, G |
+| 30 | minor/major seventh | `m/ma7` `m/maj7` `mM7` `mMaj7` `m/M7` `-Δ7` `mΔ` `-^7` `-maj7` | 1P 3m 5P 7M | `100100010001` | Minor | C, D#, G, B |
+| 31 | minor seventh | `m7` `min7` `mi7` `-7` | 1P 3m 5P 7m | `100100010010` | Minor | C, D#, G, A# |
+| 32 | minor sixth | `m6` `-6` | 1P 3m 5P 6M | `100100010100` | Minor | C, D#, G, A |
+| 33 | | `mMaj7b6` | 1P 3m 5P 6m 7M | `100100011001` | Minor | C, D#, G, G#, B |
+| 34 | diminished | `dim` `°` `o` | 1P 3m 5d | `100100100000` | Diminished | C, D#, F# |
+| 35 | | `oM7` | 1P 3m 5d 7M | `100100100001` | Diminished | C, D#, F#, B |
+| 36 | half-diminished | `m7b5` `ø` `-7b5` `h7` `h` | 1P 3m 5d 7m | `100100100010` | Diminished | C, D#, F#, A# |
+| 37 | diminished seventh | `dim7` `°7` `o7` | 1P 3m 5d 7d | `100100100100` | Diminished | C, D#, F#, A |
+| 38 | | `o7M7` | 1P 3m 5d 6M 7M | `100100100101` | Diminished | C, D#, F#, A, B |
+| 39 | | `4` `quartal` | 1P 4P 7m 10m | `100101000010` | Unknown | C, D#, F, A# |
+| 40 | | `madd4` | 1P 3m 4P 5P | `100101010000` | Minor | C, D#, F, G |
+| 41 | | `m7add11` `m7add4` | 1P 3m 5P 7m 11P | `100101010010` | Minor | C, D#, F, G, A# |
+| 42 | | `+add#9` | 1P 3M 5A 9A | `100110001000` | Augmented | C, D#, E, G# |
+| 43 | | `7#5#9` `7#9#5` `7alt` | 1P 3M 5A 7m 9A | `100110001010` | Augmented | C, D#, E, G#, A# |
+| 44 | dominant sharp ninth | `7#9` | 1P 3M 5P 7m 9A | `100110010010` | Major | C, D#, E, G, A# |
+| 45 | | `13#9` | 1P 3M 5P 7m 9A 13M | `100110010110` | Major | C, D#, E, G, A, A# |
+| 46 | | `7#9b13` | 1P 3M 5P 7m 9A 13m | `100110011010` | Major | C, D#, E, G, G#, A# |
+| 47 | | `maj7#9#11` | 1P 3M 5P 7M 9A 11A | `100110110001` | Major | C, D#, E, F#, G, B |
+| 48 | | `7#9#11` `7b5#9` `7#9b5` | 1P 3M 5P 7m 9A 11A | `100110110010` | Major | C, D#, E, F#, G, A# |
+| 49 | | `13#9#11` | 1P 3M 5P 7m 9A 11A 13M | `100110110110` | Major | C, D#, E, F#, G, A, A# |
+| 50 | | `7#9#11b13` | 1P 3M 5P 7m 9A 11A 13m | `100110111010` | Major | C, D#, E, F#, G, G#, A# |
+| 51 | suspended second | `sus2` | 1P 2M 5P | `101000010000` | Unknown | C, D, G |
+| 52 | | `M9#5sus4` | 1P 4P 5A 7M 9M | `101001001001` | Augmented | C, D, F, G#, B |
+| 53 | | `sus24` `sus4add9` | 1P 2M 4P 5P | `101001010000` | Unknown | C, D, F, G |
+| 54 | | `M9sus4` | 1P 4P 5P 7M 9M | `101001010001` | Unknown | C, D, F, G, B |
+| 55 | eleventh | `11` | 1P 5P 7m 9M 11P | `101001010010` | Unknown | C, D, F, G, A# |
+| 56 | | `9sus4` `9sus` | 1P 4P 5P 7m 9M | `101001010010` | Unknown | C, D, F, G, A# |
+| 57 | | `13sus4` `13sus` | 1P 4P 5P 7m 9M 13M | `101001010110` | Unknown | C, D, F, G, A, A# |
+| 58 | | `9no5` | 1P 3M 7m 9M | `101010000010` | Major | C, D, E, A# |
+| 59 | | `13no5` | 1P 3M 7m 9M 13M | `101010000110` | Major | C, D, E, A, A# |
+| 60 | | `M#5add9` `+add9` | 1P 3M 5A 9M | `101010001000` | Augmented | C, D, E, G# |
+| 61 | | `maj9#5` `Maj9#5` | 1P 3M 5A 7M 9M | `101010001001` | Augmented | C, D, E, G#, B |
+| 62 | | `9#5` `9+` | 1P 3M 5A 7m 9M | `101010001010` | Augmented | C, D, E, G#, A# |
+| 63 | | `9b13` | 1P 3M 7m 9M 13m | `101010001010` | Major | C, D, E, G#, A# |
+| 64 | | `Madd9` `2` `add9` `add2` | 1P 3M 5P 9M | `101010010000` | Major | C, D, E, G |
+| 65 | major ninth | `maj9` `Δ9` `^9` | 1P 3M 5P 7M 9M | `101010010001` | Major | C, D, E, G, B |
+| 66 | dominant ninth | `9` | 1P 3M 5P 7m 9M | `101010010010` | Major | C, D, E, G, A# |
+| 67 | sixth added ninth | `6add9` `6/9` `69` `M69` | 1P 3M 5P 6M 9M | `101010010100` | Major | C, D, E, G, A |
+| 68 | major thirteenth | `maj13` `Maj13` `^13` | 1P 3M 5P 7M 9M 13M | `101010010101` | Major | C, D, E, G, A, B |
+| 69 | | `M7add13` | 1P 3M 5P 6M 7M 9M | `101010010101` | Major | C, D, E, G, A, B |
+| 70 | dominant thirteenth | `13` | 1P 3M 5P 7m 9M 13M | `101010010110` | Major | C, D, E, G, A, A# |
+| 71 | | `M9b5` | 1P 3M 5d 7M 9M | `101010100001` | Major | C, D, E, F#, B |
+| 72 | | `9b5` | 1P 3M 5d 7m 9M | `101010100010` | Major | C, D, E, F#, A# |
+| 73 | | `13b5` | 1P 3M 5d 6M 7m 9M | `101010100110` | Major | C, D, E, F#, A, A# |
+| 74 | | `9#5#11` | 1P 3M 5A 7m 9M 11A | `101010101010` | Augmented | C, D, E, F#, G#, A# |
+| 75 | major sharp eleventh (lydian) | `maj9#11` `Δ9#11` `^9#11` | 1P 3M 5P 7M 9M 11A | `101010110001` | Major | C, D, E, F#, G, B |
+| 76 | | `9#11` `9+4` `9#4` | 1P 3M 5P 7m 9M 11A | `101010110010` | Major | C, D, E, F#, G, A# |
+| 77 | | `69#11` | 1P 3M 5P 6M 9M 11A | `101010110100` | Major | C, D, E, F#, G, A |
+| 78 | | `M13#11` `maj13#11` `M13+4` `M13#4` | 1P 3M 5P 7M 9M 11A 13M | `101010110101` | Major | C, D, E, F#, G, A, B |
+| 79 | | `13#11` `13+4` `13#4` | 1P 3M 5P 7m 9M 11A 13M | `101010110110` | Major | C, D, E, F#, G, A, A# |
+| 80 | | `9#11b13` `9b5b13` | 1P 3M 5P 7m 9M 11A 13m | `101010111010` | Major | C, D, E, F#, G, G#, A# |
+| 81 | | `m9#5` | 1P 3m 6m 7m 9M | `101100001010` | Minor | C, D, D#, G#, A# |
+| 82 | | `madd9` | 1P 3m 5P 9M | `101100010000` | Minor | C, D, D#, G |
+| 83 | minor/major ninth | `mM9` `mMaj9` `-^9` | 1P 3m 5P 7M 9M | `101100010001` | Minor | C, D, D#, G, B |
+| 84 | minor ninth | `m9` `-9` | 1P 3m 5P 7m 9M | `101100010010` | Minor | C, D, D#, G, A# |
+| 85 | | `m69` `-69` | 1P 3m 5P 6M 9M | `101100010100` | Minor | C, D, D#, G, A |
+| 86 | minor thirteenth | `m13` `-13` | 1P 3m 5P 7m 9M 13M | `101100010110` | Minor | C, D, D#, G, A, A# |
+| 87 | | `mMaj9b6` | 1P 3m 5P 6m 7M 9M | `101100011001` | Minor | C, D, D#, G, G#, B |
+| 88 | | `m9b5` | 1P 2M 3m 5d 7m | `101100100010` | Diminished | C, D, D#, F#, A# |
+| 89 | | `m11A` | 1P 3m 5A 7m 9M 11P | `101101001010` | Augmented | C, D, D#, F, G#, A# |
+| 90 | minor eleventh | `m11` `-11` | 1P 3m 5P 7m 9M 11P | `101101010010` | Minor | C, D, D#, F, G, A# |
+| 91 | suspended fourth flat ninth | `b9sus` `phryg` `7b9sus` `7b9sus4` | 1P 4P 5P 7m 9m | `110001010010` | Unknown | C, C#, F, G, A# |
+| 92 | | `11b9` | 1P 5P 7m 9m 11P | `110001010010` | Unknown | C, C#, F, G, A# |
+| 93 | | `7sus4b9b13` `7b9b13sus4` | 1P 4P 5P 7m 9m 13m | `110001011010` | Unknown | C, C#, F, G, G#, A# |
+| 94 | altered | `alt7` | 1P 3M 7m 9m | `110010000010` | Major | C, C#, E, A# |
+| 95 | | `7#5b9` `7b9#5` | 1P 3M 5A 7m 9m | `110010001010` | Augmented | C, C#, E, G#, A# |
+| 96 | | `Maddb9` | 1P 3M 5P 9m | `110010010000` | Major | C, C#, E, G |
+| 97 | | `M7b9` | 1P 3M 5P 7M 9m | `110010010001` | Major | C, C#, E, G, B |
+| 98 | dominant flat ninth | `7b9` | 1P 3M 5P 7m 9m | `110010010010` | Major | C, C#, E, G, A# |
+| 99 | | `13b9` | 1P 3M 5P 7m 9m 13M | `110010010110` | Major | C, C#, E, G, A, A# |
+| 100 | | `7b9b13` | 1P 3M 5P 7m 9m 13m | `110010011010` | Major | C, C#, E, G, G#, A# |
+| 101 | | `7#5b9#11` | 1P 3M 5A 7m 9m 11A | `110010101010` | Augmented | C, C#, E, F#, G#, A# |
+| 102 | | `7b9#11` `7b5b9` `7b9b5` | 1P 3M 5P 7m 9m 11A | `110010110010` | Major | C, C#, E, F#, G, A# |
+| 103 | | `13b9#11` | 1P 3M 5P 7m 9m 11A 13M | `110010110110` | Major | C, C#, E, F#, G, A, A# |
+| 104 | | `7b9b13#11` `7b9#11b13` `7b5b9b13` | 1P 3M 5P 7m 9m 11A 13m | `110010111010` | Major | C, C#, E, F#, G, G#, A# |
+| 105 | | `mb6b9` | 1P 3m 6m 9m | `110100001000` | Minor | C, C#, D#, G# |
+| 106 | | `7b9#9` | 1P 3M 5P 7m 9m 9A | `110110010010` | Major | C, C#, D#, E, G, A# |
 
 Note: `chroma` collisions are intentional. The following bitmasks are shared by multiple chord types; the registry stores all of them, and the lookup returns all matching entries:
 
