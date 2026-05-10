@@ -618,6 +618,5 @@ deactivate Screen
 
 ## См. также
 
-- [Архитектурные принципы](../plans/ARCHITECTURE_PRINCIPLES.md)
 - [Документ о Kotlin Flow](../tech/KOTLIN_FLOW.md)
 - [Документ о MIDI API в Android](../tech/MIDI.md)

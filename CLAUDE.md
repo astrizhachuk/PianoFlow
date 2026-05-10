@@ -111,3 +111,8 @@ Subdirectories mirror each other: `plans/`, `specs/`, `tech/`, `uc/`.
 - After any change to an English document, update the corresponding Russian document in `docs/ru/` to keep them in sync.
 - When adding a new document, create both language versions simultaneously.
 - If only the Russian document exists for some topic, treat it as a draft — create the English version before merging.
+
+**Spec section convention:**
+- `### 1.2. Base Documents` (in §1 General Information) — **prerequisites**: parent specs, use cases, architectural principles the reader needs to know before reading this spec.
+- `## See Also` (trailing, optional) — **additional technical references** not strictly required: tech docs (Kotlin Flow, MIDI API, etc.). Omit the section entirely if there are no entries beyond what is already listed in Base Documents — never duplicate.
+- Specs describe the **current state** of the system, not the history of changes. Migration narratives (file removals, "rewritten internals", "previously used X, now uses Y") belong in commit messages and PR descriptions, not in `specs/`.

@@ -642,9 +642,3 @@ The `intervals` column above uses the following codes (for reference; not consum
 | `11A` | Augmented eleventh / sharp eleventh | 18 (= 6 mod 12) |
 
 Intervals wider than an octave (9th, 11th, 13th) collapse onto the same chroma positions as their within-octave equivalents because the chroma bitmask is modulo 12.
-
-## See Also
-
-- [Architectural Principles](../plans/ARCHITECTURE_PRINCIPLES.md)
-- [Technical Specification: MIDI Message Processing](./MIDI_MESSAGE_PROCESSING.md)
-- [Testing Strategy](../plans/TESTING_STRATEGY.md)
