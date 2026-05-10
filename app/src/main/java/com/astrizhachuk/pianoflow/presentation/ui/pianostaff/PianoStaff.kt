@@ -83,8 +83,8 @@ fun PianoStaff(
         }
     }
 
-    val executor = remember {
-        MusicScriptEngine(
+    val scriptExecutor = remember {
+        WebViewScriptExecutor(
             webView = webView,
             pageUrl = "file:///android_asset/vexflow.html"
         )
@@ -100,6 +100,6 @@ fun PianoStaff(
         if (viewSize == IntSize.Zero) return@LaunchedEffect
 
         val drawScript = "drawGrandStaff(JSON.parse('$notesJson').treble, JSON.parse('$notesJson').bass, $isPortrait, $isDarkScheme, $needsScale);"
-        executor.execute(drawScript) { /* No result needed */ }
+        scriptExecutor.execute(drawScript) { /* No result needed */ }
     }
 }

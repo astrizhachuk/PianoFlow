@@ -45,7 +45,7 @@ The MIDI message processing system is integrated into the existing architecture,
 - **`PianoStaffScreen`:** Composable screen that displays played notes on the musical staff and the chord name.
 - **`PianoStaff`:** Composable that hosts a `WebView` and renders the musical staff via the VexFlow JS library.
 - **`VexflowNoteMapper`:** Converts a `List<Note>` into the JSON format expected by VexFlow.
-- **`MusicScriptEngine`:** Engine that executes JavaScript inside a hidden `WebView`. Manages page-load timing and pending-script queueing so `PianoStaff` can use a synchronous-style API for VexFlow calls.
+- **`WebViewScriptExecutor`:** Generic executor that runs JavaScript inside a hidden `WebView`. Manages page-load timing and pending-script queueing. Used by `PianoStaff` for VexFlow rendering, but contains no music-specific logic.
 
 #### 2.1.1. C4 Level 2: Containers
 
@@ -70,7 +70,7 @@ System_Boundary(piano_flow, "PianoFlow Application") {
     Container(midi_repo_impl, "MidiRepositoryImpl", "Kotlin", "Implementation of MIDI repository")
     Container(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Kotlin", "Implementation of chord analysis")
     Container(chord_analyzer, "ChordAnalyzer", "Pure Kotlin", "Native chord detection engine")
-    Container(script_engine, "MusicScriptEngine", "Kotlin + WebView", "JavaScript execution engine for staff rendering")
+    Container(script_executor, "WebViewScriptExecutor", "Kotlin + WebView", "Generic JS executor; used by PianoStaff for VexFlow rendering")
 }
 
 Rel(user, midi_device, "Plays notes")
@@ -91,8 +91,8 @@ Rel(midi_repo_impl, midi_repo, "@Binds")
 Rel(chord_repo_impl, chord_repo, "@Binds")
 
 Rel(vm, ui, "Updates UiState")
-Rel(ui, script_engine, "PianoStaff calls execute(drawScript)")
-Rel(script_engine, vexflow, "Loads vexflow.html, calls drawGrandStaff()")
+Rel(ui, script_executor, "PianoStaff calls execute(drawScript)")
+Rel(script_executor, vexflow, "Loads vexflow.html, calls drawGrandStaff()")
 
 @enduml
 ```
@@ -206,17 +206,17 @@ Container_Boundary(presentation, "Presentation Layer") {
     Component(screen, "PianoStaffScreen", "Composable", "Hosts PianoStaff and chord name")
     Component(staff, "PianoStaff", "Composable", "Wraps WebView, drives redraw on state change")
     Component(mapper, "VexflowNoteMapper", "Mapper", "Converts List<Note> to VexFlow JSON")
-    Component(engine, "MusicScriptEngine", "Infrastructure", "Manages WebView lifecycle and JS queue")
+    Component(executor, "WebViewScriptExecutor", "Infrastructure", "Manages WebView lifecycle and JS queue")
 }
 
 ' Presentation flow
 Rel(vm, mapper, "Builds notesJson")
 Rel(vm, screen, "uiState (notesJson, chordName)")
 Rel(screen, staff, "Passes notes and rendering parameters")
-Rel(staff, engine, "execute(drawScript)")
+Rel(staff, executor, "execute(drawScript)")
 
 ' Infrastructure
-Rel(engine, android_sdk, "evaluateJavascript()")
+Rel(executor, android_sdk, "evaluateJavascript()")
 Rel(android_sdk, vexflow, "Loads vexflow.html, calls drawGrandStaff()")
 
 @enduml
@@ -290,11 +290,11 @@ data class PianoStaffUiState(
     val chordName: String? = null
 )
 
-// com.astrizhachuk.pianoflow.presentation.ui.pianostaff.MusicScriptEngine.kt
+// com.astrizhachuk.pianoflow.presentation.ui.pianostaff.WebViewScriptExecutor.kt
 /**
  * Executes JavaScript inside a hidden WebView; used by PianoStaff for VexFlow rendering.
  */
-class MusicScriptEngine(webView: WebView, pageUrl: String) {
+class WebViewScriptExecutor(webView: WebView, pageUrl: String) {
     fun execute(script: String, onResult: (String?) -> Unit)
 }
 ```
@@ -492,16 +492,16 @@ The musical staff is drawn using a `WebView` and the [VexFlow](https://www.vexfl
 **Key Components:**
 
 - **`PianoStaff` Composable:** Wraps an `AndroidView` where a `WebView` is created and configured. This component manages the `WebView` lifecycle and redraws.
-- **`MusicScriptEngine`:** Used inside the component to manage JS execution and HTML resource loading.
+- **`WebViewScriptExecutor`:** Used inside the component to manage JS execution and HTML resource loading.
 - **`VexflowNoteMapper.kt`**: Contains logic for converting `List<Note>` into the final JSON object.
 - **`vexflow.html`:** HTML file in `assets` containing logic for calling `VexFlow` functions (version [4.2.2](https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js), also located in `assets`).
 
 **Workflow:**
 
-1. **Initialization**: `PianoStaff` creates a `WebView` instance and initializes `MusicScriptEngine`, which loads `vexflow.html`.
+1. **Initialization**: `PianoStaff` creates a `WebView` instance and initializes `WebViewScriptExecutor`, which loads `vexflow.html`.
 2. **Size Tracking**: The `onSizeChanged` modifier updates the `viewSize` state. This is necessary for VexFlow to know the available drawing area.
 3. **Drawing Trigger**: `LaunchedEffect` monitors changes to `notesJson`, `isPortrait` (orientation parameter), and `viewSize`.
-4. **Drawing Execution**: When `viewSize` becomes non-zero, a JavaScript call to `drawGrandStaff` is formed. The call is passed to `MusicScriptEngine`, which executes it in the `WebView` context.
+4. **Drawing Execution**: When `viewSize` becomes non-zero, a JavaScript call to `drawGrandStaff` is formed. The call is passed to `WebViewScriptExecutor`, which executes it in the `WebView` context.
 5. **JSON Format**: Data is passed as a single JSON object containing separate arrays for treble and bass clefs.
    ```json
    {
@@ -520,10 +520,10 @@ title PianoStaff State Diagram
 
 state Initializing
 Initializing : Creating WebView
-Initializing : Creating MusicScriptEngine
+Initializing : Creating WebViewScriptExecutor
 Initializing : viewSize = IntSize.Zero
 
-Initializing --> WaitingForMeasurement : MusicScriptEngine loads vexflow.html
+Initializing --> WaitingForMeasurement : WebViewScriptExecutor loads vexflow.html
 
 state WaitingForMeasurement
 WaitingForMeasurement : Waiting for measurement (onSizeChanged)
@@ -557,7 +557,7 @@ box "Presentation Layer (Kotlin/Compose)" #LightBlue
 end box
 
 box "Infrastructure" #LightGreen
-    participant "MusicScriptEngine" as Engine
+    participant "WebViewScriptExecutor" as Executor
     participant "WebView" as WebView
 end box
 
@@ -571,8 +571,8 @@ Screen -> StaffComposable : Initial composition
 activate StaffComposable
 
 StaffComposable -> WebView : create()
-StaffComposable -> Engine : create(webView, "vexflow.html")
-Engine -> WebView : loadUrl(...)
+StaffComposable -> Executor : create(webView, "vexflow.html")
+Executor -> WebView : loadUrl(...)
 
 deactivate StaffComposable
 
@@ -585,11 +585,11 @@ Screen -> StaffComposable : Recomposition (new parameters)
 activate StaffComposable
 
 StaffComposable -> StaffComposable : LaunchedEffect triggers
-StaffComposable -> Engine : execute("drawGrandStaff(...)")
+StaffComposable -> Executor : execute("drawGrandStaff(...)")
 
-note right of Engine: Engine ensures execution\nafter page load
+note right of Executor: Executor ensures execution\nafter page load
 
-Engine -> WebView : evaluateJavascript(...)
+Executor -> WebView : evaluateJavascript(...)
 WebView -> DrawJsFunc : Call drawing
 
 deactivate StaffComposable
