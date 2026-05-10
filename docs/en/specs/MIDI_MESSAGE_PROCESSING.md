@@ -299,7 +299,7 @@ class WebViewScriptExecutor(webView: WebView, pageUrl: String) {
 }
 ```
 
-### 2.3. Dependencies
+### 2.3. Dependency Graph
 
 The system uses Hilt for dependency management.
 

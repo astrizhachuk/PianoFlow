@@ -66,7 +66,7 @@ interface UserNotifier {
 }
 ```
 
-### 2.3. Внедрение зависимостей
+### 2.3. Граф зависимостей
 
 Чтобы Hilt знал, что при запросе интерфейса `UserNotifier` нужно предоставлять экземпляр класса `UserNotifierImpl`, используется `NotificationModule`.
 

@@ -299,7 +299,7 @@ class WebViewScriptExecutor(webView: WebView, pageUrl: String) {
 }
 ```
 
-### 2.3. Зависимости
+### 2.3. Граф зависимостей
 
 Система использует Hilt для управления зависимостями.
 
