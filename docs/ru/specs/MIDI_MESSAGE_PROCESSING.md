@@ -40,9 +40,12 @@
 **Presentation Layer**
 - **`PianoStaffViewModel`:** Управляет состоянием UI. Объединяет (`combine`) поток нот и результаты анализа. При изменении состава нот инициирует новый анализ.
 - **`PianoStaffUiState`:** Состояние UI:
-  - `notesJson: String` - JSON-представление нот для визуализации через VexFlow.
-  - `chordName: String?` - название распознанного аккорда или локализованная строка "Не определен".
+  - `notesJson: String` — JSON-представление нот для визуализации через VexFlow.
+  - `chordName: String?` — название распознанного аккорда или локализованная строка "Не определен".
 - **`PianoStaffScreen`:** Composable-экран, который отображает сыгранные ноты на нотном стане и название аккорда.
+- **`PianoStaff`:** Composable, который инкапсулирует `WebView` и отрисовывает нотный стан через JS-библиотеку VexFlow.
+- **`VexflowNoteMapper`:** Преобразует `List<Note>` в JSON-формат, ожидаемый VexFlow.
+- **`MusicScriptEngine`:** Движок выполнения JavaScript внутри скрытого `WebView`. Управляет жизненным циклом WebView и очередью отложенных скриптов, чтобы `PianoStaff` мог использовать синхронный API для вызовов VexFlow.
 
 #### 2.1.1. C4 Level 2: Контейнеры
 
@@ -50,10 +53,11 @@
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-title C4 - Level 2: Контейнеры подсистемы MIDI
+title C4 - Level 2: Контейнеры приложения PianoFlow
 
 Person(user, "Пользователь", "Музыкант, играющий на клавиатуре")
 System_Ext(midi_device, "MIDI Keyboard", "Внешнее физическое устройство")
+System_Ext(vexflow, "VexFlow", "JavaScript-библиотека нотации (vexflow.html)")
 
 System_Boundary(piano_flow, "Приложение PianoFlow") {
     Container(ui, "UI (Compose)", "Kotlin, Jetpack Compose", "Отображает нотный стан и названия аккордов")
@@ -66,6 +70,7 @@ System_Boundary(piano_flow, "Приложение PianoFlow") {
     Container(midi_repo_impl, "MidiRepositoryImpl", "Kotlin", "Реализация MIDI-репозитория")
     Container(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Kotlin", "Реализация анализа аккордов")
     Container(chord_analyzer, "ChordAnalyzer", "Pure Kotlin", "Нативный движок распознавания аккордов")
+    Container(script_engine, "MusicScriptEngine", "Kotlin + WebView", "Движок выполнения JavaScript для отрисовки нотного стана")
 }
 
 Rel(user, midi_device, "Играет ноты")
@@ -86,6 +91,8 @@ Rel(midi_repo_impl, midi_repo, "@Binds")
 Rel(chord_repo_impl, chord_repo, "@Binds")
 
 Rel(vm, ui, "Обновляет UiState")
+Rel(ui, script_engine, "PianoStaff вызывает execute(drawScript)")
+Rel(script_engine, vexflow, "Загружает vexflow.html, вызывает drawGrandStaff()")
 
 @enduml
 ```
@@ -183,6 +190,38 @@ Rel(chord_repo_impl, chord_analyzer, "Использует")
 
 > Внутренняя структура `ChordAnalyzer` (парсер, реестр типов аккордов, модели `Pitch` и `ChordType`) описана в [Нативный анализ аккордов на Kotlin](./CHORD_ANALYSIS.md).
 
+#### 2.1.4. C4 Level 3c: Конвейер отрисовки нот
+
+```plantuml
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title C4 - Level 3c: Конвейер отрисовки нот
+
+System_Ext(android_sdk, "Android SDK", "WebView, WebViewClient")
+System_Ext(vexflow, "VexFlow", "JavaScript-библиотека (vexflow.html)")
+
+Container_Boundary(presentation, "Presentation Layer") {
+    Component(vm, "PianoStaffViewModel", "ViewModel", "Отдает notesJson через UiState")
+    Component(screen, "PianoStaffScreen", "Composable", "Размещает PianoStaff и название аккорда")
+    Component(staff, "PianoStaff", "Composable", "Инкапсулирует WebView, инициирует перерисовку")
+    Component(mapper, "VexflowNoteMapper", "Mapper", "Преобразует List<Note> в VexFlow JSON")
+    Component(engine, "MusicScriptEngine", "Infrastructure", "Управляет жизненным циклом WebView и очередью JS")
+}
+
+' Поток в Presentation
+Rel(vm, mapper, "Формирует notesJson")
+Rel(vm, screen, "uiState (notesJson, chordName)")
+Rel(screen, staff, "Передает ноты и параметры отрисовки")
+Rel(staff, engine, "execute(drawScript)")
+
+' Инфраструктура
+Rel(engine, android_sdk, "evaluateJavascript()")
+Rel(android_sdk, vexflow, "Загружает vexflow.html, вызывает drawGrandStaff()")
+
+@enduml
+```
+
 ### 2.2. API и Модели данных
 
 В этом разделе представлены программные интерфейсы и модели данных, распределенные по слоям архитектуры.
@@ -237,14 +276,6 @@ class ChordAnalyzer {
 class MidiMessageParser {
     fun parse(data: ByteArray): Note?
 }
-
-// com.astrizhachuk.pianoflow.data.datasource.analysis.MusicScriptEngine.kt
-/**
- * Движок для выполнения JavaScript кода.
- */
-class MusicScriptEngine {
-    fun execute(script: String, callback: (String?) -> Unit)
-}
 ```
 
 **Presentation Layer:**
@@ -258,6 +289,14 @@ data class PianoStaffUiState(
     val notesJson: String = "{\"treble\":[], \"bass\":[]}",
     val chordName: String? = null
 )
+
+// com.astrizhachuk.pianoflow.presentation.ui.pianostaff.MusicScriptEngine.kt
+/**
+ * Выполняет JavaScript внутри скрытого WebView; используется PianoStaff для отрисовки через VexFlow.
+ */
+class MusicScriptEngine(webView: WebView, pageUrl: String) {
+    fun execute(script: String, onResult: (String?) -> Unit)
+}
 ```
 
 ### 2.3. Зависимости

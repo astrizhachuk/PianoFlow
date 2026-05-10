@@ -22,31 +22,6 @@ Custom `HiltTestRunner` is used for instrumented tests (`testInstrumentationRunn
 
 **Clean Architecture** with three strictly separated layers. The dependency rule: `Presentation → Domain ← Data`. The Domain layer has **zero** platform dependencies.
 
-```
-presentation/   ← MVVM (ViewModels, Compose UI, state models)
-domain/         ← Use cases, repository interfaces, domain models, services (pure Kotlin)
-data/           ← Repository implementations, data sources, mappers
-```
-
-Package naming: `{layer}.{component_type}.{functionality}`, e.g. `domain.usecase.midi`.
-
-### Key Data Flow
-
-1. Android MIDI API → `MidiDataSource` → `MidiMessageParser` → raw MIDI bytes
-2. `ObserveMidiMessagesUseCase` groups notes within a 260ms time window into chords
-3. `AnalyzeChordUseCase` → `ChordAnalysisRepositoryImpl` → `MusicScriptEngine` (JavaScript via WebView + VexFlow)
-4. Results flow via Kotlin `StateFlow`/`Flow` into `PianoStaffViewModel` → Compose UI
-
-### Chord Analysis via WebView
-
-`MusicScriptEngine` runs JavaScript music theory logic inside a `WebView`. The script file is `assets/vexflow.html`. Results are returned asynchronously via `JavascriptInterface`.
-
-### Dependency Injection
-
-Hilt is used throughout. Key DI modules:
-- `data/di/DataModule.kt` — binds repository interfaces to implementations
-- `presentation/di/NotificationModule.kt` — binds `UserNotifier`
-
 ## Code Standards
 
 Follow [Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html) and [Kotlin idioms](https://kotlinlang.org/docs/idioms.html). Any deviation must be explicitly noted.

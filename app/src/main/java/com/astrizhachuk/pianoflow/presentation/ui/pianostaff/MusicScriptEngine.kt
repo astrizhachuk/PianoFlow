@@ -1,4 +1,4 @@
-package com.astrizhachuk.pianoflow.data.datasource.analysis
+package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -6,18 +6,17 @@ import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
- * Executes JavaScript for music analysis tasks using a hidden [WebView].
+ * Executes JavaScript inside a hidden [WebView] to render musical notation via VexFlow.
  *
  * This engine provides a simplified interface for running JavaScript code by abstracting away the
  * asynchronous nature of [WebView]. It maintains a queue for scripts, executing them only after
  * the designated web page has fully loaded. This allows callers to use a synchronous-style API
  * without managing the complexities of page load events.
  *
- * By encapsulating the [WebView] within this data-layer class, the application benefits from:
- * - Decoupling of the presentation layer from the Android-specific `WebView` implementation.
- * - Enabling data-layer components (e.g., repositories) to execute JavaScript without
- *   depending on UI lifecycle or callbacks.
- * - A clear separation of concerns, isolating JavaScript-based business logic from the UI.
+ * By encapsulating the [WebView] lifecycle within this engine, the [PianoStaff] composable
+ * benefits from:
+ * - Decoupling of the Composable from page-load timing and pending-script bookkeeping.
+ * - A clear separation of concerns, isolating WebView setup from UI logic.
  *
  * @param webView The [WebView] instance to be used for script execution. This class takes
  *   ownership of configuring its [WebViewClient].

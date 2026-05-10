@@ -1,4 +1,4 @@
-package com.astrizhachuk.pianoflow.data.datasource.analysis
+package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 
 import android.os.Build
 import android.webkit.ValueCallback
