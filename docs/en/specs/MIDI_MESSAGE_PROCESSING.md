@@ -4,16 +4,45 @@
 
 ### 1.1. Purpose of the Enhancement
 
-Implement functionality for receiving, processing, and visualizing MIDI messages (notes) coming from a connected MIDI keyboard. The main task is to display the notes and chords played by the user on a musical staff in real time, including automatic chord name recognition.
+Implement functionality for receiving, processing, analyzing, and visualizing MIDI messages (notes) coming from a connected MIDI keyboard. Key tasks:
+- Display notes and chords played by the user on a musical staff in real time.
+- Analyze recognized chords and display their names (e.g., "C Major", "Am", "G7").
+- Correctly handle single notes (do not display them as unrecognized chords).
 
 ### 1.2. Base Documents
 
 - [Architectural Principles](../plans/ARCHITECTURE_PRINCIPLES.md)
+- [Use Cases: Receiving and Displaying MIDI Messages](../uc/MIDI_MESSAGE_PROCESSING.md)
 - [Technical Specification: Implementation of MIDI Keyboard Connection State Tracking](./MIDI_CONNECTION.md)
 
 ## 2. Architectural Solution
 
-### 2.1. Components
+### 2.1. Architecture Diagrams
+
+The MIDI message processing system is integrated into the existing architecture, extending the `Data` and `Domain` layers and adding new components to the `Presentation` layer. Chord analysis is performed by the built-in `ChordAnalyzer` engine in pure Kotlin (see [Native Kotlin Chord Analysis](./CHORD_ANALYSIS.md)).
+
+**Data Layer**
+- **`MidiDataSource`:** Extended to handle incoming MIDI messages. After successfully opening a device (`MidiManager.openDevice`), it connects a `MidiReceiver` to the device's **output port** (`MidiOutputPort`) to receive data.
+- **`MidiMessageReceiver`:** Internal implementation of `android.media.midi.MidiReceiver`, responsible for receiving raw MIDI data (`byte[]`).
+- **`MidiMessageParser`:** Component that receives raw data from `MidiMessageReceiver`, parses it, and converts it into the `Note` domain model. Ignores all messages except `Note On` (with velocity > 0).
+- **`MidiRepositoryImpl`:** Repository implementation that provides a stream of incoming notes.
+- **`ChordAnalysisRepositoryImpl`:** Chord analysis repository implementation. Delegates recognition to the `ChordAnalyzer` engine synchronously and updates `StateFlow<String?>` directly without thread hops.
+
+**Domain Layer**
+- **`Note`:** Domain model of a note (MIDI number and musical name, e.g. "C4").
+- **`MidiRepository`:** Interface for obtaining the note stream.
+- **`ObserveMidiMessagesUseCase`:** Groups individual notes into chords (lists) via `channelFlow` with a 50 ms delay.
+- **`ChordAnalysisRepository`:** Interface with `analyzeChord()` and `chordAnalysisResult` members.
+- **`AnalyzeChordUseCase`:** Use case for triggering asynchronous chord analysis (fire-and-forget).
+- **`ObserveChordAnalysisResultsUseCase`:** Use case for subscribing to analysis results.
+- **`ChordAnalyzer`:** Domain service for native chord detection and single-note simplification. Pure Kotlin, synchronous, main-safe. Internal structure and algorithm are described in the [Chord Analysis specification](./CHORD_ANALYSIS.md).
+
+**Presentation Layer**
+- **`PianoStaffViewModel`:** Manages UI state. Combines (`combine`) the note stream and analysis results. Initiates a new analysis when the note set changes.
+- **`PianoStaffUiState`:** UI state:
+  - `notesJson: String` — JSON representation of notes for visualization via VexFlow.
+  - `chordName: String?` — name of the recognized chord, or the localized string "Not defined".
+- **`PianoStaffScreen`:** Composable screen that displays played notes on the musical staff and the chord name.
 
 #### 2.1.1. C4 Level 2: Containers
 
@@ -231,7 +260,7 @@ data class PianoStaffUiState(
 )
 ```
 
-### 2.3. Extension of Dependencies
+### 2.3. Dependencies
 
 The system uses Hilt for dependency management.
 
@@ -274,9 +303,9 @@ end note
 
 ### 3.1. Principle of Operation
 
-1.  **Connecting the Receiver**:
-    *   After `MidiDataSource` successfully opens a connection to a MIDI device, it finds the first available **output port** (`MidiOutputPort`) of the device.
-    *   `MidiDataSource` calls `outputPort.connect(midiMessageReceiver)` to start receiving MIDI data.
+1. **Connecting the Receiver**:
+   * After `MidiDataSource` successfully opens a connection to a MIDI device, it finds the first available **output port** (`MidiOutputPort`) of the device.
+   * `MidiDataSource` calls `outputPort.connect(midiMessageReceiver)` to start receiving MIDI data.
 
 ```plantuml
 @startuml
@@ -307,11 +336,11 @@ deactivate DS
 @enduml
 ```
 
-2.  **Receiving and Parsing Messages**:
-    *   When the user presses a key, the MIDI keyboard sends a message. `MidiMessageReceiver.onSend()` is called with the raw data (`byte[]`).
-    *   `MidiMessageReceiver` immediately passes this data to `MidiMessageParser`.
-    *   `MidiMessageParser` analyzes the bytes. If it is `Note On`, it extracts the note number and creates a `Note` object (including its musical name via `pitchToName`), which it passes back to `MidiDataSource`.
-    *   `MidiDataSource` sends the received `Note` to a `SharedFlow`.
+2. **Receiving and Parsing Messages**:
+   * When the user presses a key, the MIDI keyboard sends a message. `MidiMessageReceiver.onSend()` is called with the raw data (`byte[]`).
+   * `MidiMessageReceiver` immediately passes this data to `MidiMessageParser`.
+   * `MidiMessageParser` analyzes the bytes. If it is `Note On`, it extracts the note number and creates a `Note` object (including its musical name via `pitchToName`), which it passes back to `MidiDataSource`.
+   * `MidiDataSource` sends the received `Note` to a `SharedFlow`.
 
 ```plantuml
 @startuml
@@ -352,23 +381,24 @@ deactivate Receiver
 @enduml
 ```
 
-3.  **Grouping and Transmitting Notes**:
-    *   `MidiRepositoryImpl` proxies `Flow<Note>` from `MidiDataSource` via `observeNotes()`.
-    *   `ObserveMidiMessagesUseCase` subscribes to this stream. It uses `Kotlin Flow` operators (inside `channelFlow` with `launch` and `delay`) to group notes arriving within a short period (`50 ms`) into a single `List<Note>` (a chord). Each new `Note` resets the timer, allowing for chords played not perfectly simultaneously (arpeggiato) to be captured.
+3. **Grouping and Transmitting Notes**:
 
-4.  **Chord Analysis**:
-    *   `PianoStaffViewModel` observes `ObserveMidiMessagesUseCase`. When a new list of notes arrives:
-        1. Initiates analysis via `AnalyzeChordUseCase(notes)`. This is a fire-and-forget operation.
-        2. `AnalyzeChordUseCase` calls `ChordAnalysisRepository.analyzeChord(notes)`.
-        3. The repository deduplicates and sorts note names, then **synchronously** invokes `ChordAnalyzer.analyze(noteNames)`.
-        4. The result is written directly into the repository's `StateFlow<String?>` (no thread hop, no callbacks).
-    *   In parallel, `PianoStaffViewModel` combines (`combine`) the note stream and the analysis result stream from `ObserveChordAnalysisResultsUseCase`.
-    *   See [Native Kotlin Chord Analysis](./CHORD_ANALYSIS.md) for the algorithm and the chord type registry.
+   * `MidiRepositoryImpl` proxies `Flow<Note>` from `MidiDataSource` via `observeNotes()`.
+   * `ObserveMidiMessagesUseCase` subscribes to this stream. It uses `Kotlin Flow` operators (inside `channelFlow` with `launch` and `delay`) to group notes arriving within a short period (`50 ms`) into a single `List<Note>` (a chord). Each new `Note` resets the timer, allowing for chords played not perfectly simultaneously (arpeggiato) to be captured.
+4. **Chord Analysis**:
 
-5.  **UI Display**:
-    *   The combination result forms `PianoStaffUiState`.
-    *   If a chord is recognized, `chordName` contains the name. If notes are present but analysis is empty — "Not defined" is displayed.
-    *   `PianoStaffScreen` receives `uiState` and passes `notesJson` to the `PianoStaff` component.
+   * `PianoStaffViewModel` observes `ObserveMidiMessagesUseCase`. When a new list of notes arrives:
+     1. Initiates analysis via `AnalyzeChordUseCase(notes)`. This is a fire-and-forget operation.
+     2. `AnalyzeChordUseCase` calls `ChordAnalysisRepository.analyzeChord(notes)`.
+     3. The repository deduplicates and sorts note names, then **synchronously** invokes `ChordAnalyzer.analyze(noteNames)`.
+     4. The result is written directly into the repository's `StateFlow<String?>` (no thread hop, no callbacks).
+   * In parallel, `PianoStaffViewModel` combines (`combine`) the note stream and the analysis result stream from `ObserveChordAnalysisResultsUseCase`.
+   * See [Native Kotlin Chord Analysis](./CHORD_ANALYSIS.md) for the algorithm and the chord type registry.
+5. **UI Display**:
+
+   * The combination result forms `PianoStaffUiState`.
+   * If a chord is recognized, `chordName` contains the name. If notes are present but analysis is empty — "Not defined" is displayed.
+   * `PianoStaffScreen` receives `uiState` and passes `notesJson` to the `PianoStaff` component.
 
 ```plantuml
 @startuml
@@ -429,17 +459,17 @@ The musical staff is drawn using a `WebView` and the [VexFlow](https://www.vexfl
 
 **Workflow:**
 
-1.  **Initialization**: `PianoStaff` creates a `WebView` instance and initializes `MusicScriptEngine`, which loads `vexflow.html`.
-2.  **Size Tracking**: The `onSizeChanged` modifier updates the `viewSize` state. This is necessary for VexFlow to know the available drawing area.
-3.  **Drawing Trigger**: `LaunchedEffect` monitors changes to `notesJson`, `isPortrait` (orientation parameter), and `viewSize`.
-4.  **Drawing Execution**: When `viewSize` becomes non-zero, a JavaScript call to `drawGrandStaff` is formed. The call is passed to `MusicScriptEngine`, which executes it in the `WebView` context.
-5.  **JSON Format**: Data is passed as a single JSON object containing separate arrays for treble and bass clefs.
-    ```json
-    {
-      "treble": [{"keys":["c/5"], "duration":"w"}, {"keys":["g/4"], "duration":"w", "ghost":true}],
-      "bass": [{"keys":["c/4"], "duration":"w"}, {"keys":["e/3", "g/3"], "duration":"w"}]
-    }
-    ```
+1. **Initialization**: `PianoStaff` creates a `WebView` instance and initializes `MusicScriptEngine`, which loads `vexflow.html`.
+2. **Size Tracking**: The `onSizeChanged` modifier updates the `viewSize` state. This is necessary for VexFlow to know the available drawing area.
+3. **Drawing Trigger**: `LaunchedEffect` monitors changes to `notesJson`, `isPortrait` (orientation parameter), and `viewSize`.
+4. **Drawing Execution**: When `viewSize` becomes non-zero, a JavaScript call to `drawGrandStaff` is formed. The call is passed to `MusicScriptEngine`, which executes it in the `WebView` context.
+5. **JSON Format**: Data is passed as a single JSON object containing separate arrays for treble and bass clefs.
+   ```json
+   {
+     "treble": [{"keys":["c/5"], "duration":"w"}, {"keys":["g/4"], "duration":"w", "ghost":true}],
+     "bass": [{"keys":["c/4"], "duration":"w"}, {"keys":["e/3", "g/3"], "duration":"w"}]
+   }
+   ```
 
 **`PianoStaff` Lifecycle State Diagram**
 
@@ -532,6 +562,7 @@ deactivate Screen
 ## 4. Acceptance Criteria
 
 ### Note Display
+
 - When a single key is pressed on the MIDI keyboard, the corresponding note is immediately displayed on the musical staff.
 - When multiple keys are pressed simultaneously (a chord), all corresponding notes are displayed on the musical staff.
 - Each new press event (`Note On`) results in a complete screen clear before displaying new notes.
@@ -541,12 +572,13 @@ deactivate Screen
 - When the screen is rotated, the musical staff is correctly redrawn considering the new orientation.
 
 ### Chord Analysis and Display
+
 - For each recognized chord (2+ notes), its name is displayed on screen (e.g., "C Major", "Am", "G7sus4").
 - For single notes, NO chord name is displayed (the field remains empty).
 - If multiple notes do not form a known chord, the text "Not defined" is displayed (or according to localization).
 - Chord analysis is synchronous, sub-millisecond, and main-safe; no UI-thread blocking is observable.
 - Analysis results are updated in `StateFlow` and are safe for concurrent access from different threads.
-- The system uses a native Kotlin chord detection engine (see [Native Kotlin Chord Analysis](./CHORD_ANALYSIS.md)), ensuring accurate recognition of standard musical chords without any JavaScript runtime.
+- The system uses a native Kotlin chord detection engine (see [Native Kotlin Chord Analysis](./CHORD_ANALYSIS.md)), ensuring accurate recognition of standard musical chords.
 
 ## See Also
 

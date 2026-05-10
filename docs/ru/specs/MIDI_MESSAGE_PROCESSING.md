@@ -17,7 +17,7 @@
 
 ## 2. Архитектурное решение
 
-### 2.1. Компоненты
+### 2.1. Архитектурные диаграммы
 
 Система обработки MIDI-сообщений интегрирована в существующую архитектуру, расширяя функционал `Data` и `Domain` слоев и добавляя новые компоненты в `Presentation` слой. Анализ аккордов выполняется встроенным движком `ChordAnalyzer` на чистом Kotlin (см. [Нативный анализ аккордов на Kotlin](./CHORD_ANALYSIS.md)).
 
@@ -35,7 +35,7 @@
 - **`ChordAnalysisRepository`:** Интерфейс с методами `analyzeChord()` и `chordAnalysisResult`.
 - **`AnalyzeChordUseCase`:** Use case для запуска асинхронного анализа аккорда (fire-and-forget).
 - **`ObserveChordAnalysisResultsUseCase`:** Use case для подписки на результаты анализа.
-- **`ChordAnalyzer`:** Доменный сервис нативного распознавания аккордов и упрощения одиночных нот. Pure Kotlin, синхронный, main-safe. Внутренняя структура и алгоритм описаны в [спеке Chord Analysis](./CHORD_ANALYSIS.md).
+- **`ChordAnalyzer`:** Доменный сервис нативного распознавания аккордов и упрощения одиночных нот. Pure Kotlin, синхронный, main-safe. Внутренняя структура и алгоритм описаны в [спецификации Chord Analysis](./CHORD_ANALYSIS.md).
 
 **Presentation Layer**
 - **`PianoStaffViewModel`:** Управляет состоянием UI. Объединяет (`combine`) поток нот и результаты анализа. При изменении состава нот инициирует новый анализ.
@@ -44,49 +44,35 @@
   - `chordName: String?` - название распознанного аккорда или локализованная строка "Не определен".
 - **`PianoStaffScreen`:** Composable-экран, который отображает сыгранные ноты на нотном стане и название аккорда.
 
-#### 2.1.1. C4 Level 3 Overview: Обзор подсистем
+#### 2.1.1. C4 Level 2: Контейнеры
 
 ```plantuml
 @startuml
-!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-title C4 - Level 3 Overview: Обзор подсистем обработки MIDI-сообщений
+title C4 - Level 2: Контейнеры подсистемы MIDI
 
-System_Ext(midi_device, "MIDI Keyboard", "Физическое устройство")
+Person(user, "Пользователь", "Музыкант, играющий на клавиатуре")
+System_Ext(midi_device, "MIDI Keyboard", "Внешнее физическое устройство")
 
-Container_Boundary(presentation, "Presentation Layer") {
-    Component(vm, "PianoStaffViewModel", "ViewModel", "Управляет ноты + аккорды")
-    Component(screen, "PianoStaffScreen", "Composable", "Отображает ноты и названия")
+System_Boundary(piano_flow, "Приложение PianoFlow") {
+    Container(ui, "UI (Compose)", "Kotlin, Jetpack Compose", "Отображает нотный стан и названия аккордов")
+    Container(vm, "ViewModel", "Kotlin", "Управляет состоянием UI и координирует анализ")
+    Container(observe_midi, "ObserveMidiMessagesUseCase", "Kotlin Flow", "Группирует ноты в аккорды")
+    Container(analyze_chord, "AnalyzeChordUseCase", "Kotlin", "Инициирует анализ аккордов")
+    Container(observe_chord, "ObserveChordAnalysisResultsUseCase", "Kotlin Flow", "Предоставляет результаты анализа")
+    Container(midi_repo, "MidiRepository", "Kotlin", "Абстракция для MIDI-данных")
+    Container(chord_repo, "ChordAnalysisRepository", "Kotlin", "Абстракция для анализа аккордов")
+    Container(midi_repo_impl, "MidiRepositoryImpl", "Kotlin", "Реализация MIDI-репозитория")
+    Container(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Kotlin", "Реализация анализа аккордов")
+    Container(chord_analyzer, "ChordAnalyzer", "Pure Kotlin", "Нативный движок распознавания аккордов")
 }
 
-Container_Boundary(domain, "Domain Layer") {
-    Container_Boundary(midi_subsystem, "MIDI Subsystem") {
-        Component(observe_midi, "ObserveMidiMessagesUseCase", "Use Case", "")
-        Component(midi_repo, "MidiRepository", "Interface", "")
-    }
-    
-    Container_Boundary(chord_subsystem, "Chord Analysis Subsystem") {
-        Component(analyze_chord, "AnalyzeChordUseCase", "Use Case", "")
-        Component(observe_chord, "ObserveChordAnalysisResultsUseCase", "Use Case", "")
-        Component(chord_repo, "ChordAnalysisRepository", "Interface", "")
-        Component(chord_analyzer, "ChordAnalyzer", "Domain Service", "Pure Kotlin")
-    }
-}
-
-Container_Boundary(data, "Data Layer") {
-    Container_Boundary(midi_impl, "MIDI Implementation") {
-        Component(midi_repo_impl, "MidiRepositoryImpl", "Impl", "")
-        Component(ds, "MidiDataSource", "Data Source", "")
-    }
-    
-    Container_Boundary(chord_impl, "Chord Analysis Implementation") {
-        Component(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Impl", "")
-    }
-}
-
-' Связи
-Rel(midi_device, ds, "MIDI сообщения")
-Rel(chord_repo_impl, chord_analyzer, "Делегирует анализ")
+Rel(user, midi_device, "Играет ноты")
+Rel(midi_device, midi_repo_impl, "Отправляет MIDI-сообщения")
+Rel(midi_repo_impl, midi_repo, "Реализует")
+Rel(chord_repo_impl, chord_repo, "Реализует")
+Rel(chord_repo_impl, chord_analyzer, "Делегирует analyze()")
 
 Rel(vm, observe_midi, "observeNotes()")
 Rel(vm, analyze_chord, "analyzeChord()")
@@ -99,7 +85,7 @@ Rel(observe_chord, chord_repo, "observeChordAnalysisResults()")
 Rel(midi_repo_impl, midi_repo, "@Binds")
 Rel(chord_repo_impl, chord_repo, "@Binds")
 
-Rel(vm, screen, "Обновляет UiState")
+Rel(vm, ui, "Обновляет UiState")
 
 @enduml
 ```
@@ -274,7 +260,7 @@ data class PianoStaffUiState(
 )
 ```
 
-### 2.3. Расширение зависимостей
+### 2.3. Зависимости
 
 Система использует Hilt для управления зависимостями.
 
@@ -589,7 +575,7 @@ deactivate Screen
 - Если несколько нот не образуют известный аккорд, отображается текст "Не определен" (или согласно локализации).
 - Анализ аккордов синхронный, выполняется менее чем за миллисекунду и main-safe; блокировка UI-потока не наблюдается.
 - Результаты анализа обновляются в `StateFlow` и безопасны для одновременного доступа из разных потоков (thread-safe).
-- Система использует встроенный движок распознавания аккордов на Kotlin (см. [Нативный анализ аккордов на Kotlin](./CHORD_ANALYSIS.md)), что обеспечивает точное распознавание стандартных музыкальных аккордов без какого-либо JavaScript-рантайма.
+- Система использует встроенный движок распознавания аккордов на Kotlin (см. [Нативный анализ аккордов на Kotlin](./CHORD_ANALYSIS.md)), что обеспечивает точное распознавание стандартных музыкальных аккордов.
 
 ## См. также
 
