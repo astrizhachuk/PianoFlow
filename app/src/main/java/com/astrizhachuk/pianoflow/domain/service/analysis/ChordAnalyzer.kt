@@ -33,8 +33,9 @@ class ChordAnalyzer @Inject constructor() {
     private fun simplify(originalName: String, pitch: Pitch): String? {
         val scale = if (pitch.alter > 0) SHARP_SCALE else FLAT_SCALE
         val noteName = scale[pitch.chroma]
-        return if (pitch.octave != null && pitch.midi != null) {
-            val octave = (pitch.midi / 12) - 1
+        val midi = pitch.midi
+        return if (pitch.octave != null && midi != null) {
+            val octave = (midi / 12) - 1
             "$noteName$octave"
         } else {
             noteName

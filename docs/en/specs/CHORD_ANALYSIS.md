@@ -170,6 +170,8 @@ The `ChordAnalysisRepository` interface is the stable boundary between the chord
 
 **Visibility of `Pitch` and `ChordType`.** Both types are marked `internal` because they are value objects of the analysis engine — a parsed form of a note name and a chord-type registry entry — and never appear in the public API. `ChordAnalyzer.analyze` accepts `List<String>` and returns `String?`; `ChordAnalysisRepository` exposes `Note` and `StateFlow<String?>`. The `internal` visibility cements their status as implementation details, protects invariants (a valid `Pitch` is produced only via `Pitch.parse`), and — once `:domain` is extracted as a separate Gradle module — automatically hides them from `:data` and `:ui` without requiring API changes.
 
+**Invariant enforcement.** `Pitch` stores only the canonical triple (`letter`, `alter`, `octave`); `chroma` and `midi` are derived properties computed deterministically from it, so an instance with inconsistent sounding values is impossible at the type level. The `letter ∈ A..G` constraint is carried by the type — `NoteLetter` is an enum with the seven entries `C`, `D`, `E`, `F`, `G`, `A`, `B`; the `alter` parameter is validated against `-2..2` in the `init` block. The `midi` computation uses `Long` arithmetic to guard against `Int` overflow for arbitrary `octave` values the parser admits.
+
 ### 2.3. Dependency Graph
 
 The chord analysis subsystem uses Hilt for dependency injection.

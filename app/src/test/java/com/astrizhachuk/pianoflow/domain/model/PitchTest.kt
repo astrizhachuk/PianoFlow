@@ -3,6 +3,7 @@ package com.astrizhachuk.pianoflow.domain.model
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class PitchTest {
@@ -12,7 +13,7 @@ class PitchTest {
     @Test
     fun `parse C4 natural note`() {
         val p = Pitch.parse("C4")!!
-        assertEquals('C', p.letter)
+        assertEquals(NoteLetter.C, p.letter)
         assertEquals(0, p.alter)
         assertEquals(4, p.octave)
         assertEquals(60, p.midi)
@@ -22,14 +23,14 @@ class PitchTest {
     @Test
     fun `parse lowercase c4`() {
         val p = Pitch.parse("c4")!!
-        assertEquals('C', p.letter)
+        assertEquals(NoteLetter.C, p.letter)
         assertEquals(0, p.chroma)
     }
 
     @Test
     fun `parse A4`() {
         val p = Pitch.parse("A4")!!
-        assertEquals('A', p.letter)
+        assertEquals(NoteLetter.A, p.letter)
         assertEquals(9, p.chroma)
         assertEquals(69, p.midi)  // (4+1)*12 + 9 = 69
     }
@@ -55,7 +56,7 @@ class PitchTest {
     @Test
     fun `parse B sharp cross-octave midi 72 chroma 0`() {
         val p = Pitch.parse("B#4")!!
-        assertEquals('B', p.letter)
+        assertEquals(NoteLetter.B, p.letter)
         assertEquals(1, p.alter)
         assertEquals(4, p.octave)
         assertEquals(72, p.midi)   // (4+1)*12 + 11 + 1 = 72
@@ -112,6 +113,23 @@ class PitchTest {
     }
 
     @Test
+    fun `parse C0 midi 12`() {
+        val p = Pitch.parse("C0")!!
+        assertEquals(0, p.octave)
+        assertEquals(12, p.midi)   // (0+1)*12 + 0 + 0 = 12
+        assertEquals(0, p.chroma)
+    }
+
+    @Test
+    fun `parse B-1 midi 11`() {
+        val p = Pitch.parse("B-1")!!
+        assertEquals(NoteLetter.B, p.letter)
+        assertEquals(-1, p.octave)
+        assertEquals(11, p.midi)   // (-1+1)*12 + 11 + 0 = 11
+        assertEquals(11, p.chroma)
+    }
+
+    @Test
     fun `parse C without octave has null octave and midi`() {
         val p = Pitch.parse("C")!!
         assertNull(p.octave)
@@ -159,6 +177,24 @@ class PitchTest {
         assertNull(Pitch.parse("4"))
     }
 
+    @Test
+    fun `parse octave overflow returns null`() {
+        // Regex (-?\d+)? admits arbitrary digit length; parse must not throw NumberFormatException.
+        assertNull(Pitch.parse("C99999999999"))
+        assertNull(Pitch.parse("C-99999999999"))
+    }
+
+    @Test
+    fun `parse triple sharp is invalid`() {
+        // Regex (#{1,2}|b{1,2}|x) admits at most two sharps; longer runs must be rejected.
+        assertNull(Pitch.parse("C###4"))
+    }
+
+    @Test
+    fun `parse triple flat is invalid`() {
+        assertNull(Pitch.parse("Cbbb4"))
+    }
+
     // ── MIDI boundary ─────────────────────────────────────────────────────
 
     @Test
@@ -186,5 +222,53 @@ class PitchTest {
         assertEquals(-1, p.octave)
         assertNull(p.midi)
         assertEquals(11, p.chroma)
+    }
+
+    @Test
+    fun `parse very large octave does not overflow and yields null midi`() {
+        // (200_000_000 + 1) * 12 = 2_400_000_012, exceeds Int.MAX_VALUE.
+        // Without Long arithmetic this would wrap and could spuriously fall into 0..127.
+        val p = Pitch.parse("C200000000")!!
+        assertEquals(200_000_000, p.octave)
+        assertNull(p.midi)
+        assertEquals(0, p.chroma)
+    }
+
+    @Test
+    fun `parse very large negative octave does not overflow and yields null midi`() {
+        val p = Pitch.parse("C-200000000")!!
+        assertEquals(-200_000_000, p.octave)
+        assertNull(p.midi)
+        assertEquals(0, p.chroma)
+    }
+
+    // ── Direct constructor: invariant enforcement ─────────────────────────
+
+    @Test
+    fun `constructor rejects alter below -2`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            Pitch(NoteLetter.C, alter = -3, octave = 4)
+        }
+    }
+
+    @Test
+    fun `constructor rejects alter above +2`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            Pitch(NoteLetter.C, alter = 3, octave = 4)
+        }
+    }
+
+    @Test
+    fun `constructor accepts alter at boundary -2`() {
+        val p = Pitch(NoteLetter.E, alter = -2, octave = 4)
+        assertEquals(2, p.chroma)   // (4 - 2) mod 12 = 2
+        assertEquals(62, p.midi)    // (4+1)*12 + 4 - 2 = 62
+    }
+
+    @Test
+    fun `constructor accepts alter at boundary +2`() {
+        val p = Pitch(NoteLetter.C, alter = 2, octave = 4)
+        assertEquals(2, p.chroma)   // (0 + 2) mod 12 = 2
+        assertEquals(62, p.midi)    // (4+1)*12 + 0 + 2 = 62
     }
 }
