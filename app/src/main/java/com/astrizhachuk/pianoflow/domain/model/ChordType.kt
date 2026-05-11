@@ -1,4 +1,4 @@
-package com.astrizhachuk.pianoflow.domain.model.music
+package com.astrizhachuk.pianoflow.domain.model
 
 /**
  * One chord type from the registry.

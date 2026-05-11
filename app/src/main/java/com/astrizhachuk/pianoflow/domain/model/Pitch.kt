@@ -1,7 +1,7 @@
-package com.astrizhachuk.pianoflow.domain.model.music
+package com.astrizhachuk.pianoflow.domain.model
 
 /**
- * Parsed musical note. Internal representation used by the analysis engine.
+ * Represents a parsed musical note and its properties.
  *
  * @param letter Note letter 'A'..'G'.
  * @param alter Accidental sign: -2 (bb), -1 (b), 0 (natural), +1 (#), +2 (x).

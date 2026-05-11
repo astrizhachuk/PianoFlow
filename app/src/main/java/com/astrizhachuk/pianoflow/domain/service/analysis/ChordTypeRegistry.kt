@@ -1,7 +1,21 @@
 package com.astrizhachuk.pianoflow.domain.service.analysis
 
-import com.astrizhachuk.pianoflow.domain.model.music.ChordType
+import com.astrizhachuk.pianoflow.domain.model.ChordType
 
+/**
+ * A registry of known musical chord types mapped to their pitch-class chroma patterns.
+ *
+ * This registry uses a bitmask (chroma) to represent the intervals present in a chord,
+ * where each bit corresponds to a semitone relative to the root (bit 0 = root, bit 1 = m2, etc.).
+ *
+ * It provides a comprehensive list of common and complex chords across various families,
+ * including Major, Minor, Augmented, Quartal, and Altered chords. Since different musical
+ * contexts can use different names for the same set of notes (enharmonic or functional equivalents),
+ * the registry handles collisions by mapping a single chroma to multiple [ChordType] definitions.
+ *
+ * @property all A complete list of all registered [ChordType] instances.
+ * @property byChroma A lazy-initialized map for efficient lookup of chord names by their integer bitmask.
+ */
 internal object ChordTypeRegistry {
 
     // Convert spec chroma string to Int: spec writes chroma-0 at leftmost position,

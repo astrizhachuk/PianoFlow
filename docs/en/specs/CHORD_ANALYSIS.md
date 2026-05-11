@@ -29,8 +29,8 @@ The reactive contract `ChordAnalysisRepository.chordAnalysisResult: StateFlow<St
 The chord analysis subsystem lives in the Domain layer as a pure-Kotlin service. The Data layer hosts only the `ChordAnalysisRepositoryImpl` adapter, which holds the reactive state and delegates analysis to the domain service.
 
 **Domain Layer**
-- **`Pitch`** (`domain.model.music`): parsed note — letter, alteration, octave (nullable), MIDI number (nullable), chroma index. Pure data class.
-- **`ChordType`** (`domain.model.music`): single chord type — 12-bit chroma bitmask and primary symbol (e.g. `"M"`, `"m"`, `"7"`, `"m7"`).
+- **`Pitch`** (`domain.model`): parsed note — letter, alteration, octave (nullable), MIDI number (nullable), chroma index. Pure data class.
+- **`ChordType`** (`domain.model`): single chord type — 12-bit chroma bitmask and primary symbol (e.g. `"M"`, `"m"`, `"7"`, `"m7"`).
 - **`ChordTypeRegistry`** (`domain.service.analysis`): internal object owning the inline table of 106 chord types and an indexed lookup `Map<chroma, List<ChordType>>`. Loaded once via lazy initialization.
 - **`ChordAnalyzer`** (`domain.service.analysis`): public domain service with the single entry point `analyze(noteNames: List<String>): String?`. Internally performs note parsing, pitch-class extraction, chord matching, and output formatting. Provides single-note enharmonic simplification when only one note is supplied.
 
@@ -110,7 +110,7 @@ Rel(chord_registry, chord_type_model, "Holds")
 **Domain Layer:**
 
 ```kotlin
-// com.astrizhachuk.pianoflow.domain.model.music.Pitch.kt
+// com.astrizhachuk.pianoflow.domain.model.Pitch.kt
 /**
  * Parsed musical note. Internal representation used by the analysis engine.
  *
@@ -128,7 +128,7 @@ internal data class Pitch(
     val chroma: Int
 )
 
-// com.astrizhachuk.pianoflow.domain.model.music.ChordType.kt
+// com.astrizhachuk.pianoflow.domain.model.ChordType.kt
 /**
  * One chord type from the registry.
  *
@@ -168,6 +168,8 @@ interface ChordAnalysisRepository {
 
 The `ChordAnalysisRepository` interface is the stable boundary between the chord-analysis subsystem and its consumers (`AnalyzeChordUseCase`, `ObserveChordAnalysisResultsUseCase`, `PianoStaffViewModel`).
 
+**Visibility of `Pitch` and `ChordType`.** Both types are marked `internal` because they are value objects of the analysis engine — a parsed form of a note name and a chord-type registry entry — and never appear in the public API. `ChordAnalyzer.analyze` accepts `List<String>` and returns `String?`; `ChordAnalysisRepository` exposes `Note` and `StateFlow<String?>`. The `internal` visibility cements their status as implementation details, protects invariants (a valid `Pitch` is produced only via `Pitch.parse`), and — once `:domain` is extracted as a separate Gradle module — automatically hides them from `:data` and `:ui` without requiring API changes.
+
 ### 2.3. Dependency Graph
 
 The chord analysis subsystem uses Hilt for dependency injection.
@@ -196,7 +198,7 @@ end note
 
 ## 3. Algorithm
 
-The algorithm uses pure arithmetic and table lookups — no external dependencies. Conventions follow Tonal.js v6 (`Tonal.Chord.detect` and `Tonal.Note.simplify`); behavior is compatible with that library.
+The algorithm uses pure arithmetic and table lookups — no external dependencies.
 
 ### 3.1. Note Name Parsing
 
@@ -296,7 +298,7 @@ The formatting rule is intentionally minimal — anything more aggressive would 
 
 ### 3.3. Single-Note Simplification (N = 1 valid note)
 
-Direct port of `Tonal.Note.simplify`:
+Simplification algorithm:
 
 1. Parse the input into a `Pitch`. If parsing fails, return `null`.
 2. Choose the chromatic scale based on `alter`:
@@ -505,7 +507,7 @@ For exhaustive coverage of all 106 chord types, see the **Notes from C** column 
 
 ## Appendix A: Chord Type Database (106 entries)
 
-Source: `Tonal.ChordType.all()` v6, transcribed for the inline registry. Each row contributes one `ChordType(chroma, symbol)` to the registry, where `chroma` is the 12-bit string parsed into an `Int` and `symbol` is the **first** alias (the leading entry in the `aliases` column).
+Each row contributes one `ChordType(chroma, symbol)` to the registry, where `chroma` is the 12-bit string parsed into an `Int` and `symbol` is the **first** alias (the leading entry in the `aliases` column).
 
 The implementation is free to organize the table for readability (one constant list, grouped by quality, etc.) as long as all 106 entries are present and the indexed lookup returns every entry.
 
@@ -631,7 +633,7 @@ Note: `chroma` collisions are intentional. The following bitmasks are shared by 
 | `101010010101` | `maj13`, `M7add13` |
 | `110001010010` | `b9sus`, `11b9` |
 
-When multiple types share a chroma, the engine returns the first symbol in the list above (insertion order). This matches the Tonal.js behavior, where the chord type list is iterated in declaration order.
+When multiple types share a chroma, the engine returns the first symbol in the list above (insertion order). The chord type list is iterated in declaration order.
 
 The `intervals`, `quality`, and the alias columns beyond the first are reference information and are **not** required by the runtime — only `chroma` and the primary alias drive matching and output formatting.
 

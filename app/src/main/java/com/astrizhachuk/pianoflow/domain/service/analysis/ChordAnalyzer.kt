@@ -1,6 +1,6 @@
 package com.astrizhachuk.pianoflow.domain.service.analysis
 
-import com.astrizhachuk.pianoflow.domain.model.music.Pitch
+import com.astrizhachuk.pianoflow.domain.model.Pitch
 import javax.inject.Inject
 
 /**

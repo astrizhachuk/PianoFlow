@@ -1,4 +1,4 @@
-package com.astrizhachuk.pianoflow.domain.model.music
+package com.astrizhachuk.pianoflow.domain.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
