@@ -162,6 +162,13 @@ class PitchTest {
     // ── MIDI boundary ─────────────────────────────────────────────────────
 
     @Test
+    fun `parse G9 midi 127 boundary`() {
+        // (9+1)*12 + 7 = 127
+        val p = Pitch.parse("G9")!!
+        assertEquals(127, p.midi)
+    }
+
+    @Test
     fun `parse G sharp 9 midi out of range returns Pitch with null midi`() {
         // (9+1)*12 + 7 + 1 = 128 → out of 0..127 → midi = null
         val p = Pitch.parse("G#9")!!
@@ -169,5 +176,15 @@ class PitchTest {
         assertEquals(9, p.octave)  // octave is present
         assertNull(p.midi)          // but midi is null (out of range)
         assertEquals(8, p.chroma)  // G#=chroma 8
+    }
+
+    @Test
+    fun `parse Cb-1 midi -1 out of range returns Pitch with null midi`() {
+        // (-1+1)*12 + 0 - 1 = -1 → out of 0..127 → midi = null
+        val p = Pitch.parse("Cb-1")!!
+        assertNotNull(p)
+        assertEquals(-1, p.octave)
+        assertNull(p.midi)
+        assertEquals(11, p.chroma)
     }
 }
