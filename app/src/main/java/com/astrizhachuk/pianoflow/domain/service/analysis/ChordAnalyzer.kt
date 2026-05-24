@@ -38,10 +38,9 @@ class ChordAnalyzer @Inject constructor() {
     private fun simplify(pitch: Pitch): String {
         val scale = if (pitch.alter > 0) SHARP_SCALE else FLAT_SCALE
         val noteName = scale[pitch.chroma]
-        return pitch.midi?.let { midi ->
-            val octave = (midi / 12) - 1
-            "$noteName$octave"
-        } ?: noteName
+        val midi = pitch.midi ?: return noteName
+        val octave = (midi / 12) - 1
+        return "$noteName$octave"
     }
 
     private fun detectChord(parsed: List<Pair<String, Pitch>>): String? {
