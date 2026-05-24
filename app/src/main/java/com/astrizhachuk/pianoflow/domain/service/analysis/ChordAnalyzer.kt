@@ -52,7 +52,7 @@ class ChordAnalyzer @Inject constructor() {
         // 12-bit bitmask from unique chromas.
         val bitmask = chromaToName.keys.fold(0) { acc, c -> acc or (1 shl c) }
         val bassChroma = parsed[0].second.chroma
-        val bassName = chromaToName[bassChroma]
+        val bassName = chromaToName.getValue(bassChroma)
 
         // Find all possible chord interpretations across all potential roots.
         // We prioritize the root matching the bass note by assigning a higher weight.
