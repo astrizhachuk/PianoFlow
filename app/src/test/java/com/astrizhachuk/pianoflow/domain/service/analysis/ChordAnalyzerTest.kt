@@ -252,4 +252,11 @@ class ChordAnalyzerTest {
         // Am7 (A-C-E-G) found at root A (chroma 9).
         assertEquals("Am7/G", analyzer.analyze(listOf("G3", "A3", "C4", "E4")))
     }
+
+    @Test
+    fun `D minor with A bass returns Dm over A`() {
+        // Sorted input from repository: ["A3", "D4", "F4"]. Bass A (chroma 9).
+        // No chord type matches with A as root; Dm (D-F-A) found at root D (chroma 2).
+        assertEquals("Dm/A", analyzer.analyze(listOf("A3", "D4", "F4")))
+    }
 }
