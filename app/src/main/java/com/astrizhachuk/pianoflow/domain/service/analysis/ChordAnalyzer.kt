@@ -56,30 +56,24 @@ class ChordAnalyzer @Inject constructor() {
 
         // Steps 4–6: try all 12 rotations
         val results = mutableListOf<Pair<Double, String>>()
-        for (u in 0..11) {
+        for ((u, rootName) in chromaToName) {
             val rotated = rotate12(bitmask, u)
-            if (rotated and 1 == 0) continue                       // root not present at this rotation
             val types = ChordTypeRegistry.byChroma[rotated] ?: continue
-            val rootName = chromaToName[u] ?: continue             // root must be an input note
 
             for (type in types) {
+                val symbol = if (type.symbol == "M") "" else type.symbol
                 if (u == bassChroma) {
-                    results += 1.0 to "$rootName${type.symbol}"
+                    results += 1.0 to "$rootName$symbol"
                 } else {
                     val bassName = chromaToName[bassChroma]!!
-                    results += 0.5 to "$rootName${type.symbol}/$bassName"
+                    results += 0.5 to "$rootName$symbol/$bassName"
                 }
             }
         }
 
-        if (results.isEmpty()) return null
-
         // Step 7: pick first result with highest weight (preserves rotation/insertion order)
-        val maxWeight = results.maxOf { it.first }
-        val best = results.first { it.first == maxWeight }.second
-
-        // Step 8: strip trailing M for root-position major chord compatibility
-        return if (best.endsWith("M")) best.dropLast(1) else best
+        // maxByOrNull returns null if results is empty, satisfying the "no match" requirement.
+        return results.maxByOrNull { it.first }?.second
     }
 
     private fun rotate12(mask: Int, u: Int): Int {
