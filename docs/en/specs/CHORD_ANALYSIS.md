@@ -29,7 +29,7 @@ The reactive contract `ChordAnalysisRepository.chordAnalysisResult: StateFlow<St
 The chord analysis subsystem lives in the Domain layer as a pure-Kotlin service. The Data layer hosts only the `ChordAnalysisRepositoryImpl` adapter, which holds the reactive state and delegates analysis to the domain service.
 
 **Domain Layer**
-- **`Pitch`** (`domain.model`): parsed note — letter, alteration, octave (nullable), MIDI number (nullable), chroma index. Pure data class.
+- **`Pitch`** (`domain.model`): parsed note — canonical triple (letter: `NoteLetter`, alter, octave) and computed properties (chroma, midi). Pure data class.
 - **`ChordType`** (`domain.model`): single chord type — 12-bit chroma bitmask and primary symbol (e.g. `"M"`, `"m"`, `"7"`, `"m7"`).
 - **`ChordTypeRegistry`** (`domain.service.analysis`): internal object owning the inline table of 106 chord types and an indexed lookup `Map<chroma, List<ChordType>>`. Loaded once via lazy initialization.
 - **`ChordAnalyzer`** (`domain.service.analysis`): public domain service with the single entry point `analyze(noteNames: List<String>): String?`. Internally performs note parsing, pitch-class extraction, chord matching, and output formatting. Provides single-note enharmonic simplification when only one note is supplied.
@@ -111,22 +111,27 @@ Rel(chord_registry, chord_type_model, "Holds")
 
 ```kotlin
 // com.astrizhachuk.pianoflow.domain.model.Pitch.kt
+
+internal enum class NoteLetter(val chroma: Int) {
+    C(0), D(2), E(4), F(5), G(7), A(9), B(11)
+}
+
 /**
- * Parsed musical note. Internal representation used by the analysis engine.
- *
- * @param letter Note letter 'A'..'G'.
- * @param alter Accidental sign: -2 (bb), -1 (b), 0 (natural), +1 (#), +2 (x).
- * @param octave Octave number, or null if the input note name had no octave.
- * @param midi MIDI pitch (0..127) when octave is present and within range, else null.
- * @param chroma Pitch class 0..11 (semitones from C, modulo 12).
+ * Parsed musical note. Stores the canonical spelling triple (letter, alter, octave);
+ * chroma and midi are computed properties derived deterministically from it.
  */
 internal data class Pitch(
-    val letter: Char,
-    val alter: Int,
-    val octave: Int?,
-    val midi: Int?,
-    val chroma: Int
-)
+    val letter: NoteLetter,
+    val alter: Int,       // -2..2
+    val octave: Int?
+) {
+    val chroma: Int       // pitch class 0..11
+    val midi: Int?        // 0..127 or null
+
+    companion object {
+        fun parse(name: String): Pitch?
+    }
+}
 
 // com.astrizhachuk.pianoflow.domain.model.ChordType.kt
 /**
@@ -170,7 +175,7 @@ The `ChordAnalysisRepository` interface is the stable boundary between the chord
 
 **Visibility of `Pitch` and `ChordType`.** Both types are marked `internal` because they are value objects of the analysis engine — a parsed form of a note name and a chord-type registry entry — and never appear in the public API. `ChordAnalyzer.analyze` accepts `List<String>` and returns `String?`; `ChordAnalysisRepository` exposes `Note` and `StateFlow<String?>`. The `internal` visibility cements their status as implementation details, protects invariants (a valid `Pitch` is produced only via `Pitch.parse`), and — once `:domain` is extracted as a separate Gradle module — automatically hides them from `:data` and `:ui` without requiring API changes.
 
-**Invariant enforcement.** `Pitch` stores only the canonical triple (`letter`, `alter`, `octave`); `chroma` and `midi` are derived properties computed deterministically from it, so an instance with inconsistent sounding values is impossible at the type level. The `letter ∈ A..G` constraint is carried by the type — `NoteLetter` is an enum with the seven entries `C`, `D`, `E`, `F`, `G`, `A`, `B`; the `alter` parameter is validated against `-2..2` in the `init` block. The `midi` computation uses `Long` arithmetic to guard against `Int` overflow for arbitrary `octave` values the parser admits.
+**Invariant enforcement.** `Pitch` stores only the canonical triple (`letter`, `alter`, `octave`); `chroma` and `midi` are computed properties (`val ... get()`) derived deterministically from the triple, so an instance with inconsistent sounding values is impossible at the type level. The `letter ∈ A..G` constraint is carried by the type — enum `NoteLetter` with seven entries (`C`, `D`, `E`, `F`, `G`, `A`, `B`) and a `chroma: Int` property; the `alter` parameter is validated via `require(alter in -2..2)` in the `init` block. The `midi` computation uses `Long` arithmetic to guard against `Int` overflow for arbitrary `octave` values the parser admits.
 
 ### 2.3. Dependency Graph
 
@@ -204,20 +209,27 @@ The algorithm uses pure arithmetic and table lookups — no external dependencie
 
 ### 3.1. Note Name Parsing
 
-Input grammar: `^([A-Ga-g])([#b]+|x)?(-?\d+)?$`. The parser must accept:
+Input grammar: `^([A-Ga-g])(#{1,2}|b{1,2}|x)?(-?\d+)?$`. The parser accepts:
 
 - Plain letters: `C`, `D`, ..., `B` (case-insensitive)
-- Sharps and flats: `C#`, `Bb`, `F##`, `Bbb`
-- Double sharp shorthand: `Cx` (equivalent to `C##`) — exactly one `x`; mixing `x` with `#` or `b`, or repeating `x`, is invalid
+- Sharps: `C#`, `F##` (one or two `#`)
+- Flats: `Bb`, `Bbb` (one or two `b`)
+- Double sharp shorthand: `Cx` (equivalent to `C##`) — exactly one `x`
 - Octave (optional): integer, may be negative — `C-1`, `C0`, `C4`, `G9`
+
+Mixing `#` and `b`, mixing `x` with other accidentals, or more than two identical accidentals are invalid at the regex level.
 
 Parsing produces a `Pitch`:
 
-- `letter` — uppercased input letter.
-- `alter` = `(#-count) − (b-count) + (2 if x is present else 0)`. Mixing `#` and `b`, mixing `x` with anything else, or repeating `x` is invalid and yields `null`.
+- `letter` — `NoteLetter` enum value obtained from the uppercased input letter.
+- `alter`:
+  - `x` → `+2`
+  - `#` → `+1`, `##` → `+2`
+  - `b` → `-1`, `bb` → `-2`
+  - no accidental → `0`
 - `octave` — the parsed integer, or `null` if absent.
-- `chroma` = `(letterChroma[letter] + alter + 12) mod 12`, where the letter-to-chroma map is `{C:0, D:2, E:4, F:5, G:7, A:9, B:11}`.
-- `midi` = `(octave + 1) * 12 + letterChroma[letter] + alter` when `octave` is present and the result lies in `0..127`; otherwise `null`. The alteration shifts MIDI without wrapping the octave, so `B#4 → 72` (sounds as `C5`) and `Cb4 → 59` (sounds as `B3`).
+- `chroma` = `(letter.chroma + alter).mod(12)`, where `letter.chroma` is defined by the enum: `{C:0, D:2, E:4, F:5, G:7, A:9, B:11}`.
+- `midi` = `(octave + 1) * 12 + letter.chroma + alter` when `octave` is present and the result lies in `0..127`; otherwise `null`. The computation uses `Long` arithmetic to guard against `Int` overflow for arbitrary octave values. The alteration shifts MIDI without wrapping the octave, so `B#4 → 72` (sounds as `C5`) and `Cb4 → 59` (sounds as `B3`).
 
 Empty strings, malformed strings, and unknown letters (e.g. `H`) yield `null`.
 
@@ -253,50 +265,48 @@ Represent the input pitch-class set as a 12-bit value (bit `i` set iff chroma `i
 
 The implementation MAY use a 12-bit `Int` and `Integer.rotateRight` on the lower 12 bits, or a 12-character `String` and string rotation — both produce identical results. The reference implementation chooses the `Int` form for performance.
 
-#### Step 4 — Try all 12 rotations
+#### Step 4 — Iterate rotations over input chromas
 
-For each `u` in `0..11`, compute the bitmask rotated so that chroma `u` becomes the new bit 0 ("what intervals would these notes form if `u` were the root?").
+Only chromas present in the input (keys of the Step 2 lookup) are iterated. For each `u` from that set, compute the bitmask rotated so that chroma `u` becomes the new bit 0 ("what intervals would these notes form if `u` were the root?").
 
-Only rotations whose new bit 0 is set can match any chord type, because every chord type in the registry has bit 0 = `1` (the root is always present). This yields a fast-path early exit for irrelevant rotations.
-
-#### Step 5 — Match against the chord type registry
-
-For each rotated bitmask, look up all `ChordType` entries whose `chroma` field equals the rotation. Multiple chord types may share the same chroma — all matches are collected.
+Iteration is restricted to input chromas because bit 0 of the rotation = bit `u` of the original mask: if chroma `u` is absent from input, bit `u` = 0, so after rotation bit 0 = 0 — no chord type can match (the registry always has the root present). Thus, iterating input chromas is equivalent to a full `0..11` loop with an early exit.
 
 ```
-"100010010000"  →  matches "M"     → root C  → chord "CM"
-"100100001000"  →  matches "m#5"   → root E  → chord "Em#5" (inversion of C major)
-"100001000100"  →  no match
+Input: ["C4", "E4", "G4"]  →  chromaToName = {0:"C", 4:"E", 7:"G"}
+Iterate u ∈ {0, 4, 7}:
+  u=0 → rotate(0)  → 0b100010010000 → lookup in registry
+  u=4 → rotate(4)  → 0b100100001000 → lookup in registry
+  u=7 → rotate(7)  → 0b100001000100 → lookup in registry
 ```
 
-#### Step 6 — Assign weight and build the name
+#### Step 5 — Match against registry and build the name
 
-Let `bassChroma` = chroma of the first input note (after deduplication, the lowest-named/sorted input). For each match at rotation `u`:
+For each rotated bitmask, look up all `ChordType` entries whose `chroma` field equals the rotation. Multiple chord types may share the same chroma — all matches are processed.
 
-- `u == bassChroma` (root equals the bass note) — **weight 1.0**, name = `"<root><symbol>"` (e.g. `"CM"`).
-- `u != bassChroma` (inversion) — **weight 0.5**, name = `"<root><symbol>/<bassName>"` (e.g. `"Em#5/C"`).
+For each match, a `(weight, name)` pair is produced:
 
-The root note name is taken from the chroma → name lookup built in Step 2; if the lookup has no entry for chroma `u` (because rotation lands on a chroma not in the input), the root cannot be one of the input notes and that case never produces a match — root names are only needed for chromas already in the lookup.
-
-#### Step 7 — Sort and pick the best
-
-Filter results to `weight > 0`, sort by descending weight, take the **first** result.
+- **Weight**: `1.0` if `u == bassChroma` (root equals the bass note); `0.5` otherwise (inversion).
+- **Name**: the symbol `"M"` is replaced with an empty string (major triads display without a suffix); all other symbols are appended as-is. For inversions, `"/"` plus the bass note name is appended.
 
 ```
-detect(["C4","E4","G4"])  →  ["CM", "Em#5/C"]   →  "CM"
-detect(["E4","G4","C5"])  →  ["Em#5", "CM/E"]   →  "Em#5"
-detect(["A4","C5","E5"])  →  ["Am"]             →  "Am"
-detect(["C4","D4","E4"])  →  []                 →  null
+u=0, type "M":   bassChroma=0, u==bass → weight 1.0, symbol "M"→"" → name "C"
+u=4, type "m#5": bassChroma=0, u≠bass  → weight 0.5, symbol "m#5" → name "Em#5/C"
 ```
 
-#### Step 8 — Output formatting
+The root note name is taken from the chroma → name lookup (Step 2); the bass name comes from the same lookup at `bassChroma`. Since only input chromas are iterated, names are always available in the lookup.
 
-A trailing `M` is stripped so that root-position major chords render as `"C"` rather than `"CM"`:
+#### Step 6 — Pick the best result
 
-- If the candidate ends with `M` (case-sensitive), strip the final `M`. Examples: `"CM" → "C"`, `"DbM" → "Db"`.
-- Otherwise leave the candidate unchanged. Examples: `"Am"`, `"G7"`, `"Em#5/C"`, `"CM/E"` (the inversion form keeps `M` because it is not at the end of the string).
+From all `(weight, name)` pairs produced in Step 5, the element with the maximum weight is selected (`maxByOrNull`). If no matches exist, `null` is returned.
 
-The formatting rule is intentionally minimal — anything more aggressive would break the `Em#5/C` and `CM/E` shapes that legitimately contain `M` mid-string.
+```
+detect(["C4","E4","G4"])  →  {(1.0,"C"), (0.5,"Em#5/C")}     →  "C"
+detect(["E4","G4","C5"])  →  {(1.0,"Em#5"), (0.5,"C/E")}     →  "Em#5"
+detect(["A4","C5","E5"])  →  {(1.0,"Am")}                     →  "Am"
+detect(["C4","D4","E4"])  →  {}                               →  null
+```
+
+Note: the major inversion form is `"C/E"` (not `"CM/E"`) because the `"M"→""` replacement is applied during name construction, not as post-processing.
 
 ### 3.3. Single-Note Simplification (N = 1 valid note)
 
@@ -307,20 +317,25 @@ Simplification algorithm:
    - `alter > 0` → use the **sharp** scale: `["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]`.
    - `alter ≤ 0` → use the **flat** scale: `["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]`.
 3. Take the note name at index `chroma` from the chosen scale.
-4. If the input had an octave: append the recomputed octave `floor(midi / 12) − 1`. This handles cross-octave cases automatically (e.g. `B#4 → C5`, `Cb4 → B3`).
-5. If the input had no octave (e.g. `"E#"`), omit the octave from the output (`"F"`).
+4. If `midi` is non-null (octave present and result within `0..127`): append the recomputed octave `midi / 12 − 1`. This handles cross-octave cases automatically (e.g. `B#4 → C5`, `Cb4 → B3`).
+5. If `midi` is `null`, the octave is omitted. This occurs in two cases: input without octave (e.g. `"E#"` → `"F"`) or octave present but the computed MIDI falls outside `0..127` (e.g. `"C10"` → `"C"`, `"B-2"` → `"B"`).
 
-| Input  | MIDI | alter | Sharps? | Chroma | Output |
-|--------|------|-------|---------|--------|--------|
-| `C4`   | 60   | 0     | no      | 0      | `C4`   |
-| `G#4`  | 68   | +1    | yes     | 8      | `G#4`  |
-| `Ab4`  | 68   | -1    | no      | 8      | `Ab4`  |
-| `E#4`  | 65   | +1    | yes     | 5      | `F4`   |
-| `Fb4`  | 64   | -1    | no      | 4      | `E4`   |
-| `B#4`  | 72   | +1    | yes     | 0      | `C5`   |
-| `Cb4`  | 59   | -1    | no      | 11     | `B3`   |
-| `Cx4`  | 62   | +2    | yes     | 2      | `D4`   |
-| `Ebb4` | 62   | -2    | no      | 2      | `D4`   |
+| Input  | MIDI   | alter | Sharps? | Chroma | Output |
+|--------|--------|-------|---------|--------|--------|
+| `C4`   | 60     | 0     | no      | 0      | `C4`   |
+| `G#4`  | 68     | +1    | yes     | 8      | `G#4`  |
+| `Ab4`  | 68     | -1    | no      | 8      | `Ab4`  |
+| `E#4`  | 65     | +1    | yes     | 5      | `F4`   |
+| `Fb4`  | 64     | -1    | no      | 4      | `E4`   |
+| `B#4`  | 72     | +1    | yes     | 0      | `C5`   |
+| `Cb4`  | 59     | -1    | no      | 11     | `B3`   |
+| `Cx4`  | 62     | +2    | yes     | 2      | `D4`   |
+| `Ebb4` | 62     | -2    | no      | 2      | `D4`   |
+| `C-1`  | 0      | 0     | no      | 0      | `C-1`  |
+| `G9`   | 127    | 0     | no      | 7      | `G9`   |
+| `C10`  | `null` | 0     | no      | 0      | `C`    |
+| `B-2`  | `null` | 0     | no      | 11     | `B`    |
+| `G#9`  | `null` | +1    | yes     | 8      | `G#`   |
 
 ### 3.4. Routing
 
@@ -330,7 +345,7 @@ Simplification algorithm:
 |---------------|----------|
 | 0             | return `null` |
 | 1             | run single-note simplification (3.3) |
-| ≥ 2           | run chord detection (3.2), then output formatting (Step 8) |
+| ≥ 2           | run chord detection (3.2) |
 
 ## 4. Behavior and Edge Cases
 
@@ -350,7 +365,7 @@ Simplification algorithm:
 
 **Exceptions.** Neither the parser nor the registry throws. `analyze()` is total: it returns `null` on any input that cannot be classified. The `try/catch` in `ChordAnalysisRepositoryImpl` is retained as defense-in-depth.
 
-**Performance.** The algorithm runs in O(1) with respect to input size (12 rotations, each an O(1) hash lookup in the chroma index). Worst-case latency is sub-millisecond.
+**Performance.** The algorithm runs in O(1) with respect to input size (at most 12 rotations — in practice only over unique input chromas — each with an O(1) hash lookup). Worst-case latency is sub-millisecond.
 
 ## 5. Lifecycle and Interaction
 
@@ -407,47 +422,49 @@ The sequence is fully synchronous on the calling thread of `analyzeChord`: no th
 title Activity: ChordAnalyzer.analyze(noteNames)
 
 start
-:parse each name into Pitch;
-:filter out null (invalid);
-if (pitches.isEmpty()) then (yes)
+:parsed = noteNames.mapNotNull { Pitch.parse(it) };
+if (parsed.isEmpty()) then (yes)
   :return null;
   stop
 endif
-if (pitches.size == 1) then (yes)
-  :simplify single pitch;
+if (parsed.size == 1) then (yes)
+  :simplify(pitch): choose scale by alter,
+  take name by chroma, append octave from midi;
   :return name;
   stop
 endif
-:build chroma -> name map;
-:build chroma bitmask;
-:bassChroma = pitches[0].chroma;
-:results = []
-;
+:chromaToName = distinctBy(chroma)
+  .associate { chroma -> name without octave };
+:bitmask = fold over chromaToName.keys;
+:bassChroma = parsed[0].chroma;
+
+:flatMap over (u, rootName) from chromaToName:;
 repeat
-  :rotate bitmask by u;
-  if (rotation bit 0 == 1) then (yes)
-    :lookup chord types in registry;
+  :rotated = rotate12(bitmask, u);
+  :types = ChordTypeRegistry.byChroma[rotated];
+  if (types != null) then (yes)
     repeat
+      :symbol = if (type.symbol == "M") "" else type.symbol;
       if (u == bassChroma) then (yes)
         :weight = 1.0
-        name = root + symbol;
+        name = rootName + symbol;
       else (no)
         :weight = 0.5
-        name = root + symbol + "/" + bass;
+        name = rootName + symbol + "/" + bassName;
       endif
-      :push (weight, name);
+      :emit (weight, name);
     repeat while (more types?)
   endif
-repeat while (u < 12)
-if (results.isEmpty()) then (yes)
+repeat while (more chromas in chromaToName?)
+
+:maxByOrNull { weight };
+if (result found?) then (yes)
+  :return name;
+  stop
+else (no)
   :return null;
   stop
 endif
-:sort by weight desc;
-:best = results[0].name;
-:strip trailing 'M';
-:return best;
-stop
 
 @enduml
 ```
@@ -459,7 +476,7 @@ stop
 - Reference outputs of `chordAnalysisResult`:
   - `[C4, E4, G4]` → `"C"`
   - `[A4, C5, E5]` → `"Am"`
-  - `[E4, G4, C5]` → `"Em#5/C"` (inversion of C major)
+  - `[E4, G4, C5]` → `"Em#5"` (E is both bass and root; inversion of C major from listener's perspective)
   - `[C4, D4, E4]` → `null`
   - `[C4]` → `"C4"` (simplify, no change)
   - `[E#4]` → `"F4"` (simplify)
@@ -476,7 +493,7 @@ stop
 
 - All tests in `app/src/test/` pass under `./gradlew test`.
 - `ChordAnalyzerTest` covers: basic triads (major, minor, diminished, augmented), seventh chords, sus2/sus4, ninths/elevenths/thirteenths, altered chords, inversions, enharmonic input variants, duplicates, partial-invalid input, fully invalid input, empty list, single-note simplification (sharps, flats, double accidentals, cross-octave), names without octave.
-- `PitchTest` covers: valid letters, valid alterations (`#`, `##`, `b`, `bb`, `x`, `xx`), valid octaves (negative and large), MIDI computation, invalid letters (`H`), mixed alterations (`C#b`), empty input.
+- `PitchTest` covers: valid letters, valid alterations (`#`, `##`, `b`, `bb`, `x`), invalid alterations (`xx`, `C#b`), valid octaves (negative and large), MIDI computation, invalid letters (`H`), empty input.
 - `ChordTypeRegistryTest` covers: registry size = 106; every chroma is exactly 12 bits; every chroma has bit 0 set; lookup index returns all entries; spot-checks for known types (`M`, `m`, `7`, `m7`, `dim`, `aug`).
 - `ChordAnalysisRepositoryImplTest` runs as plain JUnit + MockK + Turbine, without Robolectric.
 
