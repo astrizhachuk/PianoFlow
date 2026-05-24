@@ -79,6 +79,14 @@ class ChordAnalyzerTest {
     }
 
     @Test
+    fun `single note with out of range octave simplifies without octave`() {
+        // C10 is midi 132, which is null in Pitch. 
+        // B-2 is midi -1, which is null in Pitch.
+        assertEquals("C", analyzer.analyze(listOf("C10")))
+        assertEquals("B", analyzer.analyze(listOf("B-2")))
+    }
+
+    @Test
     fun `partial list with one valid and one invalid returns simplification of valid`() {
         // "Z4" invalid, "C4" valid → single pitch → simplify "C4" → "C4"
         assertEquals("C4", analyzer.analyze(listOf("C4", "Z4")))
