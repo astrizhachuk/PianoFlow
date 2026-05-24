@@ -19,10 +19,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.presentation.model.UserMessage
@@ -54,27 +56,29 @@ class MainActivity : ComponentActivity() {
         setContent {
             val snackbarHostState = remember { SnackbarHostState() }
 
-            AppTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Scaffold(
-                        modifier = Modifier.fillMaxSize(),
-                        topBar = { PianoFlowTopBar() },
-                        snackbarHost = { SnackbarHost(snackbarHostState) }
-                    ) { innerPadding ->
-                        Box(
-                            modifier = Modifier
-                                .padding(innerPadding)
-                                .fillMaxSize()
-                        ) {
-                            PianoStaffScreen(
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            ObserveNotifications(
-                                messages = userNotifier.messages,
-                                snackbarHostState = snackbarHostState
-                            )
+            CompositionLocalProvider(LocalLifecycleOwner provides this) {
+                AppTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Scaffold(
+                            modifier = Modifier.fillMaxSize(),
+                            topBar = { PianoFlowTopBar() },
+                            snackbarHost = { SnackbarHost(snackbarHostState) }
+                        ) { innerPadding ->
+                            Box(
+                                modifier = Modifier
+                                    .padding(innerPadding)
+                                    .fillMaxSize()
+                            ) {
+                                PianoStaffScreen(
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                ObserveNotifications(
+                                    messages = userNotifier.messages,
+                                    snackbarHostState = snackbarHostState
+                                )
+                            }
                         }
                     }
                 }
