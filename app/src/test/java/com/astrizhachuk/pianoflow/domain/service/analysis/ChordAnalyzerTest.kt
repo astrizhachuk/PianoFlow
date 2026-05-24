@@ -79,11 +79,31 @@ class ChordAnalyzerTest {
     }
 
     @Test
+    fun `single flat note without octave simplifies without octave`() {
+        assertEquals("Ab", analyzer.analyze(listOf("Ab")))
+    }
+
+    @Test
     fun `single note with out of range octave simplifies without octave`() {
         // C10 is midi 132, which is null in Pitch. 
         // B-2 is midi -1, which is null in Pitch.
+        // G#9 is midi 128, which is null in Pitch.
         assertEquals("C", analyzer.analyze(listOf("C10")))
         assertEquals("B", analyzer.analyze(listOf("B-2")))
+        assertEquals("G#", analyzer.analyze(listOf("G#9")))
+    }
+
+    @Test
+    fun `single note at MIDI boundaries simplifies with octave`() {
+        // C-1 is midi 0.
+        // G9 is midi 127.
+        assertEquals("C-1", analyzer.analyze(listOf("C-1")))
+        assertEquals("G9", analyzer.analyze(listOf("G9")))
+    }
+
+    @Test
+    fun `single double sharp note without octave simplifies without octave`() {
+        assertEquals("D", analyzer.analyze(listOf("Cx")))
     }
 
     @Test
