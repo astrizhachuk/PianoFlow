@@ -37,36 +37,7 @@ The chord analysis subsystem lives in the Domain layer as a pure-Kotlin service.
 **Data Layer**
 - **`ChordAnalysisRepositoryImpl`**: holds a `MutableStateFlow<String?>` and exposes `analyzeChord(notes: List<Note>)`. Deduplicates and sorts note names, then synchronously invokes `ChordAnalyzer.analyze(...)` and writes the result directly to the `StateFlow`. No threading or platform dependencies.
 
-#### 2.1.1. C4 Level 2: Containers
-
-```plantuml
-@startuml
-!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
-
-title C4 - Level 2: Chord Analysis Subsystem
-
-Person(user, "User", "Musician playing the keyboard")
-
-System_Boundary(piano_flow, "PianoFlow Application") {
-    Container(vm, "PianoStaffViewModel", "Kotlin", "Coordinates analysis and updates UI state")
-    Container(analyze_chord, "AnalyzeChordUseCase", "Kotlin", "Initiates chord analysis (fire-and-forget)")
-    Container(observe_chord, "ObserveChordAnalysisResultsUseCase", "Kotlin Flow", "Provides analysis results")
-    Container(chord_repo, "ChordAnalysisRepository", "Kotlin", "Abstraction for chord analysis")
-    Container(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Kotlin", "Implementation, holds StateFlow")
-    Container(chord_analyzer, "ChordAnalyzer", "Pure Kotlin", "Native chord detection engine")
-}
-
-Rel(vm, analyze_chord, "analyzeChord()")
-Rel(vm, observe_chord, "observeChordAnalysisResults()")
-Rel(analyze_chord, chord_repo, "analyzeChord()")
-Rel(observe_chord, chord_repo, "observeChordAnalysisResults()")
-Rel(chord_repo_impl, chord_repo, "@Binds")
-Rel(chord_repo_impl, chord_analyzer, "Delegates analyze()")
-
-@enduml
-```
-
-#### 2.1.2. C4 Level 3: Chord Analysis Subsystem Components
+#### 2.1.1. C4 Level 3: Chord Analysis Subsystem Components
 
 ```plantuml
 @startuml

@@ -47,57 +47,33 @@ The MIDI message processing system is integrated into the existing architecture,
 - **`VexflowNoteMapper`:** Converts a `List<Note>` into the JSON format expected by VexFlow.
 - **`WebViewScriptExecutor`:** Generic executor that runs JavaScript inside a hidden `WebView`. Manages page-load timing and pending-script queueing. Used by `PianoStaff` for VexFlow rendering, but contains no music-specific logic.
 
-#### 2.1.1. C4 Level 2: Containers
+#### 2.1.1. C4 Level 3 (Overview): PianoFlow Application Components
 
 ```plantuml
 @startuml
-!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title C4 - Level 2: PianoFlow Application Containers
+title C4 - Level 3 (Overview): PianoFlow Application Components
 
 Person(user, "User", "Musician playing the keyboard")
 System_Ext(midi_device, "MIDI Keyboard", "External physical device")
 System_Ext(vexflow, "VexFlow", "JavaScript notation library (vexflow.html)")
 
-System_Boundary(piano_flow, "PianoFlow Application") {
-    Container(ui, "UI (Compose)", "Kotlin, Jetpack Compose", "Displays staff and chord names")
-    Container(vm, "ViewModel", "Kotlin", "Manages UI state and coordinates analysis")
-    Container(observe_midi, "ObserveMidiMessagesUseCase", "Kotlin Flow", "Groups notes into chords")
-    Container(analyze_chord, "AnalyzeChordUseCase", "Kotlin", "Initiates chord analysis")
-    Container(observe_chord, "ObserveChordAnalysisResultsUseCase", "Kotlin Flow", "Provides analysis results")
-    Container(midi_repo, "MidiRepository", "Kotlin", "Abstraction for MIDI data")
-    Container(chord_repo, "ChordAnalysisRepository", "Kotlin", "Abstraction for chord analysis")
-    Container(midi_repo_impl, "MidiRepositoryImpl", "Kotlin", "Implementation of MIDI repository")
-    Container(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Kotlin", "Implementation of chord analysis")
-    Container(chord_analyzer, "ChordAnalyzer", "Pure Kotlin", "Native chord detection engine")
-    Container(script_executor, "WebViewScriptExecutor", "Kotlin + WebView", "Generic JS executor; used by PianoStaff for VexFlow rendering")
-}
+Component(midi_subsystem, "MIDI Reception Subsystem", "Kotlin", "Receives, parses and groups MIDI messages into chords")
+Component(chord_subsystem, "Chord Analysis Subsystem", "Kotlin", "Chord recognition and result delivery")
+Component(rendering_subsystem, "Staff Rendering Subsystem", "Kotlin + WebView", "Displays staff notation and chord names via VexFlow")
 
 Rel(user, midi_device, "Plays notes")
-Rel(midi_device, midi_repo_impl, "Sends MIDI messages")
-Rel(midi_repo_impl, midi_repo, "Implements")
-Rel(chord_repo_impl, chord_repo, "Implements")
-Rel(chord_repo_impl, chord_analyzer, "Delegates analyze()")
-
-Rel(vm, observe_midi, "observeNotes()")
-Rel(vm, analyze_chord, "analyzeChord()")
-Rel(vm, observe_chord, "observeChordAnalysisResults()")
-
-Rel(observe_midi, midi_repo, "observeNotes()")
-Rel(analyze_chord, chord_repo, "analyzeChord()")
-Rel(observe_chord, chord_repo, "observeChordAnalysisResults()")
-
-Rel(midi_repo_impl, midi_repo, "@Binds")
-Rel(chord_repo_impl, chord_repo, "@Binds")
-
-Rel(vm, ui, "Updates UiState")
-Rel(ui, script_executor, "PianoStaff calls execute(drawScript)")
-Rel(script_executor, vexflow, "Loads vexflow.html, calls drawGrandStaff()")
+Rel(midi_device, midi_subsystem, "Sends MIDI messages")
+Rel(rendering_subsystem, midi_subsystem, "Subscribes to notes")
+Rel(rendering_subsystem, chord_subsystem, "Triggers analysis and subscribes to results")
+Rel(chord_subsystem, rendering_subsystem, "Analysis result")
+Rel(rendering_subsystem, vexflow, "Renders via VexFlow")
 
 @enduml
 ```
 
-#### 2.1.2. C4 Level 3a: MIDI Subsystem Components
+#### 2.1.2. C4 Level 3a (Detailed): MIDI Subsystem Components
 
 ```plantuml
 @startuml
@@ -148,7 +124,7 @@ Rel(midi_device, ds, "Sends MIDI messages")
 @enduml
 ```
 
-#### 2.1.3. C4 Level 3b: Chord Analysis Subsystem Components
+#### 2.1.3. C4 Level 3b (Detailed): Chord Analysis Subsystem Components
 
 ```plantuml
 @startuml
@@ -190,13 +166,13 @@ Rel(chord_repo_impl, chord_analyzer, "Uses")
 
 > Internal structure of `ChordAnalyzer` (parser, chord type registry, models `Pitch` and `ChordType`) is documented in [Native Kotlin Chord Analysis](./CHORD_ANALYSIS.md).
 
-#### 2.1.4. C4 Level 3c: Note Rendering Pipeline
+#### 2.1.4. C4 Level 3c (Detailed): Staff Rendering Subsystem
 
 ```plantuml
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title C4 - Level 3c: Note Rendering Pipeline
+title C4 - Level 3c: Staff Rendering Subsystem
 
 System_Ext(android_sdk, "Android SDK", "WebView, WebViewClient")
 System_Ext(vexflow, "VexFlow", "JavaScript library (vexflow.html)")

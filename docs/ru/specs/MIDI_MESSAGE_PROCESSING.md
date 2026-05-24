@@ -47,57 +47,33 @@
 - **`VexflowNoteMapper`:** Преобразует `List<Note>` в JSON-формат, ожидаемый VexFlow.
 - **`WebViewScriptExecutor`:** Универсальный исполнитель JavaScript внутри скрытого `WebView`. Управляет жизненным циклом WebView и очередью отложенных скриптов. Используется `PianoStaff` для отрисовки через VexFlow, но не содержит музыкальной логики.
 
-#### 2.1.1. C4 Level 2: Контейнеры
+#### 2.1.1. C4 Level 3 (обзорная): Компоненты приложения PianoFlow
 
 ```plantuml
 @startuml
-!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title C4 - Level 2: Контейнеры приложения PianoFlow
+title C4 - Level 3 (обзорная): Компоненты приложения PianoFlow
 
 Person(user, "Пользователь", "Музыкант, играющий на клавиатуре")
 System_Ext(midi_device, "MIDI Keyboard", "Внешнее физическое устройство")
 System_Ext(vexflow, "VexFlow", "JavaScript-библиотека нотации (vexflow.html)")
 
-System_Boundary(piano_flow, "Приложение PianoFlow") {
-    Container(ui, "UI (Compose)", "Kotlin, Jetpack Compose", "Отображает нотный стан и названия аккордов")
-    Container(vm, "ViewModel", "Kotlin", "Управляет состоянием UI и координирует анализ")
-    Container(observe_midi, "ObserveMidiMessagesUseCase", "Kotlin Flow", "Группирует ноты в аккорды")
-    Container(analyze_chord, "AnalyzeChordUseCase", "Kotlin", "Инициирует анализ аккордов")
-    Container(observe_chord, "ObserveChordAnalysisResultsUseCase", "Kotlin Flow", "Предоставляет результаты анализа")
-    Container(midi_repo, "MidiRepository", "Kotlin", "Абстракция для MIDI-данных")
-    Container(chord_repo, "ChordAnalysisRepository", "Kotlin", "Абстракция для анализа аккордов")
-    Container(midi_repo_impl, "MidiRepositoryImpl", "Kotlin", "Реализация MIDI-репозитория")
-    Container(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Kotlin", "Реализация анализа аккордов")
-    Container(chord_analyzer, "ChordAnalyzer", "Pure Kotlin", "Нативный движок распознавания аккордов")
-    Container(script_executor, "WebViewScriptExecutor", "Kotlin + WebView", "Универсальный исполнитель JS; используется PianoStaff для отрисовки через VexFlow")
-}
+Component(midi_subsystem, "Подсистема приема MIDI", "Kotlin", "Прием, парсинг и группировка MIDI-сообщений в аккорды")
+Component(chord_subsystem, "Подсистема анализа аккордов", "Kotlin", "Распознавание аккордов и доставка результатов")
+Component(rendering_subsystem, "Подсистема отрисовки нотного стана", "Kotlin + WebView", "Отображение нотного стана и названий аккордов через VexFlow")
 
 Rel(user, midi_device, "Играет ноты")
-Rel(midi_device, midi_repo_impl, "Отправляет MIDI-сообщения")
-Rel(midi_repo_impl, midi_repo, "Реализует")
-Rel(chord_repo_impl, chord_repo, "Реализует")
-Rel(chord_repo_impl, chord_analyzer, "Делегирует analyze()")
-
-Rel(vm, observe_midi, "observeNotes()")
-Rel(vm, analyze_chord, "analyzeChord()")
-Rel(vm, observe_chord, "observeChordAnalysisResults()")
-
-Rel(observe_midi, midi_repo, "observeNotes()")
-Rel(analyze_chord, chord_repo, "analyzeChord()")
-Rel(observe_chord, chord_repo, "observeChordAnalysisResults()")
-
-Rel(midi_repo_impl, midi_repo, "@Binds")
-Rel(chord_repo_impl, chord_repo, "@Binds")
-
-Rel(vm, ui, "Обновляет UiState")
-Rel(ui, script_executor, "PianoStaff вызывает execute(drawScript)")
-Rel(script_executor, vexflow, "Загружает vexflow.html, вызывает drawGrandStaff()")
+Rel(midi_device, midi_subsystem, "Отправляет MIDI-сообщения")
+Rel(rendering_subsystem, midi_subsystem, "Подписка на ноты")
+Rel(rendering_subsystem, chord_subsystem, "Запуск анализа и подписка на результаты")
+Rel(chord_subsystem, rendering_subsystem, "Результат анализа")
+Rel(rendering_subsystem, vexflow, "Отрисовка через VexFlow")
 
 @enduml
 ```
 
-#### 2.1.2. C4 Level 3a: Компоненты MIDI подсистемы
+#### 2.1.2. C4 Level 3a (детальная): Компоненты MIDI подсистемы
 
 ```plantuml
 @startuml
@@ -148,7 +124,7 @@ Rel(midi_device, ds, "Отправляет MIDI сообщения")
 @enduml
 ```
 
-#### 2.1.3. C4 Level 3b: Компоненты подсистемы анализа аккордов
+#### 2.1.3. C4 Level 3b (детальная): Компоненты подсистемы анализа аккордов
 
 ```plantuml
 @startuml
@@ -190,13 +166,13 @@ Rel(chord_repo_impl, chord_analyzer, "Использует")
 
 > Внутренняя структура `ChordAnalyzer` (парсер, реестр типов аккордов, модели `Pitch` и `ChordType`) описана в [Нативный анализ аккордов на Kotlin](./CHORD_ANALYSIS.md).
 
-#### 2.1.4. C4 Level 3c: Конвейер отрисовки нот
+#### 2.1.4. C4 Level 3c (детальная): Подсистема отрисовки нотного стана
 
 ```plantuml
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title C4 - Level 3c: Конвейер отрисовки нот
+title C4 - Level 3c: Подсистема отрисовки нотного стана
 
 System_Ext(android_sdk, "Android SDK", "WebView, WebViewClient")
 System_Ext(vexflow, "VexFlow", "JavaScript-библиотека (vexflow.html)")

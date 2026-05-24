@@ -37,36 +37,7 @@
 **Data Layer**
 - **`ChordAnalysisRepositoryImpl`**: содержит `MutableStateFlow<String?>` и публичный метод `analyzeChord(notes: List<Note>)`. Дедуплицирует и сортирует имена нот, затем синхронно вызывает `ChordAnalyzer.analyze(...)` и записывает результат напрямую в `StateFlow`. Без многопоточности и платформенных зависимостей.
 
-#### 2.1.1. C4 Level 2: Контейнеры
-
-```plantuml
-@startuml
-!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
-
-title C4 - Level 2: Подсистема анализа аккордов
-
-Person(user, "Пользователь", "Музыкант, играющий на клавиатуре")
-
-System_Boundary(piano_flow, "Приложение PianoFlow") {
-    Container(vm, "PianoStaffViewModel", "Kotlin", "Координирует анализ и обновляет UI-состояние")
-    Container(analyze_chord, "AnalyzeChordUseCase", "Kotlin", "Запускает анализ (fire-and-forget)")
-    Container(observe_chord, "ObserveChordAnalysisResultsUseCase", "Kotlin Flow", "Поставляет результаты анализа")
-    Container(chord_repo, "ChordAnalysisRepository", "Kotlin", "Абстракция анализа аккордов")
-    Container(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Kotlin", "Реализация, держит StateFlow")
-    Container(chord_analyzer, "ChordAnalyzer", "Pure Kotlin", "Нативный движок распознавания аккордов")
-}
-
-Rel(vm, analyze_chord, "analyzeChord()")
-Rel(vm, observe_chord, "observeChordAnalysisResults()")
-Rel(analyze_chord, chord_repo, "analyzeChord()")
-Rel(observe_chord, chord_repo, "observeChordAnalysisResults()")
-Rel(chord_repo_impl, chord_repo, "@Binds")
-Rel(chord_repo_impl, chord_analyzer, "Делегирует analyze()")
-
-@enduml
-```
-
-#### 2.1.2. C4 Level 3: Компоненты подсистемы анализа аккордов
+#### 2.1.1. C4 Level 3: Компоненты подсистемы анализа аккордов
 
 ```plantuml
 @startuml
