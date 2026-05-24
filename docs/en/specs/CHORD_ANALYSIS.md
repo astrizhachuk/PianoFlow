@@ -476,7 +476,7 @@ endif
 - Reference outputs of `chordAnalysisResult`:
   - `[C4, E4, G4]` → `"C"`
   - `[A4, C5, E5]` → `"Am"`
-  - `[E4, G4, C5]` → `"Em#5"` (E is both bass and root; inversion of C major from listener's perspective)
+  - `[A3, D4, F4]` → `"Dm/A"` (A is bass but not root; Dm found with root D — slash chord through real flow)
   - `[C4, D4, E4]` → `null`
   - `[C4]` → `"C4"` (simplify, no change)
   - `[E#4]` → `"F4"` (simplify)
