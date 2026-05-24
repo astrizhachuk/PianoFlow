@@ -475,7 +475,7 @@ deactivate Screen
 
 1.  **Инициализация**: `PianoStaff` создает экземпляр `WebView` и инициализирует `WebViewScriptExecutor`, который загружает `vexflow.html`.
 2.  **Отслеживание размера**: Модификатор `onSizeChanged` обновляет состояние `viewSize`. Это необходимо для того, чтобы VexFlow знал доступную область отрисовки.
-3.  **Триггер отрисовки**: `LaunchedEffect` следит за изменениями `notesJson`, `isPortrait` (входной параметр ориентации) и `viewSize`.
+3.  **Триггер отрисовки**: `LaunchedEffect` следит за изменениями `notesJson`, `isPortrait` (входной параметр ориентации), `viewSize`, `isDarkScheme` (цветовая схема) и `needsScale` (флаг компактного экрана).
 4.  **Выполнение отрисовки**: Когда `viewSize` становится отличным от нуля, формируется JavaScript-вызов функции `drawGrandStaff`. Вызов передается в `WebViewScriptExecutor`, который выполняет его в контексте `WebView`.
 5.  **Формат JSON**: Данные передаются в виде единого JSON-объекта, который содержит отдельные массивы для скрипичного и басового ключей.
     ```json
@@ -514,7 +514,7 @@ Ready : Компонент готов к отрисовке
 state Drawing
 Drawing : executor.execute(drawScript)
 
-Ready --> Drawing : notesJson, isPortrait или viewSize изменились
+Ready --> Drawing : notesJson, isPortrait, viewSize,\nisDarkScheme или needsScale изменились
 Drawing --> Ready : JS-код отправлен на выполнение
 @enduml
 ```

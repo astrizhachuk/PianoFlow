@@ -476,7 +476,7 @@ The musical staff is drawn using a `WebView` and the [VexFlow](https://www.vexfl
 
 1. **Initialization**: `PianoStaff` creates a `WebView` instance and initializes `WebViewScriptExecutor`, which loads `vexflow.html`.
 2. **Size Tracking**: The `onSizeChanged` modifier updates the `viewSize` state. This is necessary for VexFlow to know the available drawing area.
-3. **Drawing Trigger**: `LaunchedEffect` monitors changes to `notesJson`, `isPortrait` (orientation parameter), and `viewSize`.
+3. **Drawing Trigger**: `LaunchedEffect` monitors changes to `notesJson`, `isPortrait` (orientation parameter), `viewSize`, `isDarkScheme` (color scheme), and `needsScale` (compact-screen flag).
 4. **Drawing Execution**: When `viewSize` becomes non-zero, a JavaScript call to `drawGrandStaff` is formed. The call is passed to `WebViewScriptExecutor`, which executes it in the `WebView` context.
 5. **JSON Format**: Data is passed as a single JSON object containing separate arrays for treble and bass clefs.
    ```json
@@ -515,7 +515,7 @@ Ready : Component ready for drawing
 state Drawing
 Drawing : executor.execute(drawScript)
 
-Ready --> Drawing : notesJson, isPortrait or viewSize changed
+Ready --> Drawing : notesJson, isPortrait, viewSize,\nisDarkScheme or needsScale changed
 Drawing --> Ready : JS code sent for execution
 @enduml
 ```
