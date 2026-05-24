@@ -1,4 +1,4 @@
-package com.astrizhachuk.pianoflow.data.datasource.analysis
+package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -6,25 +6,25 @@ import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
- * Executes JavaScript for music analysis tasks using a hidden [WebView].
+ * Executes JavaScript inside a [WebView] with proper page-load synchronization.
  *
- * This engine provides a simplified interface for running JavaScript code by abstracting away the
- * asynchronous nature of [WebView]. It maintains a queue for scripts, executing them only after
- * the designated web page has fully loaded. This allows callers to use a synchronous-style API
- * without managing the complexities of page load events.
+ * This executor abstracts away the asynchronous nature of [WebView]. It maintains a queue for
+ * scripts and executes them only after the designated web page has finished loading, so callers
+ * can use a synchronous-style API without managing page-load events themselves.
  *
- * By encapsulating the [WebView] within this data-layer class, the application benefits from:
- * - Decoupling of the presentation layer from the Android-specific `WebView` implementation.
- * - Enabling data-layer components (e.g., repositories) to execute JavaScript without
- *   depending on UI lifecycle or callbacks.
- * - A clear separation of concerns, isolating JavaScript-based business logic from the UI.
+ * The class is domain-agnostic: it carries no music-specific logic. In PianoFlow it is used by
+ * [PianoStaff] to drive VexFlow rendering, but it can host any JS-based page.
+ *
+ * Callers benefit from:
+ * - Decoupling from page-load timing and pending-script bookkeeping.
+ * - A clear separation of concerns, isolating WebView setup from UI logic.
  *
  * @param webView The [WebView] instance to be used for script execution. This class takes
  *   ownership of configuring its [WebViewClient].
  * @param pageUrl The URL of the page to load into the [WebView]. Scripts will not be
  *   executed until this page has finished loading.
  */
-class MusicScriptEngine(
+class WebViewScriptExecutor(
     private val webView: WebView,
     pageUrl: String
 ) {
@@ -32,7 +32,7 @@ class MusicScriptEngine(
     private val pendingScripts = ConcurrentLinkedQueue<Pair<String, (String?) -> Unit>>()
 
     init {
-        Timber.d("Initializing MusicScriptEngine for URL: %s", pageUrl)
+        Timber.d("Initializing WebViewScriptExecutor for URL: %s", pageUrl)
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)

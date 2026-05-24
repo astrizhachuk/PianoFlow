@@ -60,9 +60,6 @@ dependencies {
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.constraintlayout)
     
-    // JSON Parsing
-    implementation(libs.gson)
-
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

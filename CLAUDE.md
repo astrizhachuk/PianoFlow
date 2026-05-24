@@ -22,31 +22,6 @@ Custom `HiltTestRunner` is used for instrumented tests (`testInstrumentationRunn
 
 **Clean Architecture** with three strictly separated layers. The dependency rule: `Presentation → Domain ← Data`. The Domain layer has **zero** platform dependencies.
 
-```
-presentation/   ← MVVM (ViewModels, Compose UI, state models)
-domain/         ← Use cases, repository interfaces, domain models, services (pure Kotlin)
-data/           ← Repository implementations, data sources, mappers
-```
-
-Package naming: `{layer}.{component_type}.{functionality}`, e.g. `domain.usecase.midi`.
-
-### Key Data Flow
-
-1. Android MIDI API → `MidiDataSource` → `MidiMessageParser` → raw MIDI bytes
-2. `ObserveMidiMessagesUseCase` groups notes within a 260ms time window into chords
-3. `AnalyzeChordUseCase` → `ChordAnalysisRepositoryImpl` → `MusicScriptEngine` (JavaScript via WebView + VexFlow)
-4. Results flow via Kotlin `StateFlow`/`Flow` into `PianoStaffViewModel` → Compose UI
-
-### Chord Analysis via WebView
-
-`MusicScriptEngine` runs JavaScript music theory logic inside a `WebView`. The script file is `assets/vexflow.html`. Results are returned asynchronously via `JavascriptInterface`.
-
-### Dependency Injection
-
-Hilt is used throughout. Key DI modules:
-- `data/di/DataModule.kt` — binds repository interfaces to implementations
-- `presentation/di/NotificationModule.kt` — binds `UserNotifier`
-
 ## Code Standards
 
 Follow [Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html) and [Kotlin idioms](https://kotlinlang.org/docs/idioms.html). Any deviation must be explicitly noted.
@@ -136,3 +111,9 @@ Subdirectories mirror each other: `plans/`, `specs/`, `tech/`, `uc/`.
 - After any change to an English document, update the corresponding Russian document in `docs/ru/` to keep them in sync.
 - When adding a new document, create both language versions simultaneously.
 - If only the Russian document exists for some topic, treat it as a draft — create the English version before merging.
+
+**Spec section convention:**
+- `### 1.2. Base Documents` (in §1 General Information) — **prerequisites**: parent specs, use cases, architectural principles the reader needs to know before reading this spec.
+- `### 2.3. Dependency Graph` — DI bindings and component dependencies for the subsystem (Kotlin DI module snippet and/or PlantUML graph). Always use this exact name; do not call it "Dependencies", "Dependency injection", etc.
+- `## See Also` (trailing, optional) — **additional technical references** not strictly required: tech docs (Kotlin Flow, MIDI API, etc.). Omit the section entirely if there are no entries beyond what is already listed in Base Documents — never duplicate.
+- Specs describe the **current state** of the system, not the history of changes. Migration narratives (file removals, "rewritten internals", "previously used X, now uses Y") belong in commit messages and PR descriptions, not in `specs/`.

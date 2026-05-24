@@ -100,7 +100,7 @@ interface MidiRepository {
 }
 ```
 
-### 2.3. Dependency injection
+### 2.3. Dependency Graph
 
 To let Hilt know how to provide implementations for interfaces, `DataModule` is used.
 

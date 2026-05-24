@@ -66,7 +66,7 @@ interface UserNotifier {
 }
 ```
 
-### 2.3. Dependency injection
+### 2.3. Dependency Graph
 
 To let Hilt know that when requesting the `UserNotifier` interface, you need to provide an instance of the `UserNotifierImpl` class, `NotificationModule` is used.
 

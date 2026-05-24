@@ -17,17 +17,16 @@
 
 ## 2. Архитектурное решение
 
-### 2.1. Компоненты
+### 2.1. Архитектурные диаграммы
 
-Система обработки MIDI-сообщений интегрирована в существующую архитектуру, расширяя функционал `Data` и `Domain` слоев и добавляя новые компоненты в `Presentation` слой. Включает модули для анализа аккордов с использованием JavaScript-библиотеки [Tonal](https://github.com/tonaljs/tonal).
+Система обработки MIDI-сообщений интегрирована в существующую архитектуру, расширяя функционал `Data` и `Domain` слоев и добавляя новые компоненты в `Presentation` слой. Анализ аккордов выполняется встроенным движком `ChordAnalyzer` на чистом Kotlin (см. [Нативный анализ аккордов на Kotlin](./CHORD_ANALYSIS.md)).
 
 **Data Layer**
 - **`MidiDataSource`:** Расширен для обработки входящих MIDI-сообщений. После успешного открытия устройства (`MidiManager.openDevice`), он подключает `MidiReceiver` к **выходному порту** устройства (`MidiOutputPort`) для приема данных.
 - **`MidiMessageReceiver`:** Внутренняя реализация `android.media.midi.MidiReceiver`, ответственная за прием сырых MIDI-данных (`byte[]`).
 - **`MidiMessageParser`:** Компонент, который получает сырые данные от `MidiMessageReceiver`, парсит их и преобразует в доменную модель `Note`. Игнорирует все сообщения, кроме `Note On` (с velocity > 0).
 - **`MidiRepositoryImpl`:** Реализация репозитория, которая предоставляет поток входящих нот.
-- **`MusicScriptEngine`:** Компонент для изоляции логики выполнения JavaScript-кода через WebView. Обеспечивает безопасное и изолированное выполнение скриптов Tonal.js для анализа аккордов.
-- **`ChordAnalysisRepositoryImpl`:** Реализация репозитория анализа аккордов. Использует `MusicScriptEngine` для выполнения JavaScript-кода и `ChordAnalysisService` для постобработки результатов. Предоставляет `StateFlow<String?>` с результатами анализа.
+- **`ChordAnalysisRepositoryImpl`:** Реализация репозитория анализа аккордов. Делегирует распознавание движку `ChordAnalyzer` синхронно и обновляет `StateFlow<String?>` напрямую без переходов между потоками.
 
 **Domain Layer**
 - **`Note`:** Доменная модель ноты (MIDI-номер и музыкальное имя, например "C4").
@@ -36,78 +35,45 @@
 - **`ChordAnalysisRepository`:** Интерфейс с методами `analyzeChord()` и `chordAnalysisResult`.
 - **`AnalyzeChordUseCase`:** Use case для запуска асинхронного анализа аккорда (fire-and-forget).
 - **`ObserveChordAnalysisResultsUseCase`:** Use case для подписки на результаты анализа.
-- **`ChordAnalysisService`:** Доменный сервис для обработки сырых строковых результатов из JavaScript (очистка от кавычек, нормализация имен).
+- **`ChordAnalyzer`:** Доменный сервис нативного распознавания аккордов и упрощения одиночных нот. Pure Kotlin, синхронный, main-safe. Внутренняя структура и алгоритм описаны в [спецификации Chord Analysis](./CHORD_ANALYSIS.md).
 
 **Presentation Layer**
 - **`PianoStaffViewModel`:** Управляет состоянием UI. Объединяет (`combine`) поток нот и результаты анализа. При изменении состава нот инициирует новый анализ.
 - **`PianoStaffUiState`:** Состояние UI:
-  - `notesJson: String` - JSON-представление нот для визуализации через VexFlow.
-  - `chordName: String?` - название распознанного аккорда или локализованная строка "Не определен".
+  - `notesJson: String` — JSON-представление нот для визуализации через VexFlow.
+  - `chordName: String?` — название распознанного аккорда или локализованная строка "Не определен".
 - **`PianoStaffScreen`:** Composable-экран, который отображает сыгранные ноты на нотном стане и название аккорда.
+- **`PianoStaff`:** Composable, который инкапсулирует `WebView` и отрисовывает нотный стан через JS-библиотеку VexFlow.
+- **`VexflowNoteMapper`:** Преобразует `List<Note>` в JSON-формат, ожидаемый VexFlow.
+- **`WebViewScriptExecutor`:** Универсальный исполнитель JavaScript внутри скрытого `WebView`. Управляет жизненным циклом WebView и очередью отложенных скриптов. Используется `PianoStaff` для отрисовки через VexFlow, но не содержит музыкальной логики.
 
-#### 2.1.1. C4 Level 3 Overview: Обзор подсистем
+#### 2.1.1. C4 Level 3 (обзорная): Компоненты приложения PianoFlow
 
 ```plantuml
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title C4 - Level 3 Overview: Обзор подсистем обработки MIDI-сообщений
+title C4 - Level 3 (обзорная): Компоненты приложения PianoFlow
 
-System_Ext(midi_device, "MIDI Keyboard", "Физическое устройство")
-System_Ext(webview_js, "WebView + Tonal.js", "JavaScript анализ аккордов")
+Person(user, "Пользователь", "Музыкант, играющий на клавиатуре")
+System_Ext(midi_device, "MIDI Keyboard", "Внешнее физическое устройство")
+System_Ext(vexflow, "VexFlow", "JavaScript-библиотека нотации (vexflow.html)")
 
-Container_Boundary(presentation, "Presentation Layer") {
-    Component(vm, "PianoStaffViewModel", "ViewModel", "Управляет ноты + аккорды")
-    Component(screen, "PianoStaffScreen", "Composable", "Отображает ноты и названия")
-}
+Component(midi_subsystem, "Подсистема приема MIDI", "Kotlin", "Прием, парсинг и группировка MIDI-сообщений в аккорды")
+Component(chord_subsystem, "Подсистема анализа аккордов", "Kotlin", "Распознавание аккордов и доставка результатов")
+Component(rendering_subsystem, "Подсистема отрисовки нотного стана", "Kotlin + WebView", "Отображение нотного стана и названий аккордов через VexFlow")
 
-Container_Boundary(domain, "Domain Layer") {
-    Container_Boundary(midi_subsystem, "MIDI Subsystem") {
-        Component(observe_midi, "ObserveMidiMessagesUseCase", "Use Case", "")
-        Component(midi_repo, "MidiRepository", "Interface", "")
-    }
-    
-    Container_Boundary(chord_subsystem, "Chord Analysis Subsystem") {
-        Component(analyze_chord, "AnalyzeChordUseCase", "Use Case", "")
-        Component(observe_chord, "ObserveChordAnalysisResultsUseCase", "Use Case", "")
-        Component(chord_repo, "ChordAnalysisRepository", "Interface", "")
-    }
-}
-
-Container_Boundary(data, "Data Layer") {
-    Container_Boundary(midi_impl, "MIDI Implementation") {
-        Component(midi_repo_impl, "MidiRepositoryImpl", "Impl", "")
-        Component(ds, "MidiDataSource", "Data Source", "")
-    }
-    
-    Container_Boundary(chord_impl, "Chord Analysis Implementation") {
-        Component(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Impl", "")
-        Component(js_engine, "MusicScriptEngine", "JS Engine", "")
-    }
-}
-
-' Связи
-Rel(midi_device, ds, "MIDI сообщения")
-Rel(chord_repo_impl, js_engine, "Использует для анализа")
-Rel(js_engine, webview_js, "Выполняет JS")
-
-Rel(vm, observe_midi, "observeNotes()")
-Rel(vm, analyze_chord, "analyzeChord()")
-Rel(vm, observe_chord, "observeChordAnalysisResults()")
-
-Rel(observe_midi, midi_repo, "observeNotes()")
-Rel(analyze_chord, chord_repo, "analyzeChord()")
-Rel(observe_chord, chord_repo, "observeChordAnalysisResults()")
-
-Rel(midi_repo_impl, midi_repo, "@Binds")
-Rel(chord_repo_impl, chord_repo, "@Binds")
-
-Rel(vm, screen, "Обновляет UiState")
+Rel(user, midi_device, "Играет ноты")
+Rel(midi_device, midi_subsystem, "Отправляет MIDI-сообщения")
+Rel(rendering_subsystem, midi_subsystem, "Подписка на ноты")
+Rel(rendering_subsystem, chord_subsystem, "Запуск анализа и подписка на результаты")
+Rel(chord_subsystem, rendering_subsystem, "Результат анализа")
+Rel(rendering_subsystem, vexflow, "Отрисовка через VexFlow")
 
 @enduml
 ```
 
-#### 2.1.2. C4 Level 3a: Компоненты MIDI подсистемы
+#### 2.1.2. C4 Level 3a (детальная): Компоненты MIDI подсистемы
 
 ```plantuml
 @startuml
@@ -158,15 +124,13 @@ Rel(midi_device, ds, "Отправляет MIDI сообщения")
 @enduml
 ```
 
-#### 2.1.3. C4 Level 3b: Компоненты подсистемы анализа аккордов
+#### 2.1.3. C4 Level 3b (детальная): Компоненты подсистемы анализа аккордов
 
 ```plantuml
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
 title C4 - Level 3b: Компоненты подсистемы анализа аккордов
-
-System_Ext(webview_js, "WebView + Tonal.js", "JavaScript анализ аккордов")
 
 Container_Boundary(presentation, "Presentation Layer") {
     Component(vm, "PianoStaffViewModel", "ViewModel", "Вызывает анализ и получает результаты")
@@ -176,12 +140,11 @@ Container_Boundary(domain, "Domain Layer") {
     Component(analyze_chord_uc, "AnalyzeChordUseCase", "Use Case", "Fire-and-forget анализ")
     Component(observe_chord_uc, "ObserveChordAnalysisResultsUseCase", "Use Case", "Подписка на результаты")
     Component(chord_repo, "ChordAnalysisRepository", "Interface", "Контракт анализа аккордов")
-    Component(chord_service, "ChordAnalysisService", "Domain Service", "Бизнес-логика обработки строк")
+    Component(chord_analyzer, "ChordAnalyzer", "Domain Service", "Нативный движок: analyze(noteNames)")
 }
 
 Container_Boundary(data, "Data Layer") {
-    Component(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Repository Impl", "Управляет анализом и StateFlow")
-    Component(js_executor, "MusicScriptEngine", "JS Executor", "Выполняет Tonal.js код")
+    Component(chord_repo_impl, "ChordAnalysisRepositoryImpl", "Repository Impl", "Владеет StateFlow, делегирует ChordAnalyzer")
 }
 
 ' Связи Presentation-Domain
@@ -196,11 +159,41 @@ Rel(observe_chord_uc, chord_repo, "observeChordAnalysisResults()")
 Rel(chord_repo_impl, chord_repo, "@Binds")
 
 ' Связи Data Layer
-Rel(chord_repo_impl, chord_service, "Использует")
-Rel(chord_repo_impl, js_executor, "Использует для JS")
+Rel(chord_repo_impl, chord_analyzer, "Использует")
 
-' Внешние системы
-Rel(js_executor, webview_js, "Выполняет анализ")
+@enduml
+```
+
+> Внутренняя структура `ChordAnalyzer` (парсер, реестр типов аккордов, модели `Pitch` и `ChordType`) описана в [Нативный анализ аккордов на Kotlin](./CHORD_ANALYSIS.md).
+
+#### 2.1.4. C4 Level 3c (детальная): Подсистема отрисовки нотного стана
+
+```plantuml
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title C4 - Level 3c: Подсистема отрисовки нотного стана
+
+System_Ext(android_sdk, "Android SDK", "WebView, WebViewClient")
+System_Ext(vexflow, "VexFlow", "JavaScript-библиотека (vexflow.html)")
+
+Container_Boundary(presentation, "Presentation Layer") {
+    Component(vm, "PianoStaffViewModel", "ViewModel", "Отдает notesJson через UiState")
+    Component(screen, "PianoStaffScreen", "Composable", "Размещает PianoStaff и название аккорда")
+    Component(staff, "PianoStaff", "Composable", "Инкапсулирует WebView, инициирует перерисовку")
+    Component(mapper, "VexflowNoteMapper", "Mapper", "Преобразует List<Note> в VexFlow JSON")
+    Component(executor, "WebViewScriptExecutor", "Infrastructure", "Управляет жизненным циклом WebView и очередью JS")
+}
+
+' Поток в Presentation
+Rel(vm, mapper, "Формирует notesJson")
+Rel(vm, screen, "uiState (notesJson, chordName)")
+Rel(screen, staff, "Передает ноты и параметры отрисовки")
+Rel(staff, executor, "execute(drawScript)")
+
+' Инфраструктура
+Rel(executor, android_sdk, "evaluateJavascript()")
+Rel(android_sdk, vexflow, "Загружает vexflow.html, вызывает drawGrandStaff()")
 
 @enduml
 ```
@@ -239,12 +232,13 @@ interface ChordAnalysisRepository {
     fun analyzeChord(notes: List<Note>)
 }
 
-// com.astrizhachuk.pianoflow.domain.service.ChordAnalysisService.kt
+// com.astrizhachuk.pianoflow.domain.service.analysis.ChordAnalyzer.kt
 /**
- * Доменный сервис для обработки строковых результатов анализа.
+ * Доменный сервис нативного анализа аккордов и одиночных нот.
+ * Синхронный, main-safe, pure Kotlin.
  */
-class ChordAnalysisService {
-    fun processChordAnalysisResult(rawChord: String?): String?
+class ChordAnalyzer {
+    fun analyze(noteNames: List<String>): String?
 }
 ```
 
@@ -257,14 +251,6 @@ class ChordAnalysisService {
  */
 class MidiMessageParser {
     fun parse(data: ByteArray): Note?
-}
-
-// com.astrizhachuk.pianoflow.data.datasource.analysis.MusicScriptEngine.kt
-/**
- * Движок для выполнения JavaScript кода.
- */
-class MusicScriptEngine {
-    fun execute(script: String, callback: (String?) -> Unit)
 }
 ```
 
@@ -279,9 +265,17 @@ data class PianoStaffUiState(
     val notesJson: String = "{\"treble\":[], \"bass\":[]}",
     val chordName: String? = null
 )
+
+// com.astrizhachuk.pianoflow.presentation.ui.pianostaff.WebViewScriptExecutor.kt
+/**
+ * Выполняет JavaScript внутри скрытого WebView; используется PianoStaff для отрисовки через VexFlow.
+ */
+class WebViewScriptExecutor(webView: WebView, pageUrl: String) {
+    fun execute(script: String, onResult: (String?) -> Unit)
+}
 ```
 
-### 2.3. Расширение зависимостей
+### 2.3. Граф зависимостей
 
 Система использует Hilt для управления зависимостями.
 
@@ -290,8 +284,7 @@ data class PianoStaffUiState(
 title Граф зависимостей системы обработки MIDI (Hilt)
 
 class MidiMessageParser <<@Singleton>>
-class MusicScriptEngine <<@Singleton>>
-class ChordAnalysisService <<@Singleton>>
+class ChordAnalyzer <<@Inject constructor>>
 class MidiDataSource <<@Singleton>>
 class MidiRepositoryImpl
 class ChordAnalysisRepositoryImpl <<@Singleton>>
@@ -299,8 +292,6 @@ interface MidiRepository
 interface ChordAnalysisRepository
 interface MidiDeviceMapper
 class MidiDeviceMapperImpl
-class Gson <<@Singleton>>
-class WebView <<@Singleton>>
 
 ' Репозитории и их реализации (Binds)
 MidiRepositoryImpl ..|> MidiRepository : @Binds
@@ -309,18 +300,15 @@ MidiDeviceMapperImpl ..|> MidiDeviceMapper : @Binds
 
 ' Зависимости репозиториев
 MidiRepositoryImpl --> MidiDataSource : inject
-ChordAnalysisRepositoryImpl --> MusicScriptEngine : inject
-ChordAnalysisRepositoryImpl --> ChordAnalysisService : inject
-ChordAnalysisRepositoryImpl --> Gson : inject
+ChordAnalysisRepositoryImpl --> ChordAnalyzer : inject
 
-' Источники данных и движки
+' Источники данных
 MidiDataSource --> MidiMessageParser : inject
 MidiDataSource --> MidiDeviceMapper : inject
-MusicScriptEngine --> WebView : inject
 
 note right of ChordAnalysisRepositoryImpl
-  Репозиторий координирует
-  анализ через JS движок
+  Репозиторий делегирует анализ
+  нативному ChordAnalyzer (pure Kotlin)
 end note
 
 @enduml
@@ -416,9 +404,10 @@ deactivate Receiver
     *   `PianoStaffViewModel` наблюдает за `ObserveMidiMessagesUseCase`. При поступлении нового списка нот:
         1. Инициирует анализ через `AnalyzeChordUseCase(notes)`. Это операция типа "fire-and-forget".
         2. `AnalyzeChordUseCase` вызывает `ChordAnalysisRepository.analyzeChord(notes)`.
-        3. Репозиторий подготавливает JS-скрипт и выполняет его через `MusicScriptEngine` (WebView + Tonal.js).
-        4. Результат очищается через `ChordAnalysisService` и сохраняется в `StateFlow` репозитория.
+        3. Репозиторий дедуплицирует и сортирует имена нот, затем **синхронно** вызывает `ChordAnalyzer.analyze(noteNames)`.
+        4. Результат напрямую записывается в `StateFlow<String?>` репозитория (без перехода между потоками, без callback-ов).
     *   Параллельно `PianoStaffViewModel` объединяет (`combine`) поток нот и поток результатов анализа из `ObserveChordAnalysisResultsUseCase`.
+    *   Алгоритм и реестр типов аккордов описаны в [Нативный анализ аккордов на Kotlin](./CHORD_ANALYSIS.md).
 
 5.  **Отображение на UI**:
     *   Результат объединения формирует `PianoStaffUiState`.
@@ -435,7 +424,7 @@ participant "ObserveMidiMessagesUseCase" as UC
 participant "PianoStaffViewModel" as VM
 participant "AnalyzeChordUseCase" as AnalyzeUC
 participant "ChordAnalysisRepository" as Repo
-participant "MusicScriptEngine" as JS
+participant "ChordAnalyzer" as Analyzer
 participant "PianoStaffScreen" as Screen
 
 User -> DS : Нажимает клавиши
@@ -448,10 +437,10 @@ VM -> AnalyzeUC : invoke(notes)
 activate AnalyzeUC
 AnalyzeUC -> Repo : analyzeChord(notes)
 activate Repo
-Repo -> JS : execute("analyze(...)")
-activate JS
-JS -->> Repo : rawResult
-deactivate JS
+Repo -> Analyzer : analyze(noteNames)
+activate Analyzer
+Analyzer --> Repo : имя аккорда (или null)
+deactivate Analyzer
 Repo -> Repo : update StateFlow
 Repo -->> AnalyzeUC
 deactivate Repo
@@ -478,16 +467,16 @@ deactivate Screen
 **Ключевые компоненты:**
 
 - **`PianoStaff` Composable:** Оборачивает `AndroidView`, в котором создается и настраивается `WebView`. Этот компонент отвечает за управление жизненным циклом `WebView` и его перерисовку.
-- **`MusicScriptEngine`:** Используется внутри компонента для управления выполнением JS-кода и загрузки HTML-ресурса.
+- **`WebViewScriptExecutor`:** Используется внутри компонента для управления выполнением JS-кода и загрузки HTML-ресурса.
 - **`VexflowNoteMapper.kt`**: Содержит логику преобразования `List<Note>` в конечный JSON-объект.
 - **`vexflow.html`:** HTML-файл в `assets`, содержащий логику вызова функций `VexFlow` (версия [4.2.2](https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js), также расположенная в `assets`).
 
 **Процесс работы:**
 
-1.  **Инициализация**: `PianoStaff` создает экземпляр `WebView` и инициализирует `MusicScriptEngine`, который загружает `vexflow.html`.
+1.  **Инициализация**: `PianoStaff` создает экземпляр `WebView` и инициализирует `WebViewScriptExecutor`, который загружает `vexflow.html`.
 2.  **Отслеживание размера**: Модификатор `onSizeChanged` обновляет состояние `viewSize`. Это необходимо для того, чтобы VexFlow знал доступную область отрисовки.
-3.  **Триггер отрисовки**: `LaunchedEffect` следит за изменениями `notesJson`, `isPortrait` (входной параметр ориентации) и `viewSize`.
-4.  **Выполнение отрисовки**: Когда `viewSize` становится отличным от нуля, формируется JavaScript-вызов функции `drawGrandStaff`. Вызов передается в `MusicScriptEngine`, который выполняет его в контексте `WebView`.
+3.  **Триггер отрисовки**: `LaunchedEffect` следит за изменениями `notesJson`, `isPortrait` (входной параметр ориентации), `viewSize`, `isDarkScheme` (цветовая схема) и `needsScale` (флаг компактного экрана).
+4.  **Выполнение отрисовки**: Когда `viewSize` становится отличным от нуля, формируется JavaScript-вызов функции `drawGrandStaff`. Вызов передается в `WebViewScriptExecutor`, который выполняет его в контексте `WebView`.
 5.  **Формат JSON**: Данные передаются в виде единого JSON-объекта, который содержит отдельные массивы для скрипичного и басового ключей.
     ```json
     {
@@ -506,10 +495,10 @@ title Диаграмма состояний PianoStaff
 
 state Initializing
 Initializing : Создается WebView
-Initializing : Создается MusicScriptEngine
+Initializing : Создается WebViewScriptExecutor
 Initializing : viewSize = IntSize.Zero
 
-Initializing --> WaitingForMeasurement : MusicScriptEngine загружает vexflow.html
+Initializing --> WaitingForMeasurement : WebViewScriptExecutor загружает vexflow.html
 
 state WaitingForMeasurement
 WaitingForMeasurement : Ожидание измерения размера (onSizeChanged)
@@ -525,7 +514,7 @@ Ready : Компонент готов к отрисовке
 state Drawing
 Drawing : executor.execute(drawScript)
 
-Ready --> Drawing : notesJson, isPortrait или viewSize изменились
+Ready --> Drawing : notesJson, isPortrait, viewSize,\nisDarkScheme или needsScale изменились
 Drawing --> Ready : JS-код отправлен на выполнение
 @enduml
 ```
@@ -543,7 +532,7 @@ box "Presentation Layer (Kotlin/Compose)" #LightBlue
 end box
 
 box "Infrastructure" #LightGreen
-    participant "MusicScriptEngine" as Engine
+    participant "WebViewScriptExecutor" as Executor
     participant "WebView" as WebView
 end box
 
@@ -557,8 +546,8 @@ Screen -> StaffComposable : Начальная композиция
 activate StaffComposable
 
 StaffComposable -> WebView : create()
-StaffComposable -> Engine : create(webView, "vexflow.html")
-Engine -> WebView : loadUrl(...)
+StaffComposable -> Executor : create(webView, "vexflow.html")
+Executor -> WebView : loadUrl(...)
 
 deactivate StaffComposable
 
@@ -571,11 +560,11 @@ Screen -> StaffComposable : Рекомпозиция (новые парамет�
 activate StaffComposable
 
 StaffComposable -> StaffComposable : LaunchedEffect триггерится
-StaffComposable -> Engine : execute("drawGrandStaff(...)")
+StaffComposable -> Executor : execute("drawGrandStaff(...)")
 
-note right of Engine: Движок гарантирует выполнение\nпосле загрузки страницы
+note right of Executor: Исполнитель гарантирует выполнение\nпосле загрузки страницы
 
-Engine -> WebView : evaluateJavascript(...)
+Executor -> WebView : evaluateJavascript(...)
 WebView -> DrawJsFunc : Вызов отрисовки
 
 deactivate StaffComposable
@@ -599,12 +588,11 @@ deactivate Screen
 - Для каждого распознанного аккорда (2+ ноты) на экране отображается его название (например, "C Major", "Am", "G7sus4").
 - Для одиночных нот НЕ отображается никакого названия аккорда (поле остается пустым).
 - Если несколько нот не образуют известный аккорд, отображается текст "Не определен" (или согласно локализации).
-- Анализ аккордов выполняется в отдельном потоке и не блокирует UI поток.
+- Анализ аккордов синхронный, выполняется менее чем за миллисекунду и main-safe; блокировка UI-потока не наблюдается.
 - Результаты анализа обновляются в `StateFlow` и безопасны для одновременного доступа из разных потоков (thread-safe).
-- Система использует Tonal.js для анализа аккордов, что обеспечивает точное распознавание стандартных музыкальных аккордов.
+- Система использует встроенный движок распознавания аккордов на Kotlin (см. [Нативный анализ аккордов на Kotlin](./CHORD_ANALYSIS.md)), что обеспечивает точное распознавание стандартных музыкальных аккордов.
 
 ## См. также
 
-- [Архитектурные принципы](../plans/ARCHITECTURE_PRINCIPLES.md)
 - [Документ о Kotlin Flow](../tech/KOTLIN_FLOW.md)
 - [Документ о MIDI API в Android](../tech/MIDI.md)
