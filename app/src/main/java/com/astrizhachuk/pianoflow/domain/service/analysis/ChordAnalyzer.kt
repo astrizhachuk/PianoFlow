@@ -26,11 +26,11 @@ class ChordAnalyzer @Inject constructor() {
      */
     fun analyze(noteNames: List<String>): String? {
         val parsed = noteNames.mapNotNull { name ->
-            Pitch.parse(name)?.let { pitch -> name to pitch }
+            Pitch.parse(name)?.let { name to it }
         }
-        return when {
-            parsed.isEmpty() -> null
-            parsed.size == 1 -> simplify(parsed[0].second)
+        return when (parsed.size) {
+            0 -> null
+            1 -> simplify(parsed[0].second)
             else -> detectChord(parsed)
         }
     }
@@ -38,42 +38,40 @@ class ChordAnalyzer @Inject constructor() {
     private fun simplify(pitch: Pitch): String {
         val scale = if (pitch.alter > 0) SHARP_SCALE else FLAT_SCALE
         val noteName = scale[pitch.chroma]
-        val midi = pitch.midi ?: return noteName
-        val octave = (midi / 12) - 1
-        return "$noteName$octave"
+        return pitch.midi?.let { midi ->
+            val octave = (midi / 12) - 1
+            "$noteName$octave"
+        } ?: noteName
     }
 
     private fun detectChord(parsed: List<Pair<String, Pitch>>): String? {
-        // Step 2: chroma → pitch-class name (first occurrence wins per chroma)
-        val chromaToName = mutableMapOf<Int, String>()
-        for ((name, pitch) in parsed) {
-            chromaToName.putIfAbsent(pitch.chroma, stripOctave(name))
-        }
+        // Map each unique chroma to its first occurrence's name without octave.
+        // This preserves the user's notation (e.g., "Cb" vs "B").
+        val chromaToName = parsed.distinctBy { it.second.chroma }
+            .associate { it.second.chroma to stripOctave(it.first) }
 
-        // Step 3: 12-bit bitmask from unique chromas only
+        // 12-bit bitmask from unique chromas.
         val bitmask = chromaToName.keys.fold(0) { acc, c -> acc or (1 shl c) }
         val bassChroma = parsed[0].second.chroma
+        val bassName = chromaToName[bassChroma]!!
 
-        // Steps 4–6: try all 12 rotations
-        val results = mutableListOf<Pair<Double, String>>()
-        for ((u, rootName) in chromaToName) {
-            val rotated = rotate12(bitmask, u)
-            val types = ChordTypeRegistry.byChroma[rotated] ?: continue
+        // Find all possible chord interpretations across all potential roots.
+        // We prioritize the root matching the bass note by assigning a higher weight.
+        return chromaToName.asSequence()
+            .flatMap { (u, rootName) ->
+                val rotated = rotate12(bitmask, u)
+                val types = ChordTypeRegistry.byChroma[rotated] ?: return@flatMap emptySequence()
 
-            for (type in types) {
-                val symbol = if (type.symbol == "M") "" else type.symbol
-                if (u == bassChroma) {
-                    results += 1.0 to "$rootName$symbol"
-                } else {
-                    val bassName = chromaToName[bassChroma]!!
-                    results += 0.5 to "$rootName$symbol/$bassName"
+                types.asSequence().map { type ->
+                    val isBass = u == bassChroma
+                    val symbol = type.symbol.takeIf { it != "M" } ?: ""
+                    val fullName = if (isBass) "$rootName$symbol" else "$rootName$symbol/$bassName"
+                    val weight = if (isBass) 1.0 else 0.5
+                    weight to fullName
                 }
             }
-        }
-
-        // Step 7: pick first result with highest weight (preserves rotation/insertion order)
-        // maxByOrNull returns null if results is empty, satisfying the "no match" requirement.
-        return results.maxByOrNull { it.first }?.second
+            .maxByOrNull { it.first }
+            ?.second
     }
 
     private fun rotate12(mask: Int, u: Int): Int {
