@@ -216,4 +216,20 @@ class ChordAnalyzerTest {
     fun `Db major DbM becomes Db`() {
         assertEquals("Db", analyzer.analyze(listOf("Db4", "F4", "Ab4")))
     }
+
+    // ── Chord detection: slash chords ─────────────────────────────────────
+
+    @Test
+    fun `C major with G bass returns C over G`() {
+        // G4, C5, E5. Bass G (chroma 7). 
+        // Triad C-E-G found at root C (chroma 0).
+        assertEquals("C/G", analyzer.analyze(listOf("G4", "C5", "E5")))
+    }
+
+    @Test
+    fun `A minor 7 with G bass returns Am7 over G`() {
+        // G3, A3, C4, E4. Bass G (chroma 7).
+        // Am7 (A-C-E-G) found at root A (chroma 9).
+        assertEquals("Am7/G", analyzer.analyze(listOf("G3", "A3", "C4", "E4")))
+    }
 }
