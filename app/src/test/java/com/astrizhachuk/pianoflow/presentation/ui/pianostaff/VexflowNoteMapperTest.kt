@@ -23,7 +23,7 @@ class VexflowNoteMapperTest {
         // Act
         val json = notes.toVexflowJson()
         // Assert
-        val expectedJson = "{\"treble\":[{\"keys\":[\"c/4\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/4\"], \"duration\":\"w\", \"ghost\":true}]}"
+        val expectedJson = "{\"treble\":[{\"keys\":[\"c/4\"], \"duration\":\"w\", \"align_center\":true}], \"bass\":[{\"keys\":[\"c/4\"], \"duration\":\"w\", \"align_center\":true, \"ghost\":true}]}"
         assertEquals(expectedJson, json)
     }
 
@@ -34,7 +34,7 @@ class VexflowNoteMapperTest {
         // Act
         val json = notes.toVexflowJson()
         // Assert
-        val expectedJson = "{\"treble\":[{\"keys\":[\"c/6\"], \"duration\":\"w\"}], \"bass\":[]}"
+        val expectedJson = "{\"treble\":[{\"keys\":[\"c/6\"], \"duration\":\"w\", \"align_center\":true}], \"bass\":[]}"
         assertEquals(expectedJson, json)
     }
 
@@ -45,7 +45,7 @@ class VexflowNoteMapperTest {
         // Act
         val json = notes.toVexflowJson()
         // Assert
-        val expectedJson = "{\"treble\":[], \"bass\":[{\"keys\":[\"b/1\"], \"duration\":\"w\"}]}"
+        val expectedJson = "{\"treble\":[], \"bass\":[{\"keys\":[\"b/1\"], \"duration\":\"w\", \"align_center\":true}]}"
         assertEquals(expectedJson, json)
     }
 
@@ -56,7 +56,7 @@ class VexflowNoteMapperTest {
         // Act
         val json = notes.toVexflowJson()
         // Assert
-        val expectedJson = "{\"treble\":[{\"keys\":[\"b/3\"], \"duration\":\"w\", \"ghost\":true}], \"bass\":[{\"keys\":[\"b/3\"], \"duration\":\"w\"}]}"
+        val expectedJson = "{\"treble\":[{\"keys\":[\"b/3\"], \"duration\":\"w\", \"align_center\":true, \"ghost\":true}], \"bass\":[{\"keys\":[\"b/3\"], \"duration\":\"w\", \"align_center\":true}]}"
         assertEquals(expectedJson, json)
     }
 
@@ -72,7 +72,7 @@ class VexflowNoteMapperTest {
         val json = notes.toVexflowJson()
         // Assert
         // C5 is in ghost range, so it appears on bass staff as a ghost note
-        val expectedJson = "{\"treble\":[{\"keys\":[\"c/5\", \"e/5\", \"g/5\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/5\"], \"duration\":\"w\", \"ghost\":true}]}"
+        val expectedJson = "{\"treble\":[{\"keys\":[\"c/5\", \"e/5\", \"g/5\"], \"duration\":\"w\", \"align_center\":true}], \"bass\":[{\"keys\":[\"c/5\"], \"duration\":\"w\", \"align_center\":true, \"ghost\":true}]}"
         assertEquals(expectedJson, json)
     }
 
@@ -87,7 +87,7 @@ class VexflowNoteMapperTest {
         // Act
         val json = notes.toVexflowJson()
         // Assert
-        val expectedJson = "{\"treble\":[{\"keys\":[\"c/3\", \"e/3\", \"g/3\"], \"duration\":\"w\", \"ghost\":true}], \"bass\":[{\"keys\":[\"c/3\", \"e/3\", \"g/3\"], \"duration\":\"w\"}]}"
+        val expectedJson = "{\"treble\":[{\"keys\":[\"c/3\", \"e/3\", \"g/3\"], \"duration\":\"w\", \"align_center\":true, \"ghost\":true}], \"bass\":[{\"keys\":[\"c/3\", \"e/3\", \"g/3\"], \"duration\":\"w\", \"align_center\":true}]}"
         assertEquals(expectedJson, json)
     }
 
@@ -102,7 +102,7 @@ class VexflowNoteMapperTest {
         val json = notes.toVexflowJson()
         // Assert
         // Both notes are in ghost range
-        val expectedJson = "{\"treble\":[{\"keys\":[\"g/4\"], \"duration\":\"w\"},{\"keys\":[\"g/3\"], \"duration\":\"w\", \"ghost\":true}], \"bass\":[{\"keys\":[\"g/3\"], \"duration\":\"w\"},{\"keys\":[\"g/4\"], \"duration\":\"w\", \"ghost\":true}]}"
+        val expectedJson = "{\"treble\":[{\"keys\":[\"g/4\"], \"duration\":\"w\", \"align_center\":true},{\"keys\":[\"g/3\"], \"duration\":\"w\", \"align_center\":true, \"ghost\":true}], \"bass\":[{\"keys\":[\"g/3\"], \"duration\":\"w\", \"align_center\":true},{\"keys\":[\"g/4\"], \"duration\":\"w\", \"align_center\":true, \"ghost\":true}]}"
         assertEquals(expectedJson, json)
     }
 
@@ -117,7 +117,7 @@ class VexflowNoteMapperTest {
         // Act
         val json = notes.toVexflowJson()
         // Assert
-        val expectedJson = "{\"treble\":[{\"keys\":[\"c/4\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/4\"], \"duration\":\"w\", \"ghost\":true}]}"
+        val expectedJson = "{\"treble\":[{\"keys\":[\"c/4\"], \"duration\":\"w\", \"align_center\":true}], \"bass\":[{\"keys\":[\"c/4\"], \"duration\":\"w\", \"align_center\":true, \"ghost\":true}]}"
         assertEquals(expectedJson, json)
     }
 
@@ -153,7 +153,7 @@ class VexflowNoteMapperTest {
         // Assert
         // Treble staff should have: Primary [c/5, c#/5], Ghost [c/2]
         // Bass staff should have: Primary [b/1, c/2], Ghost [c/5]
-        val expectedJson = "{\"treble\":[{\"keys\":[\"c/5\", \"c#/5\"], \"duration\":\"w\"},{\"keys\":[\"c/2\"], \"duration\":\"w\", \"ghost\":true}], \"bass\":[{\"keys\":[\"b/1\", \"c/2\"], \"duration\":\"w\"},{\"keys\":[\"c/5\"], \"duration\":\"w\", \"ghost\":true}]}"
+        val expectedJson = "{\"treble\":[{\"keys\":[\"c/5\", \"c#/5\"], \"duration\":\"w\", \"align_center\":true},{\"keys\":[\"c/2\"], \"duration\":\"w\", \"align_center\":true, \"ghost\":true}], \"bass\":[{\"keys\":[\"b/1\", \"c/2\"], \"duration\":\"w\", \"align_center\":true},{\"keys\":[\"c/5\"], \"duration\":\"w\", \"align_center\":true, \"ghost\":true}]}"
         assertEquals(expectedJson, json)
     }
 }

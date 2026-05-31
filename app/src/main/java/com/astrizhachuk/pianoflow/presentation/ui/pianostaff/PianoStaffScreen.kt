@@ -1,6 +1,5 @@
 package com.astrizhachuk.pianoflow.presentation.ui.pianostaff
 
-import android.content.res.Configuration
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -31,6 +29,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.astrizhachuk.pianoflow.R
 import com.astrizhachuk.pianoflow.presentation.ui.theme.AppTheme
+import com.astrizhachuk.pianoflow.presentation.ui.util.WindowInfo
+import com.astrizhachuk.pianoflow.presentation.ui.util.rememberWindowInfo
 import com.astrizhachuk.pianoflow.presentation.viewmodel.pianostaff.PianoStaffViewModel
 
 /**
@@ -56,10 +56,12 @@ fun PianoStaffScreen(
     viewModel: PianoStaffViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val windowInfo = rememberWindowInfo()
 
     PianoStaffContent(
         chordName = uiState.chordName,
         notesJson = uiState.notesJson,
+        windowInfo = windowInfo,
         modifier = modifier
     )
 }
@@ -75,26 +77,26 @@ fun PianoStaffScreen(
  *
  * @param chordName The name of the analyzed chord to display, or null if no chord is identified.
  * @param notesJson A JSON string representation of the musical notes to be rendered on the staff.
+ * @param windowInfo Information about the window configuration (orientation, device type).
  * @param modifier The [Modifier] to be applied to the layout container.
  */
 @Composable
 fun PianoStaffContent(
     chordName: String?,
     notesJson: String,
+    windowInfo: WindowInfo,
     modifier: Modifier = Modifier
 ) {
-    val configuration = LocalConfiguration.current
-    val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
     val isDarkScheme = isSystemInDarkTheme()
-    val needsScale = configuration.smallestScreenWidthDp < 600
-    val horizontalPadding = dimensionResource(R.dimen.padding_medium)
-    val verticalPadding = dimensionResource(R.dimen.padding_medium)
+    val mediumPadding = dimensionResource(R.dimen.padding_medium)
+    val extraSmallPadding = dimensionResource(R.dimen.padding_extra_small)
+    val visualCompensation = dimensionResource(R.dimen.offset_landscape_balance)
 
-    if (isPortrait) {
+    if (!windowInfo.isLandscape) {
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .padding(horizontal = horizontalPadding),
+                .padding(horizontal = mediumPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             PianoStaff(
@@ -104,39 +106,39 @@ fun PianoStaffContent(
                 notesJson = notesJson,
                 isPortrait = true,
                 isDarkScheme = isDarkScheme,
-                needsScale = needsScale
+                needsScale = windowInfo.isPhone
             )
             ChordCard(
                 chordName = chordName,
                 fillHeight = false,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = verticalPadding)
+                    .padding(bottom = mediumPadding)
             )
         }
     } else {
         Row(
             modifier = modifier
                 .fillMaxSize()
-                .padding(horizontal = horizontalPadding),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(start = mediumPadding, end = mediumPadding + visualCompensation),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(mediumPadding)
         ) {
             PianoStaff(
                 modifier = Modifier
-                    .weight(2f)
+                    .weight(1f)
                     .fillMaxHeight(),
                 notesJson = notesJson,
                 isPortrait = false,
                 isDarkScheme = isDarkScheme,
-                needsScale = needsScale
+                needsScale = windowInfo.isPhone
             )
             ChordCard(
                 chordName = chordName,
-                fillHeight = true,
+                fillHeight = false,
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight()
-                    .padding(vertical = verticalPadding)
+                    .padding(vertical = extraSmallPadding)
             )
         }
     }
@@ -195,49 +197,53 @@ private fun ChordCard(
     }
 }
 
-@Preview
+@Preview(apiLevel = 34)
 @Composable
 fun PianoStaffContentPortraitPreview() {
     AppTheme(darkTheme = false) {
         PianoStaffContent(
             chordName = "C Major",
             notesJson = "{\"treble\":[{\"keys\":[\"c/4\", \"e/4\", \"g/4\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/3\"], \"duration\":\"w\"}]}",
+            windowInfo = WindowInfo(isLandscape = false, isPhone = true),
             modifier = Modifier.fillMaxSize()
         )
     }
 }
 
-@Preview
+@Preview(apiLevel = 34)
 @Composable
 fun PianoStaffContentPortraitNoChordPreview() {
     AppTheme(darkTheme = false) {
         PianoStaffContent(
             chordName = null,
             notesJson = "{\"treble\":[], \"bass\":[]}",
+            windowInfo = WindowInfo(isLandscape = false, isPhone = true),
             modifier = Modifier.fillMaxSize()
         )
     }
 }
 
-@Preview(device = "spec:width=1280dp,height=800dp,orientation=landscape")
+@Preview(apiLevel = 34, device = "spec:width=1280dp,height=800dp,orientation=landscape")
 @Composable
 fun PianoStaffContentLandscapePreview() {
     AppTheme(darkTheme = true) {
         PianoStaffContent(
             chordName = "C Major",
             notesJson = "{\"treble\":[{\"keys\":[\"c/4\", \"e/4\", \"g/4\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/3\"], \"duration\":\"w\"}]}",
+            windowInfo = WindowInfo(isLandscape = true, isPhone = false),
             modifier = Modifier.fillMaxSize()
         )
     }
 }
 
-@Preview(device = "spec:width=1280dp,height=800dp,orientation=landscape")
+@Preview(apiLevel = 34, device = "spec:width=1280dp,height=800dp,orientation=landscape")
 @Composable
 fun PianoStaffContentLandscapeDarkPreview() {
     AppTheme(darkTheme = true) {
         PianoStaffContent(
             chordName = "Dm7♭5",
             notesJson = "{\"treble\":[{\"keys\":[\"d/4\", \"f/4\", \"ab/4\", \"c/5\"], \"duration\":\"w\"}], \"bass\":[]}",
+            windowInfo = WindowInfo(isLandscape = true, isPhone = false),
             modifier = Modifier.fillMaxSize()
         )
     }

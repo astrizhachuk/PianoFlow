@@ -156,22 +156,24 @@ private fun buildStaffContent(processedNotes: List<ProcessedNote>, staff: Staff)
 }
 
 /**
- * Creates a JSON string for a single VexFlow `StaveNote` object.
+ * Creates a JSON string for a single VexFlow `StaveNote` object representing a whole note.
  *
- * This function takes a list of VexFlow note keys (e.g., `["c/4", "e/4"]`) and constructs a JSON object
- * representing a whole note chord. It can also mark the note as a "ghost" note, which is
- * used for rendering notes that appear on both staves (e.g., Middle C) for readability.
+ * This function constructs a JSON representation of a chord or single note. It includes
+ * the VexFlow keys, a fixed duration of "w" (whole note), and an `align_center` attribute
+ * to center the note within the stave. If [isGhost] is true, a `"ghost":true` attribute
+ * is added, which can be used by the JavaScript side to render the note with reduced
+ * opacity or a specific style.
  *
- * The resulting JSON format is `{"keys":["c/4", "e/4"], "duration":"w", "ghost":true}`.
+ * Example: `{"keys":["c/4", "e/4"], "duration":"w", "align_center":true, "ghost":true}`
  *
- * @param keys A list of strings, where each string is a VexFlow note representation (e.g., "c/4").
- * @param isGhost A boolean flag indicating if this note should be treated as a "ghost" note.
- * @return A JSON formatted string representing the VexFlow note.
+ * @param keys A list of strings in VexFlow format (e.g., "c/4", "eb/5").
+ * @param isGhost Whether this note should be flagged as a "ghost" note for visual distinction.
+ * @return A JSON formatted string representing the VexFlow note object.
  */
 private fun createVexflowNoteJson(keys: List<String>, isGhost: Boolean): String {
     val keysJson = keys.joinToString(", ") { "\"$it\"" }
     val ghostAttr = if (isGhost) ", \"ghost\":true" else ""
-    return "{\"keys\":[$keysJson], \"duration\":\"w\"$ghostAttr}"
+    return "{\"keys\":[$keysJson], \"duration\":\"w\", \"align_center\":true$ghostAttr}"
 }
 
 /**

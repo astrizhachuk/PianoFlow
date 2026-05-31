@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <dimen name="padding_extra_small">4dp</dimen>
     <dimen name="padding_small">8dp</dimen>
     <dimen name="padding_medium">16dp</dimen>
+    <dimen name="offset_landscape_balance">48dp</dimen>
     <dimen name="elevation_card_default">4dp</dimen>
     <dimen name="spacing_chord_label">8dp</dimen>
 </resources>

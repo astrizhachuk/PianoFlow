@@ -6,6 +6,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.activity.ComponentActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -21,8 +25,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.lifecycleScope
@@ -31,8 +39,10 @@ import com.astrizhachuk.pianoflow.presentation.model.UserMessage
 import com.astrizhachuk.pianoflow.presentation.service.UserNotifier
 import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.PianoStaffScreen
 import com.astrizhachuk.pianoflow.presentation.ui.theme.AppTheme
+import com.astrizhachuk.pianoflow.presentation.ui.util.rememberWindowInfo
 import com.astrizhachuk.pianoflow.presentation.viewmodel.midi.MidiConnectionViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.launchIn
@@ -55,6 +65,18 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val snackbarHostState = remember { SnackbarHostState() }
+            val windowInfo = rememberWindowInfo()
+
+            // State for immersive mode (auto-hide top bar in landscape)
+            var isTopBarVisible by remember { mutableStateOf(!windowInfo.isLandscape || !windowInfo.isPhone) }
+
+            // Auto-hide logic
+            if (isTopBarVisible && windowInfo.isLandscape && windowInfo.isPhone) {
+                LaunchedEffect(Unit) {
+                    delay(3000)
+                    isTopBarVisible = false
+                }
+            }
 
             CompositionLocalProvider(LocalLifecycleOwner provides this) {
                 AppTheme {
@@ -63,13 +85,28 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
-                            topBar = { PianoFlowTopBar() },
+                            topBar = {
+                                AnimatedVisibility(
+                                    visible = isTopBarVisible,
+                                    enter = expandVertically(),
+                                    exit = shrinkVertically()
+                                ) {
+                                    PianoFlowTopBar()
+                                }
+                            },
                             snackbarHost = { SnackbarHost(snackbarHostState) }
                         ) { innerPadding ->
                             Box(
                                 modifier = Modifier
                                     .padding(innerPadding)
                                     .fillMaxSize()
+                                    .pointerInput(windowInfo.isLandscape, windowInfo.isPhone) {
+                                        if (windowInfo.isLandscape && windowInfo.isPhone) {
+                                            detectTapGestures(
+                                                onTap = { isTopBarVisible = !isTopBarVisible }
+                                            )
+                                        }
+                                    }
                             ) {
                                 PianoStaffScreen(
                                     modifier = Modifier.fillMaxSize()
