@@ -77,7 +77,18 @@ Every PR that resolves an issue must include `Closes #N` or `Fixes #N` in the de
 
 ### Bilingual descriptions (MANDATORY for AI-authored content)
 
-When AI (Claude Code or any other agent) authors an issue or pull request description, the body MUST be bilingual: English first, then a horizontal rule (`---`), then a Russian version with the same structure and content.
+When AI (Claude Code or any other agent) authors an issue or pull request description, the body MUST be bilingual: English first, then the Russian version wrapped in a collapsible block:
+
+```html
+<details>
+<summary><b>🇷🇺 Описание на русском</b></summary>
+
+...Russian content...
+
+</details>
+```
+
+Note: GitHub does not support text color styling (`<font color>`, `<span style="color:...">`) in issues/PRs — these tags are silently ignored.
 
 Issue and PR **titles MUST always be written in English** (Conventional Commits style), regardless of the body language and regardless of who authors them. Titles drive changelogs, search, and tooling — they stay in a single working language.
 
