@@ -31,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.lifecycleScope
@@ -69,13 +68,13 @@ class MainActivity : ComponentActivity() {
             val windowInfo = rememberWindowInfo()
 
             // State for immersive mode (auto-hide top bar in landscape)
-            var isUiVisible by remember { mutableStateOf(!windowInfo.isLandscape || !windowInfo.isPhone) }
+            var isTopBarVisible by remember { mutableStateOf(!windowInfo.isLandscape || !windowInfo.isPhone) }
 
             // Auto-hide logic
-            if (isUiVisible && windowInfo.isLandscape && windowInfo.isPhone) {
+            if (isTopBarVisible && windowInfo.isLandscape && windowInfo.isPhone) {
                 LaunchedEffect(Unit) {
                     delay(3000)
-                    isUiVisible = false
+                    isTopBarVisible = false
                 }
             }
 
@@ -88,7 +87,7 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxSize(),
                             topBar = {
                                 AnimatedVisibility(
-                                    visible = isUiVisible,
+                                    visible = isTopBarVisible,
                                     enter = expandVertically(),
                                     exit = shrinkVertically()
                                 ) {
@@ -104,7 +103,7 @@ class MainActivity : ComponentActivity() {
                                     .pointerInput(windowInfo.isLandscape, windowInfo.isPhone) {
                                         if (windowInfo.isLandscape && windowInfo.isPhone) {
                                             detectTapGestures(
-                                                onTap = { isUiVisible = !isUiVisible }
+                                                onTap = { isTopBarVisible = !isTopBarVisible }
                                             )
                                         }
                                     }
