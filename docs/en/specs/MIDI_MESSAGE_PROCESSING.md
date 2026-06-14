@@ -42,6 +42,7 @@ The MIDI message processing system is integrated into the existing architecture,
 - **`PianoStaffUiState`:** UI state:
   - `notesJson: String` — JSON representation of notes for visualization via VexFlow.
   - `chordName: String?` — name of the recognized chord, or the localized string "Not defined".
+  - `octaveName: String?` — localized traditional octave name, shown only for a single note (null for chords, the empty state, or octaves outside the A0..C8 range).
 - **`PianoStaffScreen`:** Composable screen that displays played notes on the musical staff and the chord name.
 - **`PianoStaff`:** Composable that hosts a `WebView` and renders the musical staff via the VexFlow JS library.
 - **`VexflowNoteMapper`:** Converts a `List<Note>` into the JSON format expected by VexFlow.
@@ -263,7 +264,8 @@ class MidiMessageParser {
  */
 data class PianoStaffUiState(
     val notesJson: String = "{\"treble\":[], \"bass\":[]}",
-    val chordName: String? = null
+    val chordName: String? = null,
+    val octaveName: String? = null
 )
 
 // com.astrizhachuk.pianoflow.presentation.ui.pianostaff.WebViewScriptExecutor.kt
@@ -413,6 +415,7 @@ deactivate Receiver
 
    * The combination result forms `PianoStaffUiState`.
    * If a chord is recognized, `chordName` contains the name. If notes are present but analysis is empty — "Not defined" is displayed.
+   * For a single note, `octaveName` carries the localized traditional octave name, shown on a smaller line below the note name; it is null for chords and the empty state.
    * `PianoStaffScreen` receives `uiState` and passes `notesJson` to the `PianoStaff` component.
 
 ```plantuml
