@@ -182,8 +182,8 @@ class ChordAnalyzerTest {
     }
 
     @Test
-    fun `sorted C-bass input produces C major`() {
-        // Repository always sorts before calling; sorted ["C5","E4","G4"] → C bass → "C"
+    fun `first list element is treated as bass`() {
+        // analyze treats parsed[0] as the bass regardless of pitch; C first → C-E-G → "C"
         assertEquals("C", analyzer.analyze(listOf("C5", "E4", "G4")))
     }
 
@@ -255,7 +255,7 @@ class ChordAnalyzerTest {
 
     @Test
     fun `D minor with A bass returns Dm over A`() {
-        // Sorted input from repository: ["A3", "D4", "F4"]. Bass A (chroma 9).
+        // Pitch-ordered input (A3 is the lowest note, so the bass), chroma 9.
         // No chord type matches with A as root; Dm (D-F-A) found at root D (chroma 2).
         assertEquals("Dm/A", analyzer.analyze(listOf("A3", "D4", "F4")))
     }
