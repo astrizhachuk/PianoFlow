@@ -8,6 +8,7 @@ import com.astrizhachuk.pianoflow.domain.usecase.analysis.AnalyzeChordUseCase
 import com.astrizhachuk.pianoflow.domain.usecase.analysis.ObserveChordAnalysisResultsUseCase
 import com.astrizhachuk.pianoflow.domain.usecase.midi.ObserveMidiMessagesUseCase
 import com.astrizhachuk.pianoflow.presentation.model.pianostaff.PianoStaffUiState
+import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.octaveLabelResOrNull
 import com.astrizhachuk.pianoflow.presentation.ui.pianostaff.toVexflowJson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -60,16 +61,21 @@ class PianoStaffViewModel @Inject constructor(
             }
             .combine(observeChordAnalysisResultsUseCase()) { notes, analysisResult ->
                 val notesJson = notes.toVexflowJson()
-                
+
                 val displayChordName = when {
                     analysisResult != null -> analysisResult
                     notes.isNotEmpty() -> context.getString(R.string.chord_not_defined)
                     else -> null
                 }
 
+                val octaveName = notes.singleOrNull()
+                    ?.let { octaveLabelResOrNull(it.pitch) }
+                    ?.let { context.getString(it) }
+
                 PianoStaffUiState(
                     notesJson = notesJson,
-                    chordName = displayChordName
+                    chordName = displayChordName,
+                    octaveName = octaveName
                 )
             }
             .onEach { newState ->
