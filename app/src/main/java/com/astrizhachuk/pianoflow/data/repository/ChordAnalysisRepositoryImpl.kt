@@ -27,8 +27,9 @@ class ChordAnalysisRepositoryImpl @Inject constructor(
     /**
      * Analyzes a list of [Note] objects to identify the corresponding chord.
      *
-     * This function extracts unique note names, sorts them, and uses the [chordAnalyzer]
-     * to determine the chord name. The result is published to [chordAnalysisResult].
+     * This function orders notes by pitch (ascending, so the lowest note is the bass),
+     * extracts unique note names, and uses the [chordAnalyzer] to determine the chord name.
+     * The result is published to [chordAnalysisResult].
      * If the input list is empty or an error occurs during analysis, the result is set to null.
      *
      * @param notes The list of notes to be analyzed.
@@ -42,7 +43,7 @@ class ChordAnalysisRepositoryImpl @Inject constructor(
                 return
             }
 
-            val noteNames = notes.map { it.name }.distinct().sorted()
+            val noteNames = notes.sortedBy { it.pitch }.map { it.name }.distinct()
             _chordAnalysisResult.value = chordAnalyzer.analyze(noteNames)
         } catch (e: Exception) {
             Timber.e(e, "analyzeChord: failed")

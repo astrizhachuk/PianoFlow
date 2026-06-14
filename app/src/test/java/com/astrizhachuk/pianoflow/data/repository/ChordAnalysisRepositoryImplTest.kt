@@ -64,6 +64,22 @@ class ChordAnalysisRepositoryImplTest {
     }
 
     @Test
+    fun `analyzeChord orders note names by pitch so the lowest note is the bass`() {
+        // C7: C4, E4, G4, A#4 — A# sorts before C lexicographically, but C is the bass.
+        val notes = listOf(
+            Note(70, "A#4"),
+            Note(60, "C4"),
+            Note(67, "G4"),
+            Note(64, "E4")
+        )
+        every { chordAnalyzer.analyze(listOf("C4", "E4", "G4", "A#4")) } returns "C7"
+
+        repository.analyzeChord(notes)
+
+        verify { chordAnalyzer.analyze(listOf("C4", "E4", "G4", "A#4")) }
+    }
+
+    @Test
     fun `analyzeChord emits result from analyzer synchronously`() = runTest {
         val notes = listOf(Note(60, "C4"), Note(64, "E4"), Note(67, "G4"))
         every { chordAnalyzer.analyze(listOf("C4", "E4", "G4")) } returns "C"

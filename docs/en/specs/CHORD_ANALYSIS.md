@@ -35,7 +35,7 @@ The chord analysis subsystem lives in the Domain layer as a pure-Kotlin service.
 - **`ChordAnalyzer`** (`domain.service.analysis`): public domain service with the single entry point `analyze(noteNames: List<String>): String?`. Internally performs note parsing, pitch-class extraction, chord matching, and output formatting. Provides single-note enharmonic simplification when only one note is supplied.
 
 **Data Layer**
-- **`ChordAnalysisRepositoryImpl`**: holds a `MutableStateFlow<String?>` and exposes `analyzeChord(notes: List<Note>)`. Deduplicates and sorts note names, then synchronously invokes `ChordAnalyzer.analyze(...)` and writes the result directly to the `StateFlow`. No threading or platform dependencies.
+- **`ChordAnalysisRepositoryImpl`**: holds a `MutableStateFlow<String?>` and exposes `analyzeChord(notes: List<Note>)`. Orders notes by pitch (ascending, so the lowest note is the bass), deduplicates note names, then synchronously invokes `ChordAnalyzer.analyze(...)` and writes the result directly to the `StateFlow`. No threading or platform dependencies.
 
 #### 2.1.1. C4 Level 3: Chord Analysis Subsystem Components
 
@@ -126,7 +126,8 @@ class ChordAnalyzer @Inject constructor() {
     /**
      * Analyzes a list of note names.
      *
-     * @param noteNames Sorted, deduplicated list of note names (e.g. ["C4", "E4", "G4"]).
+     * @param noteNames Pitch-ordered (bass first), deduplicated list of note names (e.g. ["C4", "E4", "G4"]).
+     *     The first element is treated as the bass note.
      *     Empty list, or list of only invalid notes, returns null.
      *     Single valid note returns its enharmonically simplified name.
      *     Two or more valid notes return a chord name or null if no chord type matches.
@@ -327,10 +328,12 @@ Simplification algorithm:
 | `["C4", "Z4", "E4"]` | invalid filtered out → 2 pitches → chord detection |
 | `["C4", "Z4"]` | invalid filtered out → 1 pitch → simplify → `"C4"` |
 | `["C4", "C4"]` (duplicate string) | the upstream repository already calls `.distinct()` before passing to the analyzer; analyzer additionally deduplicates by chroma keeping first spelling |
-| `["C#4", "Db4"]` (different spellings, same chroma) | first spelling wins (after upstream sort) → only one pitch class, no chord detected → `null` |
+| `["C#4", "Db4"]` (different spellings, same chroma) | first spelling wins (input order preserved) → only one pitch class, no chord detected → `null` |
 | `["C4", "D4", "E4"]` (no matching chord type) | `null` |
 
-**Enharmonic stability.** The chroma → name lookup is built in input order. The repository sorts note names lexicographically before calling the analyzer, so `["C#4", "Db4"]` is deterministically reduced to its sorted-first spelling.
+**Bass note.** The repository orders notes by pitch (ascending) before calling the analyzer, so the lowest sounding note is first and is treated as the bass. This is required for correct slash-chord and rooted-chord detection — a lexicographic sort by name would misplace notes such as `A#`/`B` (which precede `C` alphabetically) ahead of the true bass.
+
+**Enharmonic stability.** The chroma → name lookup is built in input order. For MIDI-sourced input every `Note.name` is derived deterministically from its pitch (sharp spelling), so two different spellings of the same pitch class never reach the analyzer from the repository; if they did, the pitch-first (then input) order decides which spelling wins.
 
 **Logging.** `ChordAnalyzer` is pure Kotlin and does not depend on Timber or any logging facility. Diagnostic logging stays in `ChordAnalysisRepositoryImpl` (Data layer): `Timber.d` on entry, `Timber.e` on caught exceptions.
 
@@ -345,7 +348,7 @@ Simplification algorithm:
 1. `PianoStaffViewModel` observes `ObserveMidiMessagesUseCase` (a stream of `List<Note>` produced by the MIDI subsystem).
 2. On each new list, it invokes `AnalyzeChordUseCase(notes)` (fire-and-forget).
 3. `AnalyzeChordUseCase` calls `ChordAnalysisRepository.analyzeChord(notes)`.
-4. `ChordAnalysisRepositoryImpl` deduplicates and sorts note names, then calls `ChordAnalyzer.analyze(noteNames)` synchronously.
+4. `ChordAnalysisRepositoryImpl` orders notes by pitch (bass first) and deduplicates note names, then calls `ChordAnalyzer.analyze(noteNames)` synchronously.
 5. The result is written to the `StateFlow<String?>` directly, with no thread hop.
 6. `ObserveChordAnalysisResultsUseCase` exposes the `StateFlow` to the view model, which combines it with the note stream into `PianoStaffUiState`.
 
@@ -365,7 +368,7 @@ VM -> UC : invoke(notes)
 activate UC
 UC -> Repo : analyzeChord(notes)
 activate Repo
-Repo -> Repo : noteNames = notes.map { it.name }.distinct().sorted()
+Repo -> Repo : noteNames = notes.sortedBy { it.pitch }.map { it.name }.distinct()
 Repo -> Analyzer : analyze(noteNames)
 activate Analyzer
 Analyzer --> Repo : chord name (or null)
