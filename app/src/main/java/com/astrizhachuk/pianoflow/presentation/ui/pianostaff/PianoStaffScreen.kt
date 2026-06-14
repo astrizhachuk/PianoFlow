@@ -60,6 +60,7 @@ fun PianoStaffScreen(
 
     PianoStaffContent(
         chordName = uiState.chordName,
+        octaveName = uiState.octaveName,
         notesJson = uiState.notesJson,
         windowInfo = windowInfo,
         modifier = modifier
@@ -83,6 +84,7 @@ fun PianoStaffScreen(
 @Composable
 fun PianoStaffContent(
     chordName: String?,
+    octaveName: String?,
     notesJson: String,
     windowInfo: WindowInfo,
     modifier: Modifier = Modifier
@@ -110,6 +112,7 @@ fun PianoStaffContent(
             )
             ChordCard(
                 chordName = chordName,
+                octaveName = octaveName,
                 fillHeight = false,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -135,6 +138,7 @@ fun PianoStaffContent(
             )
             ChordCard(
                 chordName = chordName,
+                octaveName = octaveName,
                 fillHeight = false,
                 modifier = Modifier
                     .weight(1f)
@@ -147,6 +151,7 @@ fun PianoStaffContent(
 @Composable
 private fun ChordCard(
     chordName: String?,
+    octaveName: String?,
     fillHeight: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -192,6 +197,15 @@ private fun ChordCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (octaveName != null) {
+                    Spacer(modifier = Modifier.height(dimensionResource(R.dimen.padding_extra_small)))
+                    Text(
+                        text = octaveName,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
@@ -203,6 +217,7 @@ fun PianoStaffContentPortraitPreview() {
     AppTheme(darkTheme = false) {
         PianoStaffContent(
             chordName = "C Major",
+            octaveName = null,
             notesJson = "{\"treble\":[{\"keys\":[\"c/4\", \"e/4\", \"g/4\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/3\"], \"duration\":\"w\"}]}",
             windowInfo = WindowInfo(isLandscape = false, isPhone = true),
             modifier = Modifier.fillMaxSize()
@@ -216,6 +231,7 @@ fun PianoStaffContentPortraitNoChordPreview() {
     AppTheme(darkTheme = false) {
         PianoStaffContent(
             chordName = null,
+            octaveName = null,
             notesJson = "{\"treble\":[], \"bass\":[]}",
             windowInfo = WindowInfo(isLandscape = false, isPhone = true),
             modifier = Modifier.fillMaxSize()
@@ -229,6 +245,7 @@ fun PianoStaffContentLandscapePreview() {
     AppTheme(darkTheme = true) {
         PianoStaffContent(
             chordName = "C Major",
+            octaveName = null,
             notesJson = "{\"treble\":[{\"keys\":[\"c/4\", \"e/4\", \"g/4\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/3\"], \"duration\":\"w\"}]}",
             windowInfo = WindowInfo(isLandscape = true, isPhone = false),
             modifier = Modifier.fillMaxSize()
@@ -242,8 +259,23 @@ fun PianoStaffContentLandscapeDarkPreview() {
     AppTheme(darkTheme = true) {
         PianoStaffContent(
             chordName = "Dm7♭5",
+            octaveName = null,
             notesJson = "{\"treble\":[{\"keys\":[\"d/4\", \"f/4\", \"ab/4\", \"c/5\"], \"duration\":\"w\"}], \"bass\":[]}",
             windowInfo = WindowInfo(isLandscape = true, isPhone = false),
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Preview(apiLevel = 34)
+@Composable
+fun PianoStaffContentSingleNotePreview() {
+    AppTheme(darkTheme = false) {
+        PianoStaffContent(
+            chordName = "C4",
+            octaveName = "One-lined octave",
+            notesJson = "{\"treble\":[{\"keys\":[\"c/4\"], \"duration\":\"w\"}], \"bass\":[]}",
+            windowInfo = WindowInfo(isLandscape = false, isPhone = true),
             modifier = Modifier.fillMaxSize()
         )
     }
