@@ -29,11 +29,19 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import javax.inject.Singleton
 
+/**
+ * End-to-end UI test for chord recognition: verifies the full integration path
+ * (raw MIDI bytes → MidiMessageParser → ChordAnalysisRepository + ChordAnalyzer →
+ * PianoStaffViewModel → Compose) renders the expected chord name.
+ *
+ * This path is identical for every chord, so the set below is **curated by distinct
+ * rendering/integration behavior**, not by harmonic breadth. Exhaustive recognition of all
+ * 106 registry types lives in the fast JVM test `ChordTypeRegistryRecognitionTest`.
+ */
 @RunWith(Parameterized::class)
 @UninstallModules(DataModule::class)
 @HiltAndroidTest
 class ChordRecognitionUITest(
-    private val chordName: String,
     private val expectedDisplay: String,
     private val midiPitches: IntArray
 ) {
@@ -101,20 +109,30 @@ class ChordRecognitionUITest(
 
         // MIDI pitches: C4=60, C#=61, D=62, D#=63, E=64, F=65, F#=66, G=67, G#=68, A=69, A#=70, B=71
 
+        // Curated by rendering/integration path, not by harmonic breadth:
+        //  - "C": trailing-"M" stripping path (major triad renders without a symbol)
+        //  - "Cm"/"Cdim"/"Caug": plain symbol path
+        //  - "Csus2"/"Csus4": sus formatting
+        //  - "C7"/"Cmaj7"/"Cm7"/"Cm7b5": the #24 bass-detection regression (contain A#/B)
+        //  - "Cmaj9": a long, multi-note extended symbol still renders end-to-end
+        //  - "C/G": slash-chord formatting (bass != root) — G3 is the lowest note
+        //  - "?": no match → placeholder rendering path
         @JvmStatic
-        @Parameterized.Parameters(name = "{0} → {1}")
+        @Parameterized.Parameters(name = "{0}")
         fun chords(): Collection<Array<Any>> = listOf(
-            arrayOf("Major triad", "C", intArrayOf(60, 64, 67)),
-            arrayOf("Minor triad", "Cm", intArrayOf(60, 63, 67)),
-            arrayOf("Diminished triad", "Cdim", intArrayOf(60, 63, 66)),
-            arrayOf("Augmented triad", "Caug", intArrayOf(60, 64, 68)),
-            arrayOf("sus2", "Csus2", intArrayOf(60, 62, 67)),
-            arrayOf("sus4", "Csus4", intArrayOf(60, 65, 67)),
-            arrayOf("Dominant 7", "C7", intArrayOf(60, 64, 67, 70)),
-            arrayOf("Major 7", "Cmaj7", intArrayOf(60, 64, 67, 71)),
-            arrayOf("Minor 7", "Cm7", intArrayOf(60, 63, 67, 70)),
-            arrayOf("Half-diminished", "Cm7b5", intArrayOf(60, 63, 66, 70)),
-            arrayOf("Unknown chord", "?", intArrayOf(60, 61))
+            arrayOf("C", intArrayOf(60, 64, 67)),
+            arrayOf("Cm", intArrayOf(60, 63, 67)),
+            arrayOf("Cdim", intArrayOf(60, 63, 66)),
+            arrayOf("Caug", intArrayOf(60, 64, 68)),
+            arrayOf("Csus2", intArrayOf(60, 62, 67)),
+            arrayOf("Csus4", intArrayOf(60, 65, 67)),
+            arrayOf("C7", intArrayOf(60, 64, 67, 70)),
+            arrayOf("Cmaj7", intArrayOf(60, 64, 67, 71)),
+            arrayOf("Cm7", intArrayOf(60, 63, 67, 70)),
+            arrayOf("Cm7b5", intArrayOf(60, 63, 66, 70)),
+            arrayOf("Cmaj9", intArrayOf(60, 64, 67, 71, 74)),
+            arrayOf("C/G", intArrayOf(55, 60, 64)),
+            arrayOf("?", intArrayOf(60, 61))
         )
     }
 }
