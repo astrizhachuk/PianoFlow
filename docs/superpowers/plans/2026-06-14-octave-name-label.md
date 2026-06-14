@@ -458,7 +458,139 @@ git commit -m "feat(ui): show octave name line in chord card for single notes (#
 
 ---
 
-## Task 6: Full verification
+## Task 6: Update the MIDI_MESSAGE_PROCESSING specification (en + ru)
+
+**Files:**
+- Modify: `docs/en/specs/MIDI_MESSAGE_PROCESSING.md`
+- Modify: `docs/ru/specs/MIDI_MESSAGE_PROCESSING.md`
+
+This spec documents `PianoStaffUiState` (both as a prose bullet list and as a Kotlin
+signature snippet). Adding `octaveName` changes the documented current state, so both
+language versions must be updated to stay in sync (English is the source of truth).
+The snippet shows only the data class signature — consistent with the project rule of
+documenting signatures, not implementation. No other spec is affected (the domain and
+the chord analyzer are unchanged).
+
+- [ ] **Step 1: English — extend the `PianoStaffUiState` bullet list**
+
+In `docs/en/specs/MIDI_MESSAGE_PROCESSING.md`, find:
+
+```markdown
+- **`PianoStaffUiState`:** UI state:
+  - `notesJson: String` — JSON representation of notes for visualization via VexFlow.
+  - `chordName: String?` — name of the recognized chord, or the localized string "Not defined".
+```
+
+Replace with:
+
+```markdown
+- **`PianoStaffUiState`:** UI state:
+  - `notesJson: String` — JSON representation of notes for visualization via VexFlow.
+  - `chordName: String?` — name of the recognized chord, or the localized string "Not defined".
+  - `octaveName: String?` — localized traditional octave name, shown only for a single note (null for chords, the empty state, or octaves outside the A0..C8 range).
+```
+
+- [ ] **Step 2: English — extend the data class snippet**
+
+In the same file, find:
+
+```kotlin
+data class PianoStaffUiState(
+    val notesJson: String = "{\"treble\":[], \"bass\":[]}",
+    val chordName: String? = null
+)
+```
+
+Replace with:
+
+```kotlin
+data class PianoStaffUiState(
+    val notesJson: String = "{\"treble\":[], \"bass\":[]}",
+    val chordName: String? = null,
+    val octaveName: String? = null
+)
+```
+
+- [ ] **Step 3: English — note the octave line in the UI Display section**
+
+In the same file, find:
+
+```markdown
+   * If a chord is recognized, `chordName` contains the name. If notes are present but analysis is empty — "Not defined" is displayed.
+```
+
+Replace with:
+
+```markdown
+   * If a chord is recognized, `chordName` contains the name. If notes are present but analysis is empty — "Not defined" is displayed.
+   * For a single note, `octaveName` carries the localized traditional octave name, shown on a smaller line below the note name; it is null for chords and the empty state.
+```
+
+- [ ] **Step 4: Russian — extend the `PianoStaffUiState` bullet list**
+
+In `docs/ru/specs/MIDI_MESSAGE_PROCESSING.md`, find:
+
+```markdown
+- **`PianoStaffUiState`:** Состояние UI:
+  - `notesJson: String` — JSON-представление нот для визуализации через VexFlow.
+  - `chordName: String?` — название распознанного аккорда или локализованная строка "Не определен".
+```
+
+Replace with:
+
+```markdown
+- **`PianoStaffUiState`:** Состояние UI:
+  - `notesJson: String` — JSON-представление нот для визуализации через VexFlow.
+  - `chordName: String?` — название распознанного аккорда или локализованная строка "Не определен".
+  - `octaveName: String?` — локализованное традиционное название октавы, отображается только для одиночной ноты (null для аккорда, пустого состояния и октав вне диапазона A0..C8).
+```
+
+- [ ] **Step 5: Russian — extend the data class snippet**
+
+In the same file, find:
+
+```kotlin
+data class PianoStaffUiState(
+    val notesJson: String = "{\"treble\":[], \"bass\":[]}",
+    val chordName: String? = null
+)
+```
+
+Replace with:
+
+```kotlin
+data class PianoStaffUiState(
+    val notesJson: String = "{\"treble\":[], \"bass\":[]}",
+    val chordName: String? = null,
+    val octaveName: String? = null
+)
+```
+
+- [ ] **Step 6: Russian — note the octave line in the UI Display section**
+
+In the same file, find:
+
+```markdown
+    *   Если аккорд распознан, `chordName` содержит название. Если ноты есть, но анализ пуст — отображается "Не определен".
+```
+
+Replace with:
+
+```markdown
+    *   Если аккорд распознан, `chordName` содержит название. Если ноты есть, но анализ пуст — отображается "Не определен".
+    *   Для одиночной ноты `octaveName` содержит локализованное традиционное название октавы, отображаемое меньшим шрифтом под названием ноты; для аккорда и пустого состояния — null.
+```
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add docs/en/specs/MIDI_MESSAGE_PROCESSING.md docs/ru/specs/MIDI_MESSAGE_PROCESSING.md
+git commit -m "docs(specs): document octaveName in PianoStaffUiState (#20)"
+```
+
+---
+
+## Task 7: Full verification
 
 - [ ] **Step 1: Run the whole unit test suite**
 
