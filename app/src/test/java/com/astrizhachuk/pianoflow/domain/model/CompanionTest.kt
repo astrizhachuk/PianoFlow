@@ -57,4 +57,11 @@ class CompanionTest {
         assertEquals("", Note.pitchToName(Int.MIN_VALUE))
         assertEquals("", Note.pitchToName(Int.MAX_VALUE))
     }
+
+    @Test
+    fun `midiToOctave returns the scientific octave number`() {
+        assertEquals(0, Note.midiToOctave(21))  // A0
+        assertEquals(4, Note.midiToOctave(60))  // C4
+        assertEquals(8, Note.midiToOctave(119)) // B8
+    }
 }

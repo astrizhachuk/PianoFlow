@@ -195,7 +195,7 @@ private fun Note.pitchToVexflow(): String? {
         return null
     }
     val noteNames = arrayOf("c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b")
-    val octave = (pitch / 12) - 1
+    val octave = Note.midiToOctave(pitch)
     val noteName = noteNames[pitch % 12]
     return "$noteName/$octave"
 }

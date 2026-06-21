@@ -11,7 +11,11 @@ data class Note(
     val name: String
 ) {
     companion object {
+        private const val SEMITONES_PER_OCTAVE = 12
         private val NOTE_NAMES = arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
+        /** Scientific octave number for a MIDI pitch (e.g., 60 -> 4). */
+        fun midiToOctave(pitch: Int): Int = pitch / SEMITONES_PER_OCTAVE - 1
 
         /**
          * Converts a MIDI pitch to a standard note name (e.g., 60 -> "C4").
@@ -19,8 +23,8 @@ data class Note(
          */
         fun pitchToName(pitch: Int): String {
             if (pitch !in 0..127) return ""
-            val octave = (pitch / 12) - 1
-            val noteName = NOTE_NAMES[pitch % 12]
+            val octave = midiToOctave(pitch)
+            val noteName = NOTE_NAMES[pitch % SEMITONES_PER_OCTAVE]
             return "$noteName$octave"
         }
     }
