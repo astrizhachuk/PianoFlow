@@ -52,9 +52,9 @@ class PianoStaffViewModel @Inject constructor(
         observeMidiMessagesUseCase()
             .distinctUntilChanged()
             .onEach { notes ->
-                // Триггерим анализ только когда изменились сами ноты.
-                // Это происходит до объединения с результатами анализа,
-                // поэтому обновление результата анализа не вызовет повторный цикл.
+                // Trigger analysis only when the notes themselves have changed.
+                // This occurs before merging with the analysis results,
+                // so updating the analysis result won't cause a circular update.
                 if (notes.isNotEmpty()) {
                     analyzeChordUseCase(notes)
                 }

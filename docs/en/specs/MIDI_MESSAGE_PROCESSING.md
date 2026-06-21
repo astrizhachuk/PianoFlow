@@ -46,6 +46,7 @@ The MIDI message processing system is integrated into the existing architecture,
 - **`PianoStaffScreen`:** Composable screen that displays played notes on the musical staff and the chord name.
 - **`PianoStaff`:** Composable that hosts a `WebView` and renders the musical staff via the VexFlow JS library.
 - **`VexflowNoteMapper`:** Converts a `List<Note>` into the JSON format expected by VexFlow.
+- **`OctaveLabel`:** Maps a MIDI pitch to the string resource of its traditional octave name (`octaveLabelResOrNull`), or null for octaves outside the A0..C8 range.
 - **`WebViewScriptExecutor`:** Generic executor that runs JavaScript inside a hidden `WebView`. Manages page-load timing and pending-script queueing. Used by `PianoStaff` for VexFlow rendering, but contains no music-specific logic.
 
 #### 2.1.1. C4 Level 3 (Overview): PianoFlow Application Components
