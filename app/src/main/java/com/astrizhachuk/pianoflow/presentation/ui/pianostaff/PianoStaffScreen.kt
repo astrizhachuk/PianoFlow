@@ -142,7 +142,7 @@ fun PianoStaffContent(
                 fillHeight = false,
                 modifier = Modifier
                     .weight(1f)
-                    .padding(vertical = extraSmallPadding)
+                    .padding(vertical = visualCompensation)
             )
         }
     }
@@ -164,15 +164,8 @@ private fun ChordCard(
             defaultElevation = dimensionResource(R.dimen.elevation_card_default)
         )
     ) {
-        val contentModifier = if (fillHeight) {
-            Modifier
-                .fillMaxSize()
-                .padding(dimensionResource(R.dimen.padding_medium))
-        } else {
-            Modifier
-                .fillMaxWidth()
-                .padding(dimensionResource(R.dimen.padding_medium))
-        }
+        val contentModifier = (if (fillHeight) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
+            .padding(dimensionResource(R.dimen.padding_medium))
 
         Box(
             modifier = contentModifier,
