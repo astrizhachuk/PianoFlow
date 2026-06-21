@@ -59,6 +59,12 @@ class PianoStaffViewModel @Inject constructor(
                     analyzeChordUseCase(notes)
                 }
             }
+            // Analysis is currently synchronous (ChordAnalyzer), so the trigger/observe split
+            // through a shared StateFlow is a leftover from the earlier design, when note display
+            // and analysis were two independent asynchronous components combined here.
+            // It is kept as a seam in case analysis becomes asynchronous again (background work,
+            // network/ML recognizer, debounce). If that need does not materialize, this can be
+            // simplified to a single use case returning the result and a plain map instead of combine.
             .combine(observeChordAnalysisResultsUseCase()) { notes, analysisResult ->
                 val notesJson = notes.toVexflowJson()
 
