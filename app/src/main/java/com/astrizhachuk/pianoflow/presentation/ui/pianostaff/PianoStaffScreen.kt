@@ -195,17 +195,20 @@ private fun ChordCard(
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
+                    minLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (octaveName != null) {
-                    Spacer(modifier = Modifier.height(dimensionResource(R.dimen.padding_extra_small)))
-                    Text(
-                        text = octaveName,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
-                        textAlign = TextAlign.Center
-                    )
-                }
+                Spacer(modifier = Modifier.height(dimensionResource(R.dimen.padding_extra_small)))
+                Text(
+                    text = octaveName ?: "",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(
+                        alpha = if (octaveName != null) 0.7f else 0f
+                    ),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    minLines = 1
+                )
             }
         }
     }
