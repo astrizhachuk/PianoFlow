@@ -88,14 +88,15 @@
             const trebleY = Math.max(minTopMargin, yBase);
             const bassY = trebleY + gap;
 
-            const trebleStave = new Vex.Flow.Stave(x, trebleY, staveWidth).addClef("treble").addTimeSignature("C");
-            const bassStave = new Vex.Flow.Stave(x, bassY, staveWidth).addClef("bass").addTimeSignature("C");
+            const trebleStave = new Vex.Flow.Stave(x, trebleY, staveWidth).addClef("treble");
+            const bassStave = new Vex.Flow.Stave(x, bassY, staveWidth).addClef("bass");
 
             trebleStave.setContext(context).draw();
             bassStave.setContext(context).draw();
 
-            new Vex.Flow.StaveConnector(trebleStave, bassStave).setType(Vex.Flow.StaveConnector.type.BRACE).setContext(context).draw();
+            // Close the staff with single connectors on both sides (no brace, no time signature).
             new Vex.Flow.StaveConnector(trebleStave, bassStave).setType(Vex.Flow.StaveConnector.type.SINGLE_LEFT).setContext(context).draw();
+            new Vex.Flow.StaveConnector(trebleStave, bassStave).setType(Vex.Flow.StaveConnector.type.SINGLE_RIGHT).setContext(context).draw();
 
             drawVoices(context, trebleStave, trebleNotesData, ghostColor);
             drawVoices(context, bassStave, bassNotesData, ghostColor);
@@ -113,9 +114,14 @@
         if (normalNotes.length > 0) voices.push(createVoice(normalNotes, stave.getClef(), false, ghostColor));
         if (ghostNotes.length > 0) voices.push(createVoice(ghostNotes, stave.getClef(), true, ghostColor));
         if (voices.length > 0) {
+            const available = stave.getNoteEndX() - stave.getNoteStartX();
             const formatter = new Vex.Flow.Formatter().joinVoices(voices);
-            const justifyWidth = stave.getNoteEndX() - stave.getNoteStartX();
-            formatter.format(voices, justifyWidth);
+            // Natural width of the single note group (chord) without stretching across the stave.
+            const usedWidth = formatter.preCalculateMinTotalWidth(voices);
+            formatter.format(voices, usedWidth);
+            // Center the single note group within the stave's note area.
+            const shift = Math.max(0, (available - usedWidth) / 2);
+            voices.forEach(v => v.getTickables().forEach(n => n.setXShift(shift)));
             voices.forEach(v => v.draw(context, stave));
         }
     }
