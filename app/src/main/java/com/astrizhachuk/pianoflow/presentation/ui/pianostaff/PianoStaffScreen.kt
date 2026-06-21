@@ -216,7 +216,7 @@ private fun ChordCard(
 fun PianoStaffContentPortraitPreview() {
     AppTheme(darkTheme = false) {
         PianoStaffContent(
-            chordName = "C Major",
+            chordName = "C",
             octaveName = null,
             notesJson = "{\"treble\":[{\"keys\":[\"c/4\", \"e/4\", \"g/4\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/3\"], \"duration\":\"w\"}]}",
             windowInfo = WindowInfo(isLandscape = false, isPhone = true),
@@ -244,7 +244,7 @@ fun PianoStaffContentPortraitNoChordPreview() {
 fun PianoStaffContentLandscapePreview() {
     AppTheme(darkTheme = true) {
         PianoStaffContent(
-            chordName = "C Major",
+            chordName = "C",
             octaveName = null,
             notesJson = "{\"treble\":[{\"keys\":[\"c/4\", \"e/4\", \"g/4\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/3\"], \"duration\":\"w\"}]}",
             windowInfo = WindowInfo(isLandscape = true, isPhone = false),
