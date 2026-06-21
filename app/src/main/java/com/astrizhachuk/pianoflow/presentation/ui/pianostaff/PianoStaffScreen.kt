@@ -60,6 +60,7 @@ fun PianoStaffScreen(
 
     PianoStaffContent(
         chordName = uiState.chordName,
+        octaveName = uiState.octaveName,
         notesJson = uiState.notesJson,
         windowInfo = windowInfo,
         modifier = modifier
@@ -83,6 +84,7 @@ fun PianoStaffScreen(
 @Composable
 fun PianoStaffContent(
     chordName: String?,
+    octaveName: String?,
     notesJson: String,
     windowInfo: WindowInfo,
     modifier: Modifier = Modifier
@@ -110,6 +112,7 @@ fun PianoStaffContent(
             )
             ChordCard(
                 chordName = chordName,
+                octaveName = octaveName,
                 fillHeight = false,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -135,10 +138,11 @@ fun PianoStaffContent(
             )
             ChordCard(
                 chordName = chordName,
+                octaveName = octaveName,
                 fillHeight = false,
                 modifier = Modifier
                     .weight(1f)
-                    .padding(vertical = extraSmallPadding)
+                    .padding(vertical = visualCompensation)
             )
         }
     }
@@ -147,6 +151,7 @@ fun PianoStaffContent(
 @Composable
 private fun ChordCard(
     chordName: String?,
+    octaveName: String?,
     fillHeight: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -159,15 +164,8 @@ private fun ChordCard(
             defaultElevation = dimensionResource(R.dimen.elevation_card_default)
         )
     ) {
-        val contentModifier = if (fillHeight) {
-            Modifier
-                .fillMaxSize()
-                .padding(dimensionResource(R.dimen.padding_medium))
-        } else {
-            Modifier
-                .fillMaxWidth()
-                .padding(dimensionResource(R.dimen.padding_medium))
-        }
+        val contentModifier = (if (fillHeight) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
+            .padding(dimensionResource(R.dimen.padding_medium))
 
         Box(
             modifier = contentModifier,
@@ -190,7 +188,19 @@ private fun ChordCard(
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
+                    minLines = 2,
                     overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(dimensionResource(R.dimen.padding_extra_small)))
+                Text(
+                    text = octaveName ?: "",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(
+                        alpha = if (octaveName != null) 0.7f else 0f
+                    ),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    minLines = 1
                 )
             }
         }
@@ -202,7 +212,8 @@ private fun ChordCard(
 fun PianoStaffContentPortraitPreview() {
     AppTheme(darkTheme = false) {
         PianoStaffContent(
-            chordName = "C Major",
+            chordName = "C",
+            octaveName = null,
             notesJson = "{\"treble\":[{\"keys\":[\"c/4\", \"e/4\", \"g/4\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/3\"], \"duration\":\"w\"}]}",
             windowInfo = WindowInfo(isLandscape = false, isPhone = true),
             modifier = Modifier.fillMaxSize()
@@ -216,6 +227,7 @@ fun PianoStaffContentPortraitNoChordPreview() {
     AppTheme(darkTheme = false) {
         PianoStaffContent(
             chordName = null,
+            octaveName = null,
             notesJson = "{\"treble\":[], \"bass\":[]}",
             windowInfo = WindowInfo(isLandscape = false, isPhone = true),
             modifier = Modifier.fillMaxSize()
@@ -228,7 +240,8 @@ fun PianoStaffContentPortraitNoChordPreview() {
 fun PianoStaffContentLandscapePreview() {
     AppTheme(darkTheme = true) {
         PianoStaffContent(
-            chordName = "C Major",
+            chordName = "C",
+            octaveName = null,
             notesJson = "{\"treble\":[{\"keys\":[\"c/4\", \"e/4\", \"g/4\"], \"duration\":\"w\"}], \"bass\":[{\"keys\":[\"c/3\"], \"duration\":\"w\"}]}",
             windowInfo = WindowInfo(isLandscape = true, isPhone = false),
             modifier = Modifier.fillMaxSize()
@@ -242,8 +255,23 @@ fun PianoStaffContentLandscapeDarkPreview() {
     AppTheme(darkTheme = true) {
         PianoStaffContent(
             chordName = "Dm7♭5",
+            octaveName = null,
             notesJson = "{\"treble\":[{\"keys\":[\"d/4\", \"f/4\", \"ab/4\", \"c/5\"], \"duration\":\"w\"}], \"bass\":[]}",
             windowInfo = WindowInfo(isLandscape = true, isPhone = false),
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Preview(apiLevel = 34)
+@Composable
+fun PianoStaffContentSingleNotePreview() {
+    AppTheme(darkTheme = false) {
+        PianoStaffContent(
+            chordName = "C4",
+            octaveName = "One-lined octave",
+            notesJson = "{\"treble\":[{\"keys\":[\"c/4\"], \"duration\":\"w\"}], \"bass\":[]}",
+            windowInfo = WindowInfo(isLandscape = false, isPhone = true),
             modifier = Modifier.fillMaxSize()
         )
     }

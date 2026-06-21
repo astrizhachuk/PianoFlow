@@ -42,9 +42,11 @@
 - **`PianoStaffUiState`:** Состояние UI:
   - `notesJson: String` — JSON-представление нот для визуализации через VexFlow.
   - `chordName: String?` — название распознанного аккорда или локализованная строка "Не определен".
+  - `octaveName: String?` — локализованное традиционное название октавы, отображается только для одиночной ноты (null для аккорда, пустого состояния и октав вне диапазона A0..C8).
 - **`PianoStaffScreen`:** Composable-экран, который отображает сыгранные ноты на нотном стане и название аккорда.
 - **`PianoStaff`:** Composable, который инкапсулирует `WebView` и отрисовывает нотный стан через JS-библиотеку VexFlow.
 - **`VexflowNoteMapper`:** Преобразует `List<Note>` в JSON-формат, ожидаемый VexFlow.
+- **`OctaveLabel`:** Сопоставляет MIDI-питч строковому ресурсу традиционного названия его октавы (`octaveLabelResOrNull`) или null для октав вне диапазона A0..C8.
 - **`WebViewScriptExecutor`:** Универсальный исполнитель JavaScript внутри скрытого `WebView`. Управляет жизненным циклом WebView и очередью отложенных скриптов. Используется `PianoStaff` для отрисовки через VexFlow, но не содержит музыкальной логики.
 
 #### 2.1.1. C4 Level 3 (обзорная): Компоненты приложения PianoFlow
@@ -263,7 +265,8 @@ class MidiMessageParser {
  */
 data class PianoStaffUiState(
     val notesJson: String = "{\"treble\":[], \"bass\":[]}",
-    val chordName: String? = null
+    val chordName: String? = null,
+    val octaveName: String? = null
 )
 
 // com.astrizhachuk.pianoflow.presentation.ui.pianostaff.WebViewScriptExecutor.kt
@@ -412,6 +415,7 @@ deactivate Receiver
 5.  **Отображение на UI**:
     *   Результат объединения формирует `PianoStaffUiState`.
     *   Если аккорд распознан, `chordName` содержит название. Если ноты есть, но анализ пуст — отображается "Не определен".
+    *   Для одиночной ноты `octaveName` содержит локализованное традиционное название октавы, отображаемое меньшим шрифтом под названием ноты; для аккорда и пустого состояния — null.
     *   `PianoStaffScreen` получает `uiState` и передает `notesJson` в компонент `PianoStaff`.
 
 ```plantuml

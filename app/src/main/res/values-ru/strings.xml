@@ -9,4 +9,13 @@
     <string name="chord_not_defined">?</string>
     <string name="chord_placeholder">—</string>
     <string name="note_chord_label">НОТА / АККОРД</string>
+    <string name="octave_sub_contra">Субконтроктава</string>
+    <string name="octave_contra">Контроктава</string>
+    <string name="octave_great">Большая октава</string>
+    <string name="octave_small">Малая октава</string>
+    <string name="octave_one_lined">Первая октава</string>
+    <string name="octave_two_lined">Вторая октава</string>
+    <string name="octave_three_lined">Третья октава</string>
+    <string name="octave_four_lined">Четвертая октава</string>
+    <string name="octave_five_lined">Пятая октава</string>
 </resources>

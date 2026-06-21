@@ -1,5 +1,6 @@
 package com.astrizhachuk.pianoflow.domain.service.analysis
 
+import com.astrizhachuk.pianoflow.domain.model.Note
 import com.astrizhachuk.pianoflow.domain.model.Pitch
 import javax.inject.Inject
 
@@ -39,7 +40,7 @@ class ChordAnalyzer @Inject constructor() {
         val scale = if (pitch.alter > 0) SHARP_SCALE else FLAT_SCALE
         val noteName = scale[pitch.chroma]
         val midi = pitch.midi ?: return noteName
-        val octave = (midi / 12) - 1
+        val octave = Note.midiToOctave(midi)
         return "$noteName$octave"
     }
 

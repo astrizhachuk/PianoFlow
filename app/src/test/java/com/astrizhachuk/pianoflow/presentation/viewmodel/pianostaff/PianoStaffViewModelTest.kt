@@ -186,16 +186,53 @@ class PianoStaffViewModelTest {
 
         viewModel.uiState.test {
             awaitItem() // Skip initial
-            
+
             // Emit notes first
             midiMessagesFlow.emit(notes)
             awaitItem()
-            
+
             // Act: emit empty list
             midiMessagesFlow.emit(emptyList())
 
             // Assert
             assertEquals(null, awaitItem().chordName)
+        }
+    }
+
+    @Test
+    fun `single note exposes localized octave name`() = runTest {
+        // Arrange
+        initViewModel()
+        val notes = listOf(Note(60, "C4")) // C4 -> one-lined octave
+        every { notes.toVexflowJson() } returns "json"
+        every { context.getString(R.string.octave_one_lined) } returns "One-lined octave"
+
+        viewModel.uiState.test {
+            awaitItem() // Skip initial
+
+            // Act
+            midiMessagesFlow.emit(notes)
+
+            // Assert
+            assertEquals("One-lined octave", awaitItem().octaveName)
+        }
+    }
+
+    @Test
+    fun `chord does not expose an octave name`() = runTest {
+        // Arrange
+        initViewModel()
+        val notes = listOf(Note(60, "C4"), Note(64, "E4"), Note(67, "G4"))
+        every { notes.toVexflowJson() } returns "json"
+
+        viewModel.uiState.test {
+            awaitItem() // Skip initial
+
+            // Act
+            midiMessagesFlow.emit(notes)
+
+            // Assert
+            assertEquals(null, awaitItem().octaveName)
         }
     }
 }

@@ -9,4 +9,13 @@
     <string name="chord_not_defined">?</string>
     <string name="chord_placeholder">—</string>
     <string name="note_chord_label">NOTE / CHORD</string>
+    <string name="octave_sub_contra">Sub-contra octave</string>
+    <string name="octave_contra">Contra octave</string>
+    <string name="octave_great">Great octave</string>
+    <string name="octave_small">Small octave</string>
+    <string name="octave_one_lined">One-lined octave</string>
+    <string name="octave_two_lined">Two-lined octave</string>
+    <string name="octave_three_lined">Three-lined octave</string>
+    <string name="octave_four_lined">Four-lined octave</string>
+    <string name="octave_five_lined">Five-lined octave</string>
 </resources>
